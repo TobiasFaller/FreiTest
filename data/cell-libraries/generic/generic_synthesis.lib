@@ -1,0 +1,148 @@
+library (generic) {
+	comment  : "Copyright (c) 2025 Tobias Faller; SPDX-License-Identifier: MIT";
+	date     : "2025.05.05 14:45";
+	revision : "version 0.1";
+
+	cell (BUF) {
+		area : 2.0;
+		pin (IN1) {
+			direction : input;
+		}
+		pin (OUT) {
+			direction : output;
+			function : "IN1";
+		}
+	}
+
+	cell (INV) {
+		area : 1.0;
+		pin (IN1) {
+			direction : input;
+		}
+		pin (OUT) {
+			direction : output;
+			function : "!IN1";
+		}
+	}
+
+	cell (AND) {
+		area : 3.0;
+		pin (IN1) {
+			direction : input;
+		}
+		pin (IN2) {
+			direction : input;
+		}
+		pin (OUT) {
+			direction : output;
+			function : "(IN1 & IN2)";
+		}
+	}
+
+	cell (NAND) {
+		area : 2.0;
+		pin (IN1) {
+			direction : input;
+		}
+		pin (IN2) {
+			direction : input;
+		}
+		pin (OUT) {
+			direction : output;
+			function : "!(IN1 & IN2)";
+		}
+	}
+
+	cell (OR) {
+		area : 3.0;
+		pin (IN1) {
+			direction : input;
+		}
+		pin (IN2) {
+			direction : input;
+		}
+		pin (OUT) {
+			direction : output;
+			function : "(IN1 | IN2)";
+		}
+	}
+
+	cell (NOR) {
+		area : 2.0;
+		pin (IN1) {
+			direction : input;
+		}
+		pin (IN2) {
+			direction : input;
+		}
+		pin (OUT) {
+			direction : output;
+			function : "!(IN1 | IN2)";
+		}
+	}
+
+	cell (XOR) {
+		area : 3.0;
+		pin (IN1) {
+			direction : input;
+		}
+		pin (IN2) {
+			direction : input;
+		}
+		pin (OUT) {
+			direction : output;
+			function : "(IN1 ^ IN2)";
+		}
+	}
+
+	cell (XNOR) {
+		area : 2.0;
+		pin (IN1) {
+			direction : input;
+		}
+		pin (IN2) {
+			direction : input;
+		}
+		pin (OUT) {
+			direction : output;
+			function : "!(IN1 ^ IN2)";
+		}
+	}
+
+	cell (MUX) {
+		area : 4.0;
+		pin (IN1) {
+			direction : input;
+		}
+		pin (IN2) {
+			direction : input;
+		}
+		pin (IN3) {
+			direction : input;
+		}
+		pin (OUT) {
+			direction : output;
+			function : "((!IN3 & IN1) | (IN3 & IN2))";
+		}
+	}
+
+	cell (DFF) {
+		area : 6.0;
+		ff (IQ , IQN) {
+			clocked_on : "CLOCK";
+			next_state : "IN1";
+		}
+		pin (IN1) {
+			direction : input;
+			nextstate_type : data;
+		}
+		pin (CLOCK) {
+			direction : input;
+		}
+		pin (OUT) {
+			direction : output;
+			function : "IQ";
+		}
+	}
+
+}

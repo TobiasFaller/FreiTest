@@ -19,11 +19,12 @@ We are in the process of cleaning up the code, and removing and replacing propri
 We will upload the cleaned parts as soon as they are ready.
 Find the current progress below:
 
-- [ ] Data: Remove proprietary cell-library and replace with generic cell-library
-- [ ] Data: Provide liberty file for synthesis for generic cell-library
-- [ ] Data: Provide cell-aware fault model for generic cell-library
+- [X] Data / Cell-Libraries: Provide a generic cell-library verilog implementation to eliminate dependency on proprietary cell-libraries
+- [X] Data / Cell-Libraries: Provide a generic cell-library liberty file for synthesis
+- [ ] Data / Benchmarks: Provide generated benchmarks for generic cell-library
+- [ ] Data / Fault Models: Provide cell-aware fault model for generic cell-library
 - [ ] Script: Generator for generic benchmark circuits and VCMs for generic cell-library
-- [ ] Script: Verilog utility
+- [ ] Script: Synthesis for ITC99 benchmarks for generic cell-library
 - [ ] Build: Clean build configuration from proprietary parts
 - [ ] Build: Port Ubuntu 20.04 LTS build to Ubuntu 24.04 LTS
 - [ ] Build: Port CentOS 7 build to CentOS 8 (for RHEL 8)
