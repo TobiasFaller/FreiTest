@@ -1,0 +1,24 @@
+[
+	{"define": "CircuitDir", "value": "./data/benchmarks/generated"},
+	{"define": "VcmDir", "value": "./data/benchmarks/generated"},
+	{"define": "LibraryDir", "value": "./data/cell-libraries/generic"},
+
+	{"define": "BenchmarkName", "value": "[CircuitName]-generic.v"},
+	{"define": "VcmName", "value": "[CircuitName]-generic-vcm.v"},
+
+	{"setting": "CircuitSourceType", "value": "Verilog"},
+	{"setting": "CircuitBaseDirectory", "value": "[CircuitDir]"},
+	{"setting": "CircuitName", "value": "[CircuitName]"},
+	{"setting": "VerilogImportFilename", "value": "[BenchmarkName]"},
+	{"setting": "TopLevelModuleName", "value": "benchmark"},
+	{"setting": "VerilogLibraryFilename", "value": "[LibraryDir]/generic_freitest.v"},
+	{"setting": "VerilogExportPreprocessedFilename", "value": "[DataExportDirectory]/benchmark.preprocessed.v"},
+	{"setting": "VerilogExportProcessedFilename", "value": "[DataExportDirectory]/benchmark.processed.v"},
+
+	{"setting": "Scale4Edge/TestPatternGeneration/VcmBaseDirectory", "value": "[VcmDir]", "optional": true},
+	{"setting": "Scale4Edge/TestPatternGeneration/VcmImportFilename", "value": "[VcmName]", "optional": true},
+	{"setting": "Scale4Edge/TestPatternGeneration/VcmTopLevelModuleName", "value": "vcm", "optional": true},
+	{"setting": "Scale4Edge/TestPatternGeneration/VcmLibraryFilename", "value": "[LibraryDir]/generic_freitest.v", "optional": true},
+	{"setting": "Scale4Edge/TestPatternGeneration/VcmExportPreprocessedFilename", "value": "[DataExportDirectory]/vcm.preprocessed.v", "optional": true},
+	{"setting": "Scale4Edge/TestPatternGeneration/VcmExportProcessedFilename", "value": "[DataExportDirectory]/vcm.processed.v", "optional": true},
+]
