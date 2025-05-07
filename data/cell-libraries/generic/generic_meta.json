@@ -1,0 +1,55 @@
+{
+	"cells": {
+		"BUF": {
+			"combinational": true,
+			"inputs": ["IN1"],
+			"outputs": ["OUT"]
+		},
+		"AND": {
+			"combinational": true,
+			"inputs": ["IN1", "IN2"],
+			"outputs": ["OUT"]
+		},
+		"OR": {
+			"combinational": true,
+			"inputs": ["IN1", "IN2"],
+			"outputs": ["OUT"]
+		},
+		"XOR": {
+			"combinational": true,
+			"inputs": ["IN1", "IN2"],
+			"outputs": ["OUT"]
+		},
+		"INV": {
+			"combinational": true,
+			"inputs": ["IN1"],
+			"outputs": ["OUT"]
+		},
+		"NAND": {
+			"combinational": true,
+			"inputs": ["IN1", "IN2"],
+			"outputs": ["OUT"]
+		},
+		"NOR": {
+			"combinational": true,
+			"inputs": ["IN1", "IN2"],
+			"outputs": ["OUT"]
+		},
+		"XNOR": {
+			"combinational": true,
+			"inputs": ["IN1", "IN2"],
+			"outputs": ["OUT"]
+		},
+		"MUX": {
+			"combinational": true,
+			"inputs": ["IN1", "IN2", "IN3"],
+			"outputs": ["OUT"]
+		},
+		"DFF": {
+			"sequential": true,
+			"inputs": ["IN1"],
+			"outputs": ["OUT"],
+			"clocks": ["CLOCK"]
+		}
+	}
+}

@@ -22,9 +22,10 @@ Find the current progress below:
 - [X] Data / Cell-Libraries: Provide a generic cell-library verilog implementation to eliminate dependency on proprietary cell-libraries
 - [X] Data / Cell-Libraries: Provide a generic cell-library liberty file for synthesis
 - [ ] Data / Benchmarks: Provide generated benchmarks for generic cell-library
+- [X] Data / Benchmarks: Provide ISCAS85, ISCAS89, ITC99 benchmarks for generic cell-library (through automatic download and synthesis)
 - [ ] Data / Fault Models: Provide cell-aware fault model for generic cell-library
 - [ ] Script: Generator for generic benchmark circuits and VCMs for generic cell-library
-- [ ] Script: Synthesis for ITC99 benchmarks for generic cell-library
+- [X] Script: Synthesis for ISCAS85, ISCAS89, ITC99 benchmarks for generic cell-library
 - [ ] Build: Clean build configuration from proprietary parts
 - [ ] Build: Port Ubuntu 20.04 LTS build to Ubuntu 24.04 LTS
 - [ ] Build: Port CentOS 7 build to CentOS 8 (for RHEL 8)
