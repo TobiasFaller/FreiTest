@@ -1,0 +1,15 @@
+[
+	{"define": "CircuitDir", "value": "./data/processors/picorv32"},
+	{"define": "LibraryDir", "value": "./data/cell-libraries/generic"},
+
+	{"define": "ProcessorName", "value": "[CircuitName]-generic.v"},
+
+	{"setting": "CircuitSourceType", "value": "Verilog"},
+	{"setting": "CircuitBaseDirectory", "value": "[CircuitDir]"},
+	{"setting": "CircuitName", "value": "[CircuitName]"},
+	{"setting": "VerilogImportFilename", "value": "[ProcessorName]"},
+	{"setting": "TopLevelModuleName", "value": "picorv32"},
+	{"setting": "VerilogLibraryFilename", "value": "[LibraryDir]/generic_freitest.v"},
+	{"setting": "VerilogExportPreprocessedFilename", "value": "[DataExportDirectory]/processor.preprocessed.v"},
+	{"setting": "VerilogExportProcessedFilename", "value": "[DataExportDirectory]/processor.processed.v"},
+]

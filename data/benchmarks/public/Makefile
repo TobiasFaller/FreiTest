@@ -50,7 +50,7 @@ ${SOURCES_ISCAS89_PATH}:
 
 ${SOURCES_ITC99_PATH}:
 	mkdir -p ${SOURCES_ITC99_PATH}
-	git clone --depth=1 git@github.com:cad-polito-it/I99T.git ${SOURCES_ITC99_PATH}; true
+	git clone --depth=1 https://github.com/cad-polito-it/I99T.git ${SOURCES_ITC99_PATH}; true
 	cd ${SOURCES_ITC99_PATH} && git reset --hard HEAD && git clean -dfx; true
 
 iscas85: ${SOURCES_ISCAS85_PATH}
