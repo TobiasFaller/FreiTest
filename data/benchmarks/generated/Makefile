@@ -13,22 +13,22 @@ OUTUPT_MEDIUM_PATH ?= medium
 OUTUPT_LARGE_PATH ?= large
 OUTUPT_HUGE_PATH ?= huge
 
-.PHONY: all help all-generic clean mrproper build tiny small medium large huge generate
+.PHONY: default help clean mrproper build tiny small medium large huge generate
 
-all: all-generic
+default: build-generic
 
 help:
 	@echo "Generates random benchmarks"
-	@echo "  all: Generate random benchmarks for all cell-libraries"
-	@echo "  all-generic: Generate random benchmarks for generic cell-library"
+	@echo "  default: Generate all random benchmarks for all cell-libraries"
+	@echo "  build-generic: Generate all random benchmarks for generic cell-library"
+	@echo "  tiny-generic: Generate tiny random benchmarks for generic cell-library"
+	@echo "  small-generic: Generate small random benchmarks for generic cell-library"
+	@echo "  medium-generic: Generate medium random benchmarks for generic cell-library"
+	@echo "  large-generic: Generate large random benchmarks for generic cell-library"
+	@echo "  huge-generic: Generate huge random benchmarks for generic cell-library"
 	@echo ""
 	@echo " To build for a 'custom' cell library use"
 	@echo "  make build CELL_LIBRARY=.../custom_meta.json OUTPUT_SUFFIX=-custom"
-
-all-generic:
-	$(MAKE) build \
-		CELL_LIBRARY=${GENERIC_CELL_LIBRARY} \
-		OUTPUT_SUFFIX=-generic
 
 clean:
 	rm -rf ${OUTUPT_TINY_PATH} || true
@@ -38,6 +38,11 @@ clean:
 	rm -rf ${OUTUPT_HUGE_PATH} || true
 
 mrproper: clean
+
+%-generic:
+	$(MAKE) $* \
+		CELL_LIBRARY=${GENERIC_CELL_LIBRARY} \
+		OUTPUT_SUFFIX=-generic
 
 build:
 	$(MAKE) tiny
