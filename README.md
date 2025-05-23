@@ -28,9 +28,10 @@ Find the current progress below:
 - [X] Script: Generator for generic benchmark circuits and VCMs for generic cell-library
 - [X] Script: Synthesis for ISCAS85, ISCAS89, ITC99, IWS05 benchmarks for generic cell-library
 - [X] Script: Synthesis for DarkRISCV and PicoRV32 processors for generic cell-library
-- [ ] Build: Clean build configuration from proprietary parts
-- [ ] Build: Port Ubuntu 20.04 LTS build to Ubuntu 24.04 LTS
-- [ ] Build: Port CentOS 7 build to CentOS 8 (for RHEL 8)
+- [X] Build: Clean build configuration from proprietary parts
+- [X] Build: Port Ubuntu 20.04 LTS Docker build to Ubuntu 24.04 LTS
+- [X] Build: Port CentOS 7 Docker build to CentOS 8 (for RHEL 8)
+- [X] Build: Finish Alpine linux Docker build
 - [ ] Build: Provide GitHub CI configuration
 - [ ] Code: Provide open-source basic ATPG workflows (Scale4Edge)
 - [ ] Code: Provide open-source SBST ATPG workflows (Scale4Edge)

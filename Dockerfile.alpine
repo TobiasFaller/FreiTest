@@ -1,0 +1,106 @@
+#-----------------------------------------------------------------------------
+# Base container
+# -----------------------------------------------------------------------------
+
+FROM alpine:latest AS base
+
+ENV TZ="Europe/Berlin"
+ENV CHARSET="UTF-8"
+ENV PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+RUN apk --no-cache upgrade \
+  && apk add --no-cache bash curl gnupg ca-certificates tzdata
+SHELL [ "/bin/bash", "-c" ]
+CMD [ "/bin/bash" ]
+
+# -----------------------------------------------------------------------------
+# Build container
+# -----------------------------------------------------------------------------
+
+FROM base AS builder
+
+# Remove infinite loop from symlink /usr/lib/jvm/default-jvm/jre
+# since jre points to the current directory.
+RUN apk add --no-cache \
+    cmake g++ gdb boost-dev gmp-dev zlib-dev xz-dev \
+    python3 py3-pip py3-libxml2 wget \
+    make unzip zip gnuplot pigz libstdc++ coreutils linux-headers \
+    git openjdk21-jdk \
+  && python3 -m pip install --break-system-packages --no-cache --upgrade pip setuptools \
+  && rm /usr/lib/jvm/default-jvm/jre
+
+# Build bazel and install openjdk11
+ENV JAVA_HOME="/usr/lib/jvm/default-jvm"
+ENV PATH="$JAVA_HOME/bin:$PATH"
+
+ARG BAZEL_DOWNLOAD=https://github.com/bazelbuild/bazel/releases/download/8.2.1/bazel-8.2.1-dist.zip
+RUN mkdir /tmp/bazel && cd /tmp/bazel \
+  && curl -sLO ${BAZEL_DOWNLOAD} && unzip bazel-*-dist.zip && rm bazel-*-dist.zip \
+  && EXTRA_BAZEL_ARGS="--host_cxxopt=-D_LARGEFILE64_SOURCE=1 --cxxopt=-D_LARGEFILE64_SOURCE=1" bash ./compile.sh \
+  && cp /tmp/bazel/output/bazel /usr/local/bin/ \
+  && rm -rf /tmp/bazel
+
+ARG TBB_DOWNLOAD=https://github.com/uxlfoundation/oneTBB/archive/refs/tags/v2022.1.0.tar.gz
+RUN mkdir /tmp/tbb && cd /tmp/tbb \
+  && wget --no-verbose ${TBB_DOWNLOAD} && tar -xzf v*.tar.gz && rm v*.tar.gz \
+  && cd oneTBB* \
+  && cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_COMPILE_WARNING_AS_ERROR=OFF -DTBB_TEST=OFF \
+  && cmake --build build --parallel \
+  && cmake --install build --prefix /usr \
+  && rm -rf /tmp/tbb
+
+WORKDIR /source
+COPY libraries      /source/libraries
+COPY src            /source/src
+COPY test           /source/test
+COPY .bazelrc       /source/.bazelrc
+COPY MODULE.bazel   /source/MODULE.bazel
+
+ARG BUILD_CONFIG="release"
+ARG BUILD_MARCH="x86_64"
+ARG BUILD_SRC="freitest.stripped"
+ARG BUILD_BAZEL_ARGS=""
+
+ARG BUILD_TESTS="yes"
+ARG RUN_TESTS="yes"
+
+# Build and optionally run tests, then copy generated executable files
+# to output directory for next stage.
+RUN bazel --max_idle_secs=0 build --config=$BUILD_CONFIG --config=$BUILD_MARCH $BUILD_BAZEL_ARGS //src:$BUILD_SRC \
+  && if [ "$BUILD_TESTS" = "yes" ]; then \
+    bazel --max_idle_secs=0 test --config=$BUILD_CONFIG --config=$BUILD_MARCH $BUILD_BAZEL_ARGS \
+      $([ "$RUN_TESTS" = "no" ] && echo "--build_tests_only") \
+      --test_output=all --test_arg=--log_level=all --sandbox_debug $(bazel query 'kind("test", //test:*)'); \
+  fi \
+  && mkdir -p /output \
+  && find bazel-bin/ -type f -mindepth 1 -maxdepth 2 -exec \
+    sh -c 'readelf -l "$1" 2>/dev/null | grep -qio 'executable' && cp "$1" "/output/$(basename $1)"' -- {} \; \
+  && bazel clean --expunge \
+  && rm -rf ~/.cache/bazel/
+
+RUN mkdir -p /output/lib/ \
+  && cp /usr/lib/lib{boost,tbb,gmp,z,lzma,icu}*.so* /output/lib/
+
+# -----------------------------------------------------------------------------
+# Final container
+# -----------------------------------------------------------------------------
+
+FROM base AS runner
+
+RUN apk add --no-cache python3 py3-libxml2 unzip zip gnuplot pigz
+
+WORKDIR /freitest
+COPY data           /freitest/data
+COPY scripts        /freitest/scripts
+COPY settings       /freitest/settings
+COPY test/data      /freitest/test/data
+
+# Copy built executables and libraries
+COPY --from=builder /output/freitest /freitest/
+COPY --from=builder /output/*Test /freitest/
+COPY --from=builder /output/lib /freitest/lib/
+
+WORKDIR /freitest
+ENV PATH="/freitest:${PATH}"
+ENV LD_LIBRARY_PATH="/freitest/lib"
+CMD [ "/bin/bash" ]

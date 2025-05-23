@@ -1,0 +1,95 @@
+# -----------------------------------------------------------------------------
+# Base container
+# -----------------------------------------------------------------------------
+
+FROM ubuntu:24.04 AS base
+
+ENV DEBIAN_FRONTEND="noninteractive"
+ENV TZ="Europe/Berlin"
+
+RUN apt-get update \
+  && apt-get upgrade -y \
+  && apt-get install -y --no-install-recommends \
+    curl gnupg ca-certificates tzdata \
+  && apt-get clean
+SHELL [ "/bin/bash", "-c" ]
+CMD [ "/bin/bash" ]
+
+# -----------------------------------------------------------------------------
+# Build container
+# -----------------------------------------------------------------------------
+
+FROM base AS builder
+
+# Install compiler, build tools and required libraries
+RUN curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor > /etc/apt/trusted.gpg.d/bazel.gpg \
+  && echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | tee /etc/apt/sources.list.d/bazel.list \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends \
+    g++ gdb libboost-all-dev libgmp-dev libz-dev xz-utils libtbb-dev \
+    python3 python3-libxml2 \
+    make bazel unzip zip gnuplot pigz \
+    git \
+  && apt-get clean
+
+WORKDIR /source
+COPY libraries      /source/libraries
+COPY src            /source/src
+COPY test           /source/test
+COPY .bazelrc       /source/.bazelrc
+COPY MODULE.bazel   /source/MODULE.bazel
+
+ARG BUILD_TARGET="//src:freitest.stripped"
+ARG BUILD_CONFIG="release"
+ARG BUILD_ARGS=""
+ARG TEST_BUILD="yes"
+ARG TEST_RUN="yes"
+ARG TEST_TARGET="//test:*"
+ARG TEST_ARGS="--test_arg=--log_level=all"
+ARG BAZEL_BUILD_ARGS=""
+ARG BAZEL_TEST_ARGS=""
+
+# Build and optionally run tests, then copy generated executable files
+# to output directory for next stage.
+RUN bazel --max_idle_secs=0 build --config=$BUILD_CONFIG $BAZEL_BUILD_ARGS $BUILD_TARGET -- $BUILD_ARGS \
+  && if [ "$TEST_BUILD" = "yes" ]; then \
+    bazel --max_idle_secs=0 test --config=$BUILD_CONFIG $BAZEL_BUILD_ARGS \
+      $([ "$TEST_RUN" = "no" ] && echo "--build_tests_only") \
+      $BAZEL_TEST_ARGS $TEST_ARGS $TEST_TARGET; \
+  fi \
+  && mkdir -p /output \
+  && find bazel-bin/ -type f -mindepth 1 -maxdepth 2 -exec \
+    sh -c 'ldd "$1" 2>/dev/null 1>&2 && cp "$1" "/output/$(basename $1)"' -- {} \; \
+  && bazel clean --expunge \
+  && rm -rf ~/.cache/bazel/
+
+RUN mkdir -p /output/lib/ \
+  && cp /usr/lib/x86_64-linux-gnu/lib{boost,tbb,gmp,z,lzma,icu}*.so* /output/lib/
+
+# -----------------------------------------------------------------------------
+# Final container
+# -----------------------------------------------------------------------------
+
+FROM base AS runner
+
+RUN apt-get update \
+  && apt-get dist-upgrade -y \
+  && apt-get install -y --no-install-recommends \
+    python3 python3-libxml2 unzip zip gnuplot pigz \
+  && apt-get clean
+
+WORKDIR /freitest
+COPY data           /freitest/data
+COPY scripts        /freitest/scripts
+COPY settings       /freitest/settings
+COPY test/data      /freitest/test/data
+
+# Copy built executables and libraries
+COPY --from=builder /output/freitest /freitest/
+COPY --from=builder /output/*Test /freitest/
+COPY --from=builder /output/lib /freitest/lib/
+
+WORKDIR /freitest
+ENV PATH="/freitest:${PATH}"
+ENV LD_LIBRARY_PATH="/freitest/lib"
+CMD [ "/bin/bash" ]

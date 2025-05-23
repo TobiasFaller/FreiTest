@@ -1,0 +1,142 @@
+# -----------------------------------------------------------------------------
+# Base container
+# -----------------------------------------------------------------------------
+
+FROM centos:8 AS base
+
+RUN sed -i s/mirror.centos.org/vault.centos.org/g /etc/yum.repos.d/CentOS-*.repo \
+    && sed -i s/^#.*baseurl=http/baseurl=http/g /etc/yum.repos.d/CentOS-*.repo \
+    && sed -i s/^mirrorlist=http/#mirrorlist=http/g /etc/yum.repos.d/CentOS-*.repo
+SHELL [ "/bin/bash", "-c" ]
+CMD [ "/bin/bash" ]
+
+# -----------------------------------------------------------------------------
+# Build container
+# -----------------------------------------------------------------------------
+
+FROM base AS builder
+
+## Install compiler, build tools and required libraries
+RUN yum install --setopt=skip_missing_names_on_install=False -y wget \
+  && wget https://copr.fedorainfracloud.org/coprs/lihaohong/bazel/repo/epel-8/lihaohong-bazel-epel-8.repo \
+  && mv lihaohong-bazel-epel-8.repo /etc/yum.repos.d/lihaohong-bazel-epel-8.repo \
+  && yum install --setopt=skip_missing_names_on_install=False -y gcc-toolset-9-binutils gcc-toolset-9-gcc* gcc-toolset-9-gdb gcc-toolset-9-systemtap gcc-toolset-9-valgrind \
+    gcc-toolset-9-elfutils gcc-toolset-9-ltrace gcc-toolset-9-make gcc-toolset-9-perftools gcc-toolset-9-strace \
+    gcc-toolset-9-libasan-devel gcc-toolset-9-libatomic-devel gcc-toolset-9-libitm-devel \
+    gcc-toolset-9-liblsan-devel gcc-toolset-9-libstdc++-devel gcc-toolset-9-libtsan-devel \
+    which bazel bzip2-devel gmp-devel zlib-devel xz-devel \
+    python3 python3-devel gnuplot pigz \
+    git \
+  && python3 -m pip install lxml
+
+## The ICU4C library on this system is too old
+ARG ICU_DOWNLOAD=https://github.com/unicode-org/icu/releases/download/release-69-1/icu4c-69_1-src.tgz
+RUN source scl_source enable gcc-toolset-9 \
+  && mkdir /tmp/icu4c && cd /tmp/icu4c \
+  && wget --no-verbose ${ICU_DOWNLOAD} && tar -xzf icu4c-*.tgz && rm icu4c-*.tgz \
+  && cd icu/source && ./configure --prefix=/usr && make all -j && make install \
+  && rm -rf /tmp/icu4c
+
+## The path to the python include directory is not valid for boost
+# See https://github.com/boostorg/build/issues/289#issuecomment-406925734 for the python3 ln-fix applied below
+ARG BOOST_DOWNLOAD=https://archives.boost.io/release/1.88.0/source/boost_1_88_0.tar.gz
+RUN source scl_source enable gcc-toolset-9 \
+  && ln -s /usr/include/python3.6m /usr/include/python3.6 \
+  && mkdir /tmp/boost && cd /tmp/boost \
+  && wget --no-verbose ${BOOST_DOWNLOAD} && tar -xzf boost_*.tar.gz && rm boost_*.tar.gz \
+  && cd /tmp/boost/boost_* && ./bootstrap.sh --with-python=python3 --prefix=/usr \
+  && ./b2 install -q --without-graph_parallel --without-mpi --prefix=/usr \
+  && rm -rf /tmp/boost
+
+## The CMake version bundled with CentOS is too old
+ARG CMAKE_DOWNLOAD=https://github.com/Kitware/CMake/releases/download/v3.21.1/cmake-3.21.1.tar.gz
+RUN source scl_source enable gcc-toolset-9 \
+  && mkdir /tmp/cmake && cd /tmp/cmake \
+  && wget --no-verbose ${CMAKE_DOWNLOAD} && tar -xzf cmake-*.tar.gz && rm cmake-*.tar.gz \
+  && cd cmake-* && ./configure -- -DCMAKE_USE_OPENSSL=OFF && make -j && make install \
+  && rm -rf /tmp/cmake
+
+## TBB 2021 requires CMake >= 3.1
+## TBB 2021 does not compile on this system => using 2020.3 instead
+ARG TBB_DOWNLOAD=https://github.com/oneapi-src/oneTBB/archive/v2020.3.tar.gz
+RUN source scl_source enable gcc-toolset-9 \
+  && mkdir /tmp/tbb && cd /tmp/tbb \
+  && wget --no-verbose ${TBB_DOWNLOAD} && tar -xzf v*.tar.gz && rm v*.tar.gz \
+  && cd oneTBB* && python3 build/build.py --tbbroot=$(pwd) --prefix=/usr \
+    --install-libs --install-devel --install-docs \
+  && rm -rf /tmp/tbb
+
+## The library cache has to be updated with ldconfig as otherwise the newly built libraries are not found
+RUN /sbin/ldconfig -v
+
+WORKDIR /source
+COPY libraries      /source/libraries
+COPY src            /source/src
+COPY test           /source/test
+COPY .bazelrc       /source/.bazelrc
+COPY MODULE.bazel   /source/MODULE.bazel
+
+ARG BUILD_TARGET="//src:freitest.stripped"
+ARG BUILD_CONFIG="release"
+ARG BUILD_ARGS=""
+ARG TEST_BUILD="yes"
+ARG TEST_RUN="yes"
+ARG TEST_TARGET="//test:*"
+ARG TEST_ARGS="--test_arg=--log_level=all"
+ARG BAZEL_BUILD_ARGS=""
+ARG BAZEL_TEST_ARGS=""
+
+## Build the projects and maybe the test (and run them)
+## The custom linker hack is due to bazel applying a wrong order to the C++ libraries
+# See https://github.com/bazelbuild/bazel/issues/10327
+## The C++ Library from /opt/rh/gcc-toolset-9/root/usr/lib/gcc/x86_64-redhat-linux/9 is linked by the toolchain and therefore
+# LD_LIBRARY_PATH is required for execution or symbols will not be found.
+# The path in LD_LIBRARY_PATH can not end with a slash.
+# Finally, copy generated executable files to output directory for next stage.
+RUN source scl_source enable gcc-toolset-9 \
+	&& echo "OUTPUT_FORMAT(elf64-x86-64)" > /tmp/linker_hack_for_bazel \
+	&& echo "INPUT ( -lstdc++ -lm )" >> /tmp/linker_hack_for_bazel \
+	&& export BAZEL_LINKLIBS="/tmp/linker_hack_for_bazel" \
+	&& export LD_LIBRARY_PATH="/opt/rh/gcc-toolset-9/root/usr/lib/gcc/x86_64-redhat-linux/9" \
+	&& bazel --max_idle_secs=0 build --config=$BUILD_CONFIG $BAZEL_BUILD_ARGS $BUILD_TARGET -- $BUILD_ARGS \
+	&& if [ "$TEST_BUILD" = "yes" ]; then \
+    bazel --max_idle_secs=0 test --config=$BUILD_CONFIG $BAZEL_BUILD_ARGS \
+      $([ "$TEST_RUN" = "no" ] && echo "--build_tests_only") \
+      $BAZEL_TEST_ARGS $TEST_ARGS $TEST_TARGET; \
+  fi \
+	&& mkdir -p /output \
+	&& find bazel-bin/ -type f -mindepth 1 -maxdepth 2 -exec \
+		sh -c 'readelf -l "$1" 2>/dev/null | grep -qio 'executable' && cp "$1" "/output/$(basename $1)"' -- {} \; \
+	&& bazel clean --expunge \
+  && rm -rf ~/.cache/bazel/
+
+RUN mkdir -p /output/lib/ \
+	&& cp -v /opt/rh/gcc-toolset-9/root/usr/lib/gcc/x86_64-redhat-linux/9/lib*.so* /output/lib/ \
+	&& cp -v /usr/lib/lib{boost,tbb,icu}*.so* /output/lib/ \
+	&& cp -v /usr/lib64/lib{gmp,z,lzma}*.so* /output/lib/
+
+# -----------------------------------------------------------------------------
+# Final container
+# -----------------------------------------------------------------------------
+
+FROM base AS runner
+
+RUN yum install --setopt=skip_missing_names_on_install=False -y \
+    bzip2 xz python3 gnuplot pigz \
+  && python3 -m pip install lxml
+
+WORKDIR /freitest
+COPY data           /freitest/data
+COPY scripts        /freitest/scripts
+COPY settings       /freitest/settings
+COPY test/data      /freitest/test/data
+
+# Copy built executables and libraries
+COPY --from=builder /output/freitest /freitest/
+COPY --from=builder /output/*Test /freitest/
+COPY --from=builder /output/lib /freitest/lib/
+
+WORKDIR /freitest
+ENV PATH="/freitest:${PATH}"
+ENV LD_LIBRARY_PATH="/freitest/lib"
+CMD [ "/bin/bash" ]
