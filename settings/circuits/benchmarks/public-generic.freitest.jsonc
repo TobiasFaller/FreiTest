@@ -6,7 +6,6 @@
 
 	{"setting": "CircuitSourceType", "value": "Verilog"},
 	{"setting": "CircuitBaseDirectory", "value": "[CircuitDir]"},
-	{"setting": "CircuitName", "value": "[CircuitName]"},
 	{"setting": "VerilogImportFilename", "value": "[BenchmarkName]"},
 	{"setting": "TopLevelModuleName", "value": "benchmark"},
 	{"setting": "VerilogLibraryFilename", "value": "[LibraryDir]/generic_freitest.v"},
