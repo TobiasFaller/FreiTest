@@ -1,0 +1,15 @@
+This is going to be the Pacose MaxSAT solver.
+
+## The first time you have to run ./configure in cadical or run the install script -- it rebuilds cadical each time in the make file of pacose but not the configure!
+cd solver-proxy/cadical
+./configure
+cd ../..
+
+## Build Pacose
+mkdir build && cd build && cmake .. && make -j
+
+make test <- executes the Regression suite (only the short version)
+
+the long run can be done by switching to MaxSATRegressionSuite and executing 
+./run_test.sh ../bin/Pacose [arguments]
+

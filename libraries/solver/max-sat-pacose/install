@@ -1,0 +1,10 @@
+echo "Build Pacose 23"
+
+(cd solver-proxy/cadical && ./configure && make)
+
+mkdir build 
+(cd build && cmake .. && make -j)
+
+echo ""
+echo "For future builds just execute make or make test in the build directory of Pacose."
+echo ""

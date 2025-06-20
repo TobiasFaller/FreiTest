@@ -1,0 +1,393 @@
+/* body */
+body
+{
+  background: #336666;
+  font-family: sans-serif;
+  font: normal;
+  color: white;
+  margin: 0px;
+  padding: 1em 0em;
+}
+
+/* body > div#content */
+#content
+{
+  background: #000044;
+  width: 95%;
+  line-height: 1.2;
+  margin: 0em auto;
+  -moz-border-radius: .5em; /* gecko */
+  -webkit-border-radius: .5em; /* webkit */
+  border-radius: .5em; /* w3 */
+}
+
+#content>h1
+{
+  font-size: xx-large;
+  margin: 0em;
+  padding: 1em 1em 0.5em 1em;
+  text-shadow: 2px 1px 3px #8888ff;
+}
+
+#content>ul
+{
+  line-height: 1;
+  font-size: small;
+  float: left;
+  margin: 0em;
+  padding: 0em;
+}
+
+#content>ul~ul
+{
+  margin-top: 0em;
+}
+
+#content>ul>li
+{
+  float: left;
+  list-style: none;
+  padding: 0.5em 0.2em 0.5em 0.2em;
+}
+
+#content>ul a
+{
+  color: white;
+  text-decoration: none;
+  background: #003050;
+  border-radius: 0.3em 0.3em 0em 0em;
+  border-top: 1px solid #00cccc;
+  border-left: 1px solid #00cccc;
+  border-right: 2px solid #008888;
+  padding: 0.4em 0.5em 0em 0.5em;
+}
+
+#content>ul a:hover
+{
+  color: black;
+  background: #00ffff;
+}
+
+/* body > div#content > div.clear */
+div.clear
+{
+  clear: both;
+}
+
+/* body > div#content > div#table-of-content */
+#table-of-contents
+{
+  background: white;
+  color: black;
+  margin: 0em;
+  padding: 0.1em 1em 1em 1em;
+  line-height: 1.5;
+}
+
+#text-table-of-contents
+{
+  margin: 0em 0.2em 0.2em 0em;
+  padding: 1em 0em;
+  line-height: 1.8;
+  background: #ffffee;
+  color: black;
+  font-size: normal;
+  font-weight: bold;
+  -moz-border-radius: .5em; /* gecko */
+  -webkit-border-radius: .5em; /* webkit */
+  border-radius: .5em; /* w3 */
+}
+
+#text-table-of-contents ul
+{
+  list-style: none outside;
+  margin: 0em;
+  padding: 0em;
+}
+
+#text-table-of-contents li
+{
+  margin-left: 0.5em;
+  padding-left: 0.5em;
+}
+
+#text-table-of-contents>ul>li>ul
+{
+  /* display: none; */
+}
+
+#text-table-of-contents a
+{
+  display: block;
+}
+
+#text-table-of-contents>div
+{
+  float: left;
+}
+
+/* body > div#content > div#postamble */
+div#postamble
+{
+  clear: both;
+  padding: 0.5em;
+}
+div#postamble p
+{
+  font-style: italic;
+  font-size: small;
+  margin: 0em;
+  padding: 0em;
+}
+div#postamble a
+{
+  color: white;
+}
+div#postamble p.date
+{
+  font-style: italic;
+}
+
+/* body > div#content > div#org-info-js_console-container */
+#org-info-js_console-container
+{
+  /* display: none; */
+}
+
+#org-info-js_console-container #text-before-first-headline
+{
+  display: none;
+}
+
+/* body > div#content > div#org-info-js-window */
+#org-info-js-window
+{
+  clear: both;
+  width: 100%;
+  background: white;
+  color: black;
+  margin: 0em;
+  padding: 0em;
+  line-height: 1.5;
+}
+
+#org-info-js-window>table
+{
+  background: #000044;
+  color: white;
+  font-size: x-small;
+  line-height: 1;
+  margin: 0em;
+  padding: 0.5em;
+}
+#org-info-js-window>table thead, #org-info-js-window>table tbody
+{
+  background: white;
+}
+#org-info-js-window>table tbody
+{
+  background: #000044;
+  color: gray;
+  font-weight: bold;
+}
+#org-info-js-window>table tr
+{
+  margin: 1em;
+}
+#org-info-js-window>table a
+{
+  color: gray;
+}
+#org-info-js-window>table tr+tr td+td span
+{
+  color: white;
+  font-size: large;
+}
+#org-info-js-window>h1
+{
+  padding-left: 1em;
+}
+#org-info-js-window>h2
+{
+  margin: 0.5em;
+}
+#org-info-js-window>div
+{
+  padding: 0em 1em 1em 1em;
+}
+
+/* body > div#content > div.outline-2 */
+div.outline-2, #footnotes
+{
+  background: white;
+  color: black;
+  margin: 0em;
+  padding: 0.1em 1em 1em 1em;
+  line-height: 1.5;
+}
+
+/* body > div#content > div#footnotes */
+#footnotes
+{
+  border-top: 4px solid #888888;
+}
+
+#footnotes h2
+{
+  display: none;
+}
+
+p.footnote
+{
+  padding-left: 2em;
+}
+
+.footnum
+{
+  background: #eecccc;
+}
+
+div.counter
+{
+  text-align: right;
+  font-size: small;
+}
+
+div.counter~p
+{
+  display: none;
+  margin: 0em;
+  padding: 0em;
+}
+
+/*
+   General settings
+ */
+h2, h3, h4, h5
+{
+  text-shadow: 2px 1px 3px #aaaaaa;
+}
+
+h2
+{
+  font-size: large;
+  border-left: 15px solid darkblue;
+  border-bottom: none;
+  background-color: #eeeeee;
+  margin: 0.5em 0em 0.5em 0em;
+  padding: 0.5em;
+}
+
+h3
+{
+  font-size: medium;
+  border-left: 12px solid darkblue;
+  border-bottom: 2px solid darkblue;
+  margin: 0.5em 0em 0.5em 0.5em;
+  padding-left: 0.5em;
+}
+
+h4
+{
+  font-size: medium;
+  border-left: 9px solid darkblue;
+  margin: 0.5em 0em 0.5em 0.5em;
+  padding-left: 0.5em;
+}
+
+h5
+{
+  font-size: medium;
+  border-left: 6px solid darkblue;
+  margin: 0.5em 0em 0.5em 0.5em;
+  padding-left: 0.5em;
+}
+
+a:link { color: #006688; }
+a:visited { color: #000044; }
+a:hover { background: #ccccff; color: black; }
+
+ul, ol, dl
+{
+  margin-left: 1em;
+  padding-left: 1em;
+}
+
+dd > p {
+  margin: 0ex;
+}
+
+pre
+{
+  background: gainsboro;
+  font-family: monospace;
+  font-weight: normal;
+  font-style: normal;
+  white-space: pre;
+  line-height: 1.1;
+  margin-left: 1em;
+  margin-right: 0em;
+  padding: 0.5em;
+  overflow: auto;
+}
+pre.example
+{
+  background: #eeeeff;
+}
+pre.src
+{
+  background: #eeeeee;
+  color: black;
+}
+pre.src .linenr {  }
+pre.src .org-keyword { font-weight: bold; color: #880000; }
+pre.src .org-constant { color: #008800; }
+pre.src .org-type { color: #000088; }
+pre.src .org-function-name { color: #008888; }
+pre.src .org-variable-name { color: #004444; }
+pre.src .org-string { color: #880088; }
+
+blockquote
+{
+  background: #eeffee;
+  margin: 0em;
+  margin-left: 1em;
+  padding: 0.5em 0em;
+}
+
+table
+{
+  margin: 0.5em 0em 0.5em 40px;
+  line-height: 1.0;
+  padding: 0.1em;
+}
+thead { background: #cccccc; }
+tbody { background: #eeeeee; }
+th.left { text-align: center; }
+th.right { text-align: center; }
+th, td
+{
+  padding: 0.25em 0.5em;
+}
+
+p
+{
+  margin-left: 1em;
+}
+
+code, tt
+{
+  font-family: monospace;
+  font-style: normal;
+  /* font-weight: bold; */
+  font-size: 110%;
+}
+
+.left { text-align: left; }
+.center { text-align: center; }
+.right { text-align: right; }
+.emphasis { color: red; }
+.todo { font-weight: bold; color: red; }
+.done { font-weight: bold; color: green; }
+.tag { font-weight: bold; font-style: italic; }
+.timestamp { font-family: monospace; color: #550000; padding: 0em 0.3em 0.2em 0.3em; }

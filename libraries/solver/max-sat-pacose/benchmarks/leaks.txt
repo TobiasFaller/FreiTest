@@ -1,0 +1,55 @@
+c This is Pacose 2023
+c Based on QMAXSAT 2017/18 and GLUCOSE 4.2.1 using MaxPre2 optionally
+c Use CaDiCaL as SAT Solver: 0x50c000000880
+c time parsing...........: 0.008355
+c sum of weights.........: 2
+c -------------------------Solver Call: 1 assumptions size: 0
+o 1
+c Use HEURISTIC Pacose 2020
+c Use DGPW encoding!
+c encoding...............: DGPW18
+c #SoftClauses...........: 2
+c #HardClauses...........: 2
+c #Variables.............: 4
+c assertion Solver call in Pacose, wbsortandfilter1
+c -------------------------Solver Call: 2 assumptions size: 0
+c processing actualSoftClause vector
+c assertion Solver call in Pacose, wbsortandfilter2
+c -------------------------Solver Call: 3 assumptions size: 0
+c assertion Solver call in Pacose, SolveProcedure1
+c -------------------------Solver Call: 4 assumptions size: 0
+c -------------------------Solver Call: 5 assumptions size: 0
+c SetPropagationBudget -- only possible for glucose4.
+c SolveLimited -- only possible for glucose4, call normal solve instead.
+c -------------------------Solver Call: 6 assumptions size: 1
+c -------------------------Solver Call: 7 assumptions size: 0
+c assertion Solver call in SetAsUnitClause before adding unit
+c SOLVE(void)!
+c -------------------------Solver Call: 8 assumptions size: 0
+c assertion Solver call in SetAsUnitClause
+c SOLVE(void)!
+c -------------------------Solver Call: 9 assumptions size: 0
+c SOLVE(assumptions)!
+c -------------------------Solver Call: 10 assumptions size: 1
+c assertion Solver call in SetAsUnitClause
+c SOLVE(void)!
+c -------------------------Solver Call: 11 assumptions size: 0
+c assertion Solver call in SolveBucketReturnMaxPosition
+c SOLVE(void)!
+c -------------------------Solver Call: 12 assumptions size: 0
+c SOLVE(assumptions)!
+c -------------------------Solver Call: 13 assumptions size: 0
+c #SolverCalls...........: 13
+c GBMO time..............: 3.4e-05
+c GBMO #partitions.......: 1
+c TrimSAT time...........: 0.000238
+c TrimSAT #used..........: 1
+c TrimSAT #solverCalls...: 2
+c encoding #clauses......: 5
+c encoding #variables....: 2
+o 1
+s OPTIMUM FOUND
+v 1
+c time parsing...........: 0.008355
+c time SolveProcedure....: 0.00217
+c time...................: 0.009567

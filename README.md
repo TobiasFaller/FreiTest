@@ -33,21 +33,45 @@ Find the current progress below:
 - [X] Build: Port CentOS 7 Docker build to CentOS 8 (for RHEL 8)
 - [X] Build: Finish Alpine linux Docker build
 - [ ] Build: Provide GitHub CI configuration
+- [X] Code: Provide core FreiTest framework
 - [ ] Code: Provide open-source basic ATPG workflows (Scale4Edge)
 - [ ] Code: Provide open-source SBST ATPG workflows (Scale4Edge)
 - [ ] Code: Provide open-source switching activity ATPG workflows (PoliTO)
 - [ ] Code: Provide open-source untestability ATPG workflows (PoliTO)
 - [ ] Code: Provide utility workflows
+- [X] Documentation: Provide core FreiTest framework
 - [ ] Documentation: Provide open-source basic ATPG workflows (Scale4Edge)
 - [ ] Documentation: Provide open-source SBST ATPG workflows (Scale4Edge)
 - [ ] Documentation: Provide open-source switching activity ATPG workflows (PoliTO)
 - [ ] Documentation: Provide open-source untestability ATPG workflows (PoliTO)
 - [ ] Documentation: Provide utility workflows
+- [X] Configuration: Provide core FreiTest framework
 - [ ] Configuration: Provide open-source basic ATPG workflows (Scale4Edge)
 - [ ] Configuration: Provide open-source SBST ATPG workflows (Scale4Edge)
 - [ ] Configuration: Provide open-source switching activity ATPG workflows (PoliTO)
 - [ ] Configuration: Provide open-source untestability ATPG workflows (PoliTO)
 - [ ] Configuration: Provide utility workflows
+
+## Documentation
+
+- **First Steps**
+  - [**Git Setup**](documentation/framework/first_steps/1_GitSetup.md)
+  - [**IDE Setup**](documentation/framework/first_steps/2_IdeSetup.md)
+  - [**Build Setup**](documentation/framework/first_steps/3_BuildSetup.md)
+  - [**Running FreiTest**](documentation/framework/first_steps/4_RunningFreiTest.md)
+  - [**Developing Applications**](documentation/framework/first_steps/5_DevelopingApplication.md)
+- Verilog Circuit Import
+  - [Cricuit Representation](documentation/framework/circuit/1_CircuitRepresentation.md)
+  - [Verilog Instantiator](documentation/framework/circuit/2_VerilogInstantiator.md)
+  - [Circuit Builder](documentation/framework/circuit/3_CircuitBuilder.md)
+  - [Gate Library](documentation/framework/circuit/4_GateLibrary.md)
+- Automatic Test Pattern Generation (ATPG)
+  - [Solver Proxy](documentation/framework/tpg/1_SolverProxy.md)
+  - [Logic Container](documentation/framework/tpg/2_LogicContainer.md)
+  - [Logic Encoding](documentation/framework/tpg/3_LogicEncoding.md)
+- Applications
+  - [Utility Applications](documentation/applications/1_Utility.md)
+
 
 ---
 

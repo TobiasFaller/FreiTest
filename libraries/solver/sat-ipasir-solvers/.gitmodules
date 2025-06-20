@@ -1,0 +1,14 @@
+[submodule "ipasir_biotomas"]
+	path = ipasir_biotomas
+	url = https://github.com/biotomas/ipasir
+	branch = master
+
+[submodule "crypto-minisat"]
+	path = crypto-minisat/cms
+	url = ../crypto-minisat.git
+	branch = master
+
+[submodule "cadical"]
+	path = cadical
+	url = ../cadical.git
+	branch = master

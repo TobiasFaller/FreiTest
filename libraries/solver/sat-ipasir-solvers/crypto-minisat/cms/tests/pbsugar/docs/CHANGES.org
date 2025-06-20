@@ -1,0 +1,21 @@
+#+TITLE: CHANGES of PBSugar
+#+AUTHOR: @<a href='http://bach.istc.kobe-u.ac.jp/tamura.html'>Naoyuki Tamura@</a>
+#+EMAIL: 
+#+STARTUP: overview hidestars nologdone
+#+LANGUAGE: en
+#+OPTIONS: toc:nil H:3 num:nil author:t creator:nil todo:t pri:nil tags:nil LaTeX:t ^:t @:t
+#+STYLE: <link rel="stylesheet" type="text/css" href="org-common.css">
+* Overview
+  This document describes the major changes of [[http://bach.istc.kobe-u.ac.jp/pbsugar/][PBSugar]] program.
+* Version 1.1.1 [2013-02-11 Mon]
+  - Sparse Counter Matrix used as the default
+* Version 1.1.0 [2013-02-09 Sat]
+  - Implementation of sparse Counter Matrix
+* Version 1.0.3 [2013-01-29 Tue]
+  - First public release
+* Version 1.0.0 [2013-01-01 Tue]
+  - First release
+* COMMENT 
+# Local Variables:
+# system-time-locale: "C"
+# End:

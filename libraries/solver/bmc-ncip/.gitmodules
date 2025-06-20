@@ -1,0 +1,28 @@
+[submodule "deps/aiger"]
+	path = deps/aiger
+	url = https://github.com/arminbiere/aiger.git
+	branch = master
+[submodule "deps/minicraig"]
+	path = deps/minicraig
+	url = ../../sat-solver/mini-craig.git
+	branch = main
+[submodule "deps/minisat"]
+	path = deps/minisat
+	url = ../../sat-solver/minisat-2.2.0.git
+	branch = main
+[submodule "deps/cadical"]
+	path = deps/cadical
+	url = ../../sat-solver/cadical.git
+	branch = main
+[submodule "deps/kittencraig"]
+	path = deps/kittencraig
+	url = ../../sat-solver/kittencraig.git
+	branch = main
+[submodule "deps/kissat"]
+	path = deps/kissat
+	url = ../../sat-solver/kittenaslibrary.git
+	branch = main
+[submodule "deps/cadicraig"]
+	path = deps/cadicraig
+	url = ../../sat-solver/cadicraig.git
+	branch = main

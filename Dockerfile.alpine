@@ -56,13 +56,15 @@ COPY test           /source/test
 COPY .bazelrc       /source/.bazelrc
 COPY MODULE.bazel   /source/MODULE.bazel
 
+ARG BUILD_TARGET="//src:freitest.stripped"
 ARG BUILD_CONFIG="release"
-ARG BUILD_MARCH="x86_64"
-ARG BUILD_SRC="freitest.stripped"
-ARG BUILD_BAZEL_ARGS=""
-
-ARG BUILD_TESTS="yes"
-ARG RUN_TESTS="yes"
+ARG BUILD_ARGS=""
+ARG TEST_BUILD="yes"
+ARG TEST_RUN="yes"
+ARG TEST_TARGET="//test:*"
+ARG TEST_ARGS="--test_arg=--log_level=all"
+ARG BAZEL_BUILD_ARGS=""
+ARG BAZEL_TEST_ARGS="--test_output=all"
 
 # Build and optionally run tests, then copy generated executable files
 # to output directory for next stage.
@@ -70,7 +72,7 @@ RUN bazel --max_idle_secs=0 build --config=$BUILD_CONFIG --config=$BUILD_MARCH $
   && if [ "$BUILD_TESTS" = "yes" ]; then \
     bazel --max_idle_secs=0 test --config=$BUILD_CONFIG --config=$BUILD_MARCH $BUILD_BAZEL_ARGS \
       $([ "$RUN_TESTS" = "no" ] && echo "--build_tests_only") \
-      --test_output=all --test_arg=--log_level=all --sandbox_debug $(bazel query 'kind("test", //test:*)'); \
+      $BAZEL_TEST_ARGS $TEST_ARGS $TEST_TARGET; \
   fi \
   && mkdir -p /output \
   && find bazel-bin/ -type f -mindepth 1 -maxdepth 2 -exec \

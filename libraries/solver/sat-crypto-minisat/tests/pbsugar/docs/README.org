@@ -1,0 +1,18 @@
+#+TITLE: README file of PBSugar
+#+AUTHOR: @<a href='http://bach.istc.kobe-u.ac.jp/tamura.html'>Naoyuki Tamura@</a>
+#+EMAIL: 
+#+STARTUP: overview hidestars nologdone
+#+LANGUAGE: en
+#+OPTIONS: toc:t H:3 num:nil author:t creator:nil todo:t pri:nil tags:nil LaTeX:t ^:t @:t
+#+STYLE: <link rel="stylesheet" type="text/css" href="org-common.css">
+#+STYLE: <link rel="stylesheet" type="text/css" href="org-toc-right.css">
+* Overview
+  This document describes the usage of [[http://bach.istc.kobe-u.ac.jp/pbsugar/][PBSugar]] program,
+  a SAT-based Pseudo-Boolean (PB for short) solver.
+  PBSugar can solve problems of the DEC-SMALLINT-LIN category.
+  Please see [[http://bach.istc.kobe-u.ac.jp/pbsugar/][PBSugar]] web page for more details.
+* COMMENT 
+# Local Variables:
+# system-time-locale: "C"
+# End:
+

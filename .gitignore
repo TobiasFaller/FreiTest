@@ -1,0 +1,14 @@
+# Python generated cache files
+**.pyc
+**/.venv
+
+# Bazel build directories
+/bazel-*
+/MODULE.bazel.lock
+
+# Generated Data
+/output
+
+# Distribution files
+/tmp
+freitest-*.tar.gz

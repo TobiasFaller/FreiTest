@@ -84,7 +84,7 @@ ARG TEST_RUN="yes"
 ARG TEST_TARGET="//test:*"
 ARG TEST_ARGS="--test_arg=--log_level=all"
 ARG BAZEL_BUILD_ARGS=""
-ARG BAZEL_TEST_ARGS=""
+ARG BAZEL_TEST_ARGS="--test_output=all"
 
 ## Build the projects and maybe the test (and run them)
 ## The custom linker hack is due to bazel applying a wrong order to the C++ libraries

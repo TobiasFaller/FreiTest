@@ -1,0 +1,7 @@
+builds/
+*.swp
+crypto-minisat/breakid/build/
+crypto-minisat/cmake-3.12.0/
+crypto-minisat/m4ri-20200125/
+crypto-minisat/abc*
+crypto-minisat/libipasircryptominisat5.a

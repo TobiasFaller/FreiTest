@@ -1,0 +1,8 @@
+.vscode/
+*.orig
+*.zip
+*.pbp
+*.tgf
+trace.txt
+build
+bin

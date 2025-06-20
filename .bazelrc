@@ -1,0 +1,117 @@
+common --incompatible_disallow_empty_glob=False
+
+# Basic build options
+build --copt -fPIC
+build --copt -fdiagnostics-color=always
+build --copt -Wfatal-errors
+build --cxxopt -std=c++17
+build --conlyopt -std=c17
+build --linkopt -rdynamic
+
+# Debug information
+build --copt -ggdb3
+build --linkopt -ggdb3
+build --copt -fno-omit-frame-pointer
+build --linkopt -fno-omit-frame-pointer
+
+build:debug --compilation_mode=dbg
+build:debug --copt -O1
+build:debug --copt -DDEBUG
+build:debug --linkopt -O1
+
+build:release --compilation_mode=opt
+build:release --copt -O3
+build:release --copt -flto
+build:release --copt -DNDEBUG
+build:release --linkopt -O3
+build:release --linkopt -flto
+
+build:debug_keepall --copt -fno-eliminate-unused-debug-types
+build:debug_keepall --copt -fno-eliminate-unused-debug-symbols
+build:debug_keepall --copt -fno-merge-debug-strings
+
+# See https://gcc.gnu.org/onlinedocs/gcc/Instrumentation-Options.html
+build:asan --copt -fsanitize=address
+build:asan --copt -fno-omit-frame-pointer
+build:asan --copt -fsanitize-address-use-after-scope
+build:asan --copt -fstack-protector-all
+build:asan --linkopt -fsanitize=address
+build:asan --linkopt -fsanitize-address-use-after-scope
+build:asan --linkopt -fstack-protector-all
+
+build:usan --copt -fsanitize=undefined
+build:usan --copt -fno-omit-frame-pointer
+build:usan --linkopt -fsanitize=undefined
+build:usan --linkopt -lubsan
+
+build:profiler --copt -pg
+build:profiler --linkopt -pg
+
+# Compiler / linker selection options
+build:compiler_gcc --repo_env=CC=gcc
+build:compiler_gcc --repo_env=CXX=g++
+build:compiler_gcc --repo_env=LD=g++
+build:compiler_clang --repo_env=CC=clang
+build:compiler_clang --repo_env=CXX=clang++
+build:compiler_clang --repo_env=LD=clang++
+build:compiler_clang --copt -Wno-unused-command-line-argument
+build:compiler_clang --linkopt -Wno-unused-command-line-argument
+build:compiler_clang --copt -Wno-unknown-warning-option
+build:compiler_clang --linkopt -Wno-unknown-warning-option
+build:linker_bfd --linkopt -fuse-ld=bfd
+build:linker_gold --linkopt -fuse-ld=gold
+build:linker_lld --linkopt -fuse-ld=lld
+
+# Target architecure selection
+build:arch_native --copt -march=native
+build:arch_native --linkopt -march=native
+build:arch_x86_64 --copt -march=x86-64
+build:arch_x86_64 --linkopt -march=x86-64
+build:arch_ivybridge --copt -march=ivybridge
+build:arch_ivybridge --linkopt -march=ivybridge
+build:arch_zen2 --copt -march=znver2
+build:arch_zen2 --linkopt -march=znver2
+build:arch_zen3 --copt -march=znver3
+build:arch_zen3 --linkopt -march=znver3
+
+## Easylogging++
+build --copt -DELPP_NO_LOG_TO_FILE
+build --copt -DELPP_NO_DEFAULT_LOG_FILE
+build --copt -DELPP_FEATURE_CRASH_LOG
+build --copt -DELPP_DISABLE_DEFAULT_CRASH_HANDLING
+build --copt -DELPP_THREAD_SAFE
+build --copt -DELPP_FORCE_USE_STD_THREAD
+
+## Capstone
+build --copt -DCAPSTONE_USE_SYS_DYN_MEM
+build --copt -DCAPSTONE_HAS_RISCV
+
+## Intel TBB (One API)
+build --copt -DTBB_SUPPRESS_DEPRECATED_MESSAGES
+
+## Boost
+build --copt -DBOOST_ALLOW_DEPRECATED_HEADERS
+
+## Options to enable/disable solvers
+build:enable_pacose --define enable_pacose=yes
+build:disable_pacose --define enable_pacose=no
+build:enable_cadical --define enable_cadical=yes
+build:disable_cadical --define enable_cadical=no
+build:enable_crypto_minisat --define enable_crypto_minisat=yes
+build:disable_crypto_minisat --define enable_crypto_minisat=no
+build:enable_inc_bmc_complete --define enable_inc_bmc_complete=yes
+build:disable_inc_bmc_complete --define enable_inc_bmc_complete=no
+build:enable_ipasir_dynamic --define enable_ipasir_dynamic=yes
+build:disable_ipasir_dynamic --define enable_ipasir_dynamic=no
+build:enable_ipasir_static --define enable_ipasir_static=yes
+build:disable_ipasir_static --define enable_ipasir_static=no
+build:enable_glucose_421 --define enable_glucose_421=yes
+build:disable_glucose_421 --define enable_glucose_421=no
+build:enable_glucose_41 --define enable_glucose_41=yes
+build:disable_glucose_41 --define enable_glucose_41=no
+build:enable_minisat_220 --define enable_minisat_220=yes
+build:disable_minisat_220 --define enable_minisat_220=no
+
+build:debug_spirit --copt -DBOOST_SPIRIT_DEBUG
+build:debug_spirit --copt -DBOOST_SPIRIT_X3_DEBUG
+

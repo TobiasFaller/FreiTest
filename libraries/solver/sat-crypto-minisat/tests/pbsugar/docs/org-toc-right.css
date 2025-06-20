@@ -1,0 +1,57 @@
+/* body > div#content > div#table-of-content */
+#table-of-contents
+{
+  float: right;
+  width: 18%;
+  border: none;
+  background: #cccc88;
+  padding: 0em;
+  margin-right: 0.3em;
+  -moz-border-radius: .5em; /* gecko */
+  -webkit-border-radius: .5em; /* webkit */
+  border-radius: .5em; /* w3 */
+}
+
+#table-of-contents>h2
+{
+  display: none;
+}
+
+#text-table-of-contents
+{
+  font-size: small;
+}
+
+#text-table-of-contents ul
+{
+  list-style: none outside;
+  margin: 0em;
+  padding: 0em;
+}
+
+#text-table-of-contents li
+{
+  margin-left: 0.5em;
+  padding-left: 0.5em;
+}
+
+#text-table-of-contents>ul>li>ul
+{
+  display: none;
+}
+
+#text-table-of-contents a
+{
+  display: block;
+}
+
+#text-table-of-contents>div
+{
+  float: left;
+}
+
+/* body > div#content > div.outline-2 */
+div.outline-2, #footnotes
+{
+  width: 75%;
+}

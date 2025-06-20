@@ -47,7 +47,7 @@ ARG TEST_RUN="yes"
 ARG TEST_TARGET="//test:*"
 ARG TEST_ARGS="--test_arg=--log_level=all"
 ARG BAZEL_BUILD_ARGS=""
-ARG BAZEL_TEST_ARGS=""
+ARG BAZEL_TEST_ARGS="--test_output=all"
 
 # Build and optionally run tests, then copy generated executable files
 # to output directory for next stage.

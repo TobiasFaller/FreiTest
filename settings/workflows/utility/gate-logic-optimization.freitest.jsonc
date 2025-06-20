@@ -1,0 +1,7 @@
+[
+    {"application": "UTILITY_GATE_LOGIC_OPTIMIZATION"},
+
+	{"define": "OutputDir", "value": "./output"},
+	{"setting": "DataExportDirectory", "value": "[OutputDir]/GateLogicOptimization"},
+	{"setting": "StatisticsExportFilename", "value": "[DataExportDirectory]/statistics.json"},
+]
