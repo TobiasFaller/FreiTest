@@ -1,0 +1,7 @@
+[
+    {"application": "CIRCUIT_EXPORT_PORTS"},
+
+	{"define": "OutputDir", "value": "./output"},
+    {"setting": "DataExportDirectory", "value": "[OutputDir]/ExportPorts_[Circuit]"},
+	{"setting": "StatisticsExportFilename", "value": "[DataExportDirectory]/statistics.json"},
+]

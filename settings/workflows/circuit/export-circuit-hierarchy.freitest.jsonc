@@ -1,0 +1,7 @@
+[
+    {"application": "CIRCUIT_EXPORT_HIERARCHY"},
+
+	{"define": "OutputDir", "value": "./output"},
+    {"setting": "DataExportDirectory", "value": "[OutputDir]/ExportHierarchy_[Circuit]"},
+	{"setting": "StatisticsExportFilename", "value": "[DataExportDirectory]/statistics.json"},
+]

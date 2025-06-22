@@ -1,0 +1,7 @@
+[
+    {"application": "CIRCUIT_EXPORT_LOGICAL_DEPENDENCE"},
+
+	{"define": "OutputDir", "value": "./output"},
+    {"setting": "DataExportDirectory", "value": "[OutputDir]/ExportCircuitLogicalDependence_[Circuit]"},
+	{"setting": "StatisticsExportFilename", "value": "[DataExportDirectory]/statistics.json"},
+]

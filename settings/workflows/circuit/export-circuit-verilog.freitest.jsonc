@@ -1,0 +1,7 @@
+[
+    {"application": "CIRCUIT_EXPORT_VERILOG"},
+
+	{"define": "OutputDir", "value": "./output"},
+    {"setting": "DataExportDirectory", "value": "[OutputDir]/ExportVerilog_[Circuit]"},
+	{"setting": "StatisticsExportFilename", "value": "[DataExportDirectory]/statistics.json"},
+]

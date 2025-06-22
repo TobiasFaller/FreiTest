@@ -1,0 +1,7 @@
+[
+    {"application": "CIRCUIT_EXPORT_STRUCTURAL_DEPENDENCE"},
+
+	{"define": "OutputDir", "value": "./output"},
+    {"setting": "DataExportDirectory", "value": "[OutputDir]/ExportCircuitStructuralDependence_[Circuit]"},
+	{"setting": "StatisticsExportFilename", "value": "[DataExportDirectory]/statistics.json"},
+]

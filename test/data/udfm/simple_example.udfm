@@ -1,0 +1,9 @@
+Cell "SIMPLE_CELL" {
+	Fault "FAULT1" {
+		test {StaticFault "O"=0; Condition "I1"=0, "I2"=1;}
+	}
+	Fault "FAULT2" {
+		test {StaticFault "O"=1; Condition "I1"=1, "I2"=0;}
+		test {StaticFault "O"=0; Condition "I1"=0, "I2"=0;}
+	}
+}

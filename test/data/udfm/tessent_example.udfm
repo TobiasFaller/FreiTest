@@ -1,0 +1,23 @@
+UDFM {
+	version : 1;
+	Properties {
+		"library-name"	: "Unknown library";
+		"created-by"	: "PySpice simulation script"
+	}
+
+	UdfmType ("CATEGORY 1") {
+		Cell ("TESSENT_CELL") {
+			Fault ("FAULT1") {
+				Test {StaticFault {"O": 0;} Conditions {"I1": 0; "I2": 1;}}
+			}
+		}
+	}
+	UdfmType ("CATEGORY 2") {
+		Cell ("TESSENT_CELL") {
+			Fault ("FAULT2") {
+				Test {StaticFault {"O": 1;} Conditions {"I1": 1; "I2": 0;}}
+				Test {StaticFault {"O": 0;} Conditions {"I1": 0; "I2": 0;}}
+			}
+		}
+	}
+}

@@ -8,6 +8,14 @@
 #include "Basic/Settings.hpp"
 
 #include "Applications/Utility/GateLogicOptimization.hpp"
+#include "Applications/Circuit/ExportCircuitNodes.hpp"
+#include "Applications/Circuit/ExportCircuitHierarchy.hpp"
+#include "Applications/Circuit/ExportCircuitStructuralDependence.hpp"
+#include "Applications/Circuit/ExportCircuitLogicalDependence.hpp"
+#include "Applications/Circuit/ExportCircuitPorts.hpp"
+#include "Applications/Circuit/ExportCircuitVerilog.hpp"
+#include "Applications/Circuit/ExportCircuitCells.hpp"
+#include "Applications/Circuit/ExportCircuitCnf.hpp"
 
 
 using namespace std;
@@ -62,6 +70,23 @@ unique_ptr<BaseApplication> BaseApplication::Create(std::string application)
 
 	if (application == "UTILITY_GATE_LOGIC_OPTIMIZATION")
 		return std::make_unique<FreiTest::Application::Utility::GateLogicOptimization>();
+
+	if (application == "CIRCUIT_EXPORT_NODES")
+		return std::make_unique<FreiTest::Application::ExportCircuit::ExportCircuitNodes>();
+	if (application == "CIRCUIT_EXPORT_HIERARCHY")
+		return std::make_unique<FreiTest::Application::ExportCircuit::ExportCircuitHierarchy>();
+	if (application == "CIRCUIT_EXPORT_PORTS")
+		return std::make_unique<FreiTest::Application::ExportCircuit::ExportCircuitPorts>();
+	if (application == "CIRCUIT_EXPORT_VERILOG")
+		return std::make_unique<FreiTest::Application::ExportCircuit::ExportCircuitVerilog>();
+	if (application == "CIRCUIT_EXPORT_CELLS")
+		return std::make_unique<FreiTest::Application::ExportCircuit::ExportCircuitCells>();
+	if (application == "CIRCUIT_EXPORT_STRUCTURAL_DEPENDENCE")
+		return std::make_unique<FreiTest::Application::ExportCircuit::ExportCircuitStructuralDependence>();
+	if (application == "CIRCUIT_EXPORT_LOGICAL_DEPENDENCE")
+		return std::make_unique<FreiTest::Application::ExportCircuit::ExportCircuitLogicalDependence>();
+	if (application == "CIRCUIT_EXPORT_CNF")
+		return std::make_unique<FreiTest::Application::ExportCircuit::ExportCircuitCnf>();
 
 
 	LOG(FATAL) << "The application " << application << " was not found!";

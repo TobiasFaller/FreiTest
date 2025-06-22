@@ -51,3 +51,65 @@ cc_test(
     deps = [ "//src:libfreitest" ]
 )
 
+cc_test(
+    name = "CircuitBuilderTest",
+    srcs = [ "CircuitBuilderTest.cpp" ],
+    copts = ["-iquote", "src", "-iquote", "test"],
+    linkstatic = True,
+    deps = [ "//src:libfreitest" ]
+)
+
+cc_test(
+    name = "TestPatternTest",
+    srcs = [ "TestPatternTest.cpp"],
+    copts = ["-iquote", "src", "-iquote", "test"],
+    linkstatic = True,
+    deps = [ "//src:libfreitest" ]
+)
+
+cc_test(
+    name = "UnaryCounterTest",
+    srcs = [ "UnaryCounterTest.cpp"],
+    copts = ["-iquote", "src", "-iquote", "test"],
+    linkstatic = True,
+    deps = [ "//src:libfreitest" ]
+)
+
+cc_test(
+    name = "BinaryCounterTest",
+    srcs = [ "BinaryCounterTest.cpp"],
+    copts = ["-iquote", "src", "-iquote", "test"],
+    linkstatic = True,
+    deps = [ "//src:libfreitest" ]
+)
+
+cc_test(
+    name = "CircuitSimulatorTest",
+    srcs = [ "CircuitSimulatorTest.cpp"],
+    copts = ["-iquote", "src", "-iquote", "test"],
+    linkstatic = True,
+    deps = [ "//src:libfreitest" ]
+)
+
+cc_test(
+    name = "LuaInvokerTest",
+    srcs = [ "LuaInvokerTest.cpp"],
+    copts = ["-iquote", "src", "-iquote", "test"],
+    linkstatic = True,
+    deps = [ "//src:libfreitest" ]
+)
+
+cc_test(
+    name = "UdfmParserTest",
+    srcs = [ "UdfmParserTest.cpp"],
+    data = [
+        "data/udfm/simple_empty_alternative.udfm",
+        "data/udfm/simple_empty_cell.udfm",
+        "data/udfm/simple_empty_fault.udfm",
+        "data/udfm/simple_example.udfm",
+        "data/udfm/tessent_example.udfm",
+    ],
+    copts = ["-iquote", "src", "-iquote", "test"],
+    linkstatic = True,
+    deps = [ "//src:libfreitest" ]
+)

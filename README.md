@@ -13,6 +13,31 @@ This project does not have the aim to provide a full ATPG flow and lacks most fe
 On top of the FreiTest framework so-called _workflows_ provide executable utilities for research, each designed for a specific purpose.
 All of the workflows are integrated into a single executable named _freitest_ that handles command line parsing, configuration file processing and circuit loading.
 
+
+## Documentation
+
+- **First Steps**
+  - [**Git Setup**](documentation/framework/first_steps/1_GitSetup.md)
+  - [**IDE Setup**](documentation/framework/first_steps/2_IdeSetup.md)
+  - [**Build Setup**](documentation/framework/first_steps/3_BuildSetup.md)
+  - [**Running FreiTest**](documentation/framework/first_steps/4_RunningFreiTest.md)
+  - [**Developing Applications**](documentation/framework/first_steps/5_DevelopingApplication.md)
+- Verilog Circuit Import
+  - [Cricuit Representation](documentation/framework/circuit/1_CircuitRepresentation.md)
+  - [Verilog Instantiator](documentation/framework/circuit/2_VerilogInstantiator.md)
+  - [Circuit Builder](documentation/framework/circuit/3_CircuitBuilder.md)
+  - [Gate Library](documentation/framework/circuit/4_GateLibrary.md)
+- Automatic Test Pattern Generation (ATPG)
+  - [Solver Proxy](documentation/framework/tpg/1_SolverProxy.md)
+  - [Logic Container](documentation/framework/tpg/2_LogicContainer.md)
+  - [Logic Encoding](documentation/framework/tpg/3_LogicEncoding.md)
+  - [Logic Generator](documentation/framework/tpg/4_LogicGenerator.md)
+  - [Circuit Simulator](documentation/framework/tpg/5_CircuitSimulator.md)
+- Applications
+  - [Utility Applications](documentation/applications/1_Utility.md)
+  - [Circuit Applications](documentation/applications/2_Circuit.md)
+
+
 ## Where is the code?
 
 We are in the process of cleaning up the code, and removing and replacing proprietary data in our internal repository.
@@ -38,40 +63,19 @@ Find the current progress below:
 - [ ] Code: Provide open-source SBST ATPG workflows (Scale4Edge)
 - [ ] Code: Provide open-source switching activity ATPG workflows (PoliTO)
 - [ ] Code: Provide open-source untestability ATPG workflows (PoliTO)
-- [ ] Code: Provide utility workflows
+- [X] Code: Provide circuit export workflows
 - [X] Documentation: Provide core FreiTest framework
 - [ ] Documentation: Provide open-source basic ATPG workflows (Scale4Edge)
 - [ ] Documentation: Provide open-source SBST ATPG workflows (Scale4Edge)
 - [ ] Documentation: Provide open-source switching activity ATPG workflows (PoliTO)
 - [ ] Documentation: Provide open-source untestability ATPG workflows (PoliTO)
-- [ ] Documentation: Provide utility workflows
+- [X] Documentation: Provide circuit export workflows
 - [X] Configuration: Provide core FreiTest framework
 - [ ] Configuration: Provide open-source basic ATPG workflows (Scale4Edge)
 - [ ] Configuration: Provide open-source SBST ATPG workflows (Scale4Edge)
 - [ ] Configuration: Provide open-source switching activity ATPG workflows (PoliTO)
 - [ ] Configuration: Provide open-source untestability ATPG workflows (PoliTO)
-- [ ] Configuration: Provide utility workflows
-
-## Documentation
-
-- **First Steps**
-  - [**Git Setup**](documentation/framework/first_steps/1_GitSetup.md)
-  - [**IDE Setup**](documentation/framework/first_steps/2_IdeSetup.md)
-  - [**Build Setup**](documentation/framework/first_steps/3_BuildSetup.md)
-  - [**Running FreiTest**](documentation/framework/first_steps/4_RunningFreiTest.md)
-  - [**Developing Applications**](documentation/framework/first_steps/5_DevelopingApplication.md)
-- Verilog Circuit Import
-  - [Cricuit Representation](documentation/framework/circuit/1_CircuitRepresentation.md)
-  - [Verilog Instantiator](documentation/framework/circuit/2_VerilogInstantiator.md)
-  - [Circuit Builder](documentation/framework/circuit/3_CircuitBuilder.md)
-  - [Gate Library](documentation/framework/circuit/4_GateLibrary.md)
-- Automatic Test Pattern Generation (ATPG)
-  - [Solver Proxy](documentation/framework/tpg/1_SolverProxy.md)
-  - [Logic Container](documentation/framework/tpg/2_LogicContainer.md)
-  - [Logic Encoding](documentation/framework/tpg/3_LogicEncoding.md)
-- Applications
-  - [Utility Applications](documentation/applications/1_Utility.md)
-
+- [X] Configuration: Provide circuit export workflows
 
 ---
 
