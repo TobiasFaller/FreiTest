@@ -1,0 +1,11 @@
+[
+	{"application": "SCALE4EDGE_RANDOM_TRANSITION_ATPG"},
+
+	{"define": "OutputDir", "value": "./output"},
+	{"setting": "DataExportDirectory", "value": "[OutputDir]/Random_[Circuit]"},
+	{"setting": "StatisticsExportFilename", "value": "[DataExportDirectory]/statistics.json"},
+
+	{"setting": "Scale4Edge/TestPatternGeneration/NumberOfPatterns", "value": "15"},
+	{"setting": "Scale4Edge/TestPatternGeneration/NumberOfTimeframes", "value": "50"},
+	{"setting": "Scale4Edge/TestPatternGeneration/InjectDontCare", "value": "No"},
+]

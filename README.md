@@ -13,7 +13,6 @@ This project does not have the aim to provide a full ATPG flow and lacks most fe
 On top of the FreiTest framework so-called _workflows_ provide executable utilities for research, each designed for a specific purpose.
 All of the workflows are integrated into a single executable named _freitest_ that handles command line parsing, configuration file processing and circuit loading.
 
-
 ## Documentation
 
 - **First Steps**
@@ -36,6 +35,7 @@ All of the workflows are integrated into a single executable named _freitest_ th
 - Applications
   - [Utility Applications](documentation/applications/1_Utility.md)
   - [Circuit Applications](documentation/applications/2_Circuit.md)
+  - [Scale4Edge Applications](documentation/applications/3_Scale4Edge.md)
 
 
 ## Where is the code?
@@ -59,19 +59,19 @@ Find the current progress below:
 - [X] Build: Finish Alpine linux Docker build
 - [ ] Build: Provide GitHub CI configuration
 - [X] Code: Provide core FreiTest framework
-- [ ] Code: Provide open-source basic ATPG workflows (Scale4Edge)
+- [X] Code: Provide open-source basic ATPG workflows (Scale4Edge)
 - [ ] Code: Provide open-source SBST ATPG workflows (Scale4Edge)
 - [ ] Code: Provide open-source switching activity ATPG workflows (PoliTO)
 - [ ] Code: Provide open-source untestability ATPG workflows (PoliTO)
 - [X] Code: Provide circuit export workflows
 - [X] Documentation: Provide core FreiTest framework
-- [ ] Documentation: Provide open-source basic ATPG workflows (Scale4Edge)
+- [X] Documentation: Provide open-source basic ATPG workflows (Scale4Edge)
 - [ ] Documentation: Provide open-source SBST ATPG workflows (Scale4Edge)
 - [ ] Documentation: Provide open-source switching activity ATPG workflows (PoliTO)
 - [ ] Documentation: Provide open-source untestability ATPG workflows (PoliTO)
 - [X] Documentation: Provide circuit export workflows
 - [X] Configuration: Provide core FreiTest framework
-- [ ] Configuration: Provide open-source basic ATPG workflows (Scale4Edge)
+- [X] Configuration: Provide open-source basic ATPG workflows (Scale4Edge)
 - [ ] Configuration: Provide open-source SBST ATPG workflows (Scale4Edge)
 - [ ] Configuration: Provide open-source switching activity ATPG workflows (PoliTO)
 - [ ] Configuration: Provide open-source untestability ATPG workflows (PoliTO)

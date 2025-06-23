@@ -98,7 +98,7 @@ bool VcdExportMixin<FaultList>::SetSetting(std::string key, std::string value)
 	{
 		return Settings::ParseSizet(value, vcdExportSamples);
 	}
-	if (Settings::IsOption(key, "CircuitExportFileName", vcdConfigPrefix))
+	if (Settings::IsOption(key, "VcdExportCircuitName", vcdConfigPrefix))
 	{
 		vcdExportCircuitPath = value;
 		return true;

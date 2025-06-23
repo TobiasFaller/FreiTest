@@ -1,4 +1,4 @@
-[Previous] (1_Utility.md) - [Index](../../../README.md)
+[Previous](1_Utility.md) - [Index](../../README.md) - [Next](3_Scale4Edge.md)
 
 # Circuit Applications
 
@@ -13,4 +13,4 @@ Circuit Data Export:
 - `CIRCUIT_EXPORT_LOGICAL_DEPENDENCE`: Analyzes dependence of inputs and outputs
 - `CIRCUIT_EXPORT_CNF`: Encodes the circuit with binary encoding
 
-[Previous] (1_Utility.md) - [Index](../../../README.md)
+[Previous](1_Utility.md) - [Index](../../README.md) - [Next](3_Scale4Edge.md)

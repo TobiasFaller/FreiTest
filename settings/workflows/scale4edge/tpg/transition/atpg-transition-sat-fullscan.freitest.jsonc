@@ -1,0 +1,21 @@
+[
+	{"application": "SCALE4EDGE_SAT_FULLSCAN_TRANSITION_ATPG"},
+
+	{"define": "OutputDir", "value": "./output"},
+	{"setting": "DataExportDirectory", "value": "[OutputDir]/SatFullScan_[Circuit]"},
+	{"setting": "StatisticsExportFilename", "value": "[DataExportDirectory]/statistics.json"},
+
+	{"setting": "SatSolver", "value": "PROD_SAT_SINGLE_GLUCOSE_421"},
+
+	{"setting": "Scale4Edge/TestPatternGeneration/FaultSimulation", "value": "Enabled"},
+	{"setting": "Scale4Edge/TestPatternGeneration/TestPatternExport", "value": "Enabled"},
+	{"setting": "Scale4Edge/TestPatternGeneration/VcdExport", "value": "Disabled"},
+	{"setting": "Scale4Edge/TestPatternGeneration/StatisticsDataExport", "value": "Enabled"},
+	{"setting": "Scale4Edge/TestPatternGeneration/StatisticsDataPlot", "value": "Disabled"},
+	{"setting": "Scale4Edge/TestPatternGeneration/PrintFaultStatisticReport", "value": "PrintSummary"},
+	{"setting": "Scale4Edge/TestPatternGeneration/PrintTestPatternReport", "value": "PrintSummary"},
+	{"setting": "Scale4Edge/TestPatternGeneration/PatternGenerationThreadLimit", "value": "0"},
+	{"setting": "Scale4Edge/TestPatternGeneration/SolverThreadLimit", "value": "1"},
+	{"setting": "Scale4Edge/TestPatternGeneration/SimulationThreadLimit", "value": "0"},
+	{"setting": "Scale4Edge/TestPatternGeneration/SolverTimeout", "value": "10"},
+]

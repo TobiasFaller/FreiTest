@@ -195,18 +195,20 @@ switch(solver->Solve())
 
 7. **D-Chain Generator** \
     Encodes a difference chain for the circuit nodes.
-    The difference chain enables a speedup (up to a factor of 10) for the SAT / BMC-problem in cases where the sequential depth is high and  the fault fan-in or fan-out is high.
-    This chain encodes constraints that force the solver to apply a fault difference to at least one of the input ports of a gate if the  output port shows a fault difference.
-    This requires the difference DiffTag to present which can be tagged by the `DChainCircuitTagger` which encodes all nodes with  DiffTag that have a good (GoodTag) and bad (BadTag) encoding.
+    The backward D-Chain (difference chain) enables a speedup (up to a factor of 10) for the SAT / BMC-problem in cases where the sequential depth is high and the fault fan-in or fan-out is high.
+    The speedup is assumed to originate from the direct encoding of path information (like a chain) into the SAT / BMC-problem via the D-Chains.
+    This chain encodes constraints that force the solver to apply a fault difference to at least one of the input ports of a gate if the output port shows a fault difference.
+    This requires DiffTag to present, which can be tagged by the `DChainCircuitTagger` that encodes all nodes with  DiffTag that have a GoodTag and BadTag encoding.
     The `DChainBaseEncoder` encodes the difference literals following the tagging by encoding XOR-like gates that show a difference for the good and bad encoding value.
-    The chain itself is then built by the `BackwardDChainEncoder` and `BackwardDChainConnectionEncoder` that connect the difference literals in a chain-like structure.
+    The backward D-Chain itself is then built by the `BackwardDChainEncoder` and `BackwardDChainConnectionEncoder` that connect the difference literals in a chain-like structure.
+    The forward D-Chain has shown to have in most cases a negligible impact on performance.
 
-    - **DChainCircuitTagger**: TODO
-    - **DChainBaseEncoder**: TODO
-    - **ForwardDChainEncoder**: TODO
-    - **ForwardDChainConnectionEncoder**: TODO
-    - **BackwardDChainEncoder**: TODO
-    - **BackwardDChainConnectionEncoder**: TODO
+    - **DChainCircuitTagger**: Tags all gates with DiffTag if they are encoded with GoodTag and BadTag
+    - **DChainBaseEncoder**: Encodes the literals for the D-Chain, which represent a fault different at the gate output
+    - **ForwardDChainEncoder**: Encodes a forward D-Chain, that forces the gate output to not have a difference, when no input has a difference
+    - **ForwardDChainConnectionEncoder**: Encodes the forward D-Chain beyond sequential elements / timeframes
+    - **BackwardDChainEncoder**: Encodes a backward D-Chain, that forces one gate input to have a difference, when the output has a difference
+    - **BackwardDChainConnectionEncoder**: Encodes the backward D-Chain beyond sequential elements / timeframes
 
 # Fault Model Modules
 

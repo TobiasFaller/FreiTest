@@ -91,7 +91,7 @@ string FileHandle::GetCanonicalFilename(string filename)
 
 std::istream& FileHandle::GetStream()
 {
-	DASSERT(_forReading) << " Stream has not been configured for reading) << use GetOutStream instead";
+	DASSERT(_forReading) << "Stream has not been configured for reading, use GetOutStream instead";
 	if (_zipMode)
 	{
 		return _inFilter;
@@ -105,6 +105,6 @@ std::istream& FileHandle::GetStream()
 
 ofstream& FileHandle::GetOutStream()
 {
-	DASSERT(!_forReading) << " Stream has not been configured for writing) << use GetStream instead";
+	DASSERT(!_forReading) << "Stream has not been configured for writing, use GetStream instead";
 	return *_ofstream;
 }
