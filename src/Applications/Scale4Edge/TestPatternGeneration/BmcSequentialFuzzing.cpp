@@ -101,7 +101,9 @@ BmcSequentialFuzzing<FaultModel, FaultList>::BmcSequentialFuzzing():
 	SolverStatisticsMixin(SCALE4EDGE_ATPG_CONFIG),
 	VcdExportMixin<FaultList>(SCALE4EDGE_ATPG_CONFIG),
 	VcmMixin(SCALE4EDGE_ATPG_CONFIG),
-	SequentialAtpgBase<FaultModel, FaultList>()
+	AtpgBase<FaultModel, FaultList>(SCALE4EDGE_ATPG_CONFIG),
+	FuzzingBase<FaultModel, FaultList>(SCALE4EDGE_ATPG_CONFIG),
+	SequentialAtpgBase<FaultModel, FaultList>(SCALE4EDGE_ATPG_CONFIG)
 {
 }
 

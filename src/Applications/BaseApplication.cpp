@@ -25,6 +25,9 @@
 #include "Applications/Scale4Edge/TestPatternGeneration/RandomAtpg.hpp"
 #include "Applications/Scale4Edge/TestPatternExport/TestPatternsToVcd.hpp"
 #include "Applications/Scale4Edge/TestPatternExport/TestPatternsToStatistics.hpp"
+#include "Applications/Scale4Edge/FaultCompaction/GreedyStaticFaultCompaction.hpp"
+#include "Applications/Scale4Edge/FaultCompaction/SatStaticFaultCompaction.hpp"
+#include "Applications/Scale4Edge/FaultCoverageExport/FaultCoverageExport.hpp"
 #include "Basic/Fault/Lists/SingleStuckAtFaultList.hpp"
 #include "Basic/Fault/Models/SingleStuckAtFaultModel.hpp"
 #include "Basic/Fault/Lists/SingleTransitionDelayFaultList.hpp"
@@ -121,6 +124,12 @@ unique_ptr<BaseApplication> BaseApplication::Create(std::string application)
 		return std::make_unique<FreiTest::Application::Scale4Edge::SatFullScanFuzzing<Fault::SingleStuckAtFaultModel, Fault::SingleStuckAtFaultList>>();
 	if (application == "SCALE4EDGE_BMC_SEQUENTIAL_STUCK_AT_FUZZ")
 		return std::make_unique<FreiTest::Application::Scale4Edge::BmcSequentialFuzzing<Fault::SingleStuckAtFaultModel, Fault::SingleStuckAtFaultList>>();
+	if (application == "SCALE4EDGE_GREEDY_STATIC_FAULT_COMPACTION_STUCK_AT")
+		return std::make_unique<FreiTest::Application::Scale4Edge::GreedyStaticFaultCompaction<Fault::SingleStuckAtFaultModel, Fault::SingleStuckAtFaultList>>();
+	if (application == "SCALE4EDGE_SAT_STATIC_FAULT_COMPACTION_STUCK_AT")
+		return std::make_unique<FreiTest::Application::Scale4Edge::SatStaticFaultCompaction<Fault::SingleStuckAtFaultModel, Fault::SingleStuckAtFaultList>>();
+	if (application == "SCALE4EDGE_FAULT_COVERAGE_EXPORT_STUCK_AT")
+		return std::make_unique<FreiTest::Application::Scale4Edge::FaultCoverageExport<Fault::SingleStuckAtFaultModel, Fault::SingleStuckAtFaultList>>();
 
 	if (application == "SCALE4EDGE_SAT_FULLSCAN_TRANSITION_ATPG")
 		return std::make_unique<FreiTest::Application::Scale4Edge::SatFullScanAtpg<Fault::SingleTransitionDelayFaultModel, Fault::SingleTransitionDelayFaultList>>();
@@ -140,6 +149,12 @@ unique_ptr<BaseApplication> BaseApplication::Create(std::string application)
 		return std::make_unique<FreiTest::Application::Scale4Edge::SatFullScanFuzzing<Fault::SingleTransitionDelayFaultModel, Fault::SingleTransitionDelayFaultList>>();
 	if (application == "SCALE4EDGE_BMC_SEQUENTIAL_TRANSITION_FUZZ")
 		return std::make_unique<FreiTest::Application::Scale4Edge::BmcSequentialFuzzing<Fault::SingleTransitionDelayFaultModel, Fault::SingleTransitionDelayFaultList>>();
+	if (application == "SCALE4EDGE_GREEDY_STATIC_FAULT_COMPACTION_TRANSITION")
+		return std::make_unique<FreiTest::Application::Scale4Edge::GreedyStaticFaultCompaction<Fault::SingleTransitionDelayFaultModel, Fault::SingleTransitionDelayFaultList>>();
+	if (application == "SCALE4EDGE_SAT_STATIC_FAULT_COMPACTION_TRANSITION")
+		return std::make_unique<FreiTest::Application::Scale4Edge::SatStaticFaultCompaction<Fault::SingleTransitionDelayFaultModel, Fault::SingleTransitionDelayFaultList>>();
+	if (application == "SCALE4EDGE_FAULT_COVERAGE_EXPORT_TRANSITION")
+		return std::make_unique<FreiTest::Application::Scale4Edge::FaultCoverageExport<Fault::SingleTransitionDelayFaultModel, Fault::SingleTransitionDelayFaultList>>();
 
 	if (application == "SCALE4EDGE_SAT_FULLSCAN_CELL_AWARE_ATPG")
 		return std::make_unique<FreiTest::Application::Scale4Edge::SatFullScanAtpg<Fault::CellAwareFaultModel, Fault::CellAwareFaultList>>();
@@ -159,6 +174,12 @@ unique_ptr<BaseApplication> BaseApplication::Create(std::string application)
 		return std::make_unique<FreiTest::Application::Scale4Edge::SatFullScanFuzzing<Fault::CellAwareFaultModel, Fault::CellAwareFaultList>>();
 	if (application == "SCALE4EDGE_BMC_SEQUENTIAL_CELL_AWARE_FUZZ")
 		return std::make_unique<FreiTest::Application::Scale4Edge::BmcSequentialFuzzing<Fault::CellAwareFaultModel, Fault::CellAwareFaultList>>();
+	if (application == "SCALE4EDGE_GREEDY_STATIC_FAULT_COMPACTION_CELL_AWARE")
+		return std::make_unique<FreiTest::Application::Scale4Edge::GreedyStaticFaultCompaction<Fault::CellAwareFaultModel, Fault::CellAwareFaultList>>();
+	if (application == "SCALE4EDGE_SAT_STATIC_FAULT_COMPACTION_CELL_AWARE")
+		return std::make_unique<FreiTest::Application::Scale4Edge::SatStaticFaultCompaction<Fault::CellAwareFaultModel, Fault::CellAwareFaultList>>();
+	if (application == "SCALE4EDGE_FAULT_COVERAGE_EXPORT_CELL_AWARE")
+		return std::make_unique<FreiTest::Application::Scale4Edge::FaultCoverageExport<Fault::CellAwareFaultModel, Fault::CellAwareFaultList>>();
 
 
 	LOG(FATAL) << "The application " << application << " was not found!";

@@ -105,7 +105,7 @@ SatFullScanAtpg<FaultModel, FaultList>::SatFullScanAtpg(void):
 	SolverStatisticsMixin(SCALE4EDGE_ATPG_CONFIG),
 	VcdExportMixin<FaultList>(SCALE4EDGE_ATPG_CONFIG),
 	VcmMixin(SCALE4EDGE_ATPG_CONFIG),
-	AtpgBase<FaultModel, FaultList>(),
+	AtpgBase<FaultModel, FaultList>(SCALE4EDGE_ATPG_CONFIG),
 	maximizeDontCareValues(MaximizeDontCareValues::Disabled),
 	maximizeDontCarePorts(MaximizeDontCarePorts::Inputs),
 	maximizeDontCareFlipFlops(MaximizeDontCareFlipFlops::Inputs),

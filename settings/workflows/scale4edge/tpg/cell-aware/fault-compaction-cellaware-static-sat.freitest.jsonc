@@ -1,0 +1,9 @@
+[
+	{"application": "SCALE4EDGE_SAT_STATIC_FAULT_COMPACTION_CELL_AWARE"},
+
+	{"define": "OutputDir", "value": "./output"},
+	{"setting": "DataImportDirectory", "value": "UNSPECIFIED"},
+	{"setting": "DataExportDirectory", "value": "[OutputDir]/SatStaticCompaction_[Circuit]"},
+
+	{"setting": "Scale4Edge/SatStaticFaultCompaction/Mode", "value": "FullScan"}
+]

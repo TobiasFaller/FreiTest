@@ -70,14 +70,15 @@ namespace Scale4Edge
 {
 
 template <typename FaultModel, typename FaultList>
-FuzzingBase<FaultModel, FaultList>::FuzzingBase(void):
-	Mixin::StatisticsMixin(SCALE4EDGE_ATPG_CONFIG),
-	Mixin::FaultStatisticsMixin<FaultList>(SCALE4EDGE_ATPG_CONFIG),
-	Mixin::SimulationStatisticsMixin(SCALE4EDGE_ATPG_CONFIG),
-	Mixin::SolverStatisticsMixin(SCALE4EDGE_ATPG_CONFIG),
-	Mixin::VcdExportMixin<FaultList>(SCALE4EDGE_ATPG_CONFIG),
-	Mixin::VcmMixin(SCALE4EDGE_ATPG_CONFIG),
-	AtpgBase<FaultModel, FaultList>()
+FuzzingBase<FaultModel, FaultList>::FuzzingBase(std::string configPrefix):
+	Mixin::StatisticsMixin(configPrefix),
+	Mixin::FaultStatisticsMixin<FaultList>(configPrefix),
+	Mixin::SimulationStatisticsMixin(configPrefix),
+	Mixin::SolverStatisticsMixin(configPrefix),
+	Mixin::VcdExportMixin<FaultList>(configPrefix),
+	Mixin::VcmMixin(configPrefix),
+	AtpgBase<FaultModel, FaultList>(configPrefix),
+	configPrefix(configPrefix)
 {
 }
 
@@ -515,13 +516,13 @@ void FuzzingBase<FaultModel, FaultList>::GenerateFaultModel(size_t seed, UdfmTyp
 			return result;
 		};
 
-		this->udfm = std::make_unique<Io::Udfm::UdfmModel>();
+		auto udfm = std::make_shared<Io::Udfm::UdfmModel>();
 		for (auto& cell : this->cells) {
 			// We can not test cells that are themselves part of the scan chain.
 			if (udfmType == UdfmType::FullScan && cell.flipFlopCount > 0) {
 				continue;
 			}
-			auto udfmCell { this->udfm->AddCell(cell.name) };
+			auto udfmCell { udfm->AddCell(cell.name) };
 			size_t faultCount { (std::uniform_int_distribution<size_t> { configNumUdfmFaultsMin, configNumUdfmFaultsMax })(random) };
 			for (size_t fault { 0u }; fault < faultCount; fault++) {
 				auto const alternativeCount { (std::uniform_int_distribution<size_t> { configNumUdfmAltsMin, configNumUdfmAltsMax })(random) };
@@ -608,7 +609,8 @@ void FuzzingBase<FaultModel, FaultList>::GenerateFaultModel(size_t seed, UdfmTyp
 				}
 			}
 		}
-		DVLOG(3) << *this->udfm;
+		DVLOG(3) << *udfm;
+		Mixin::UdfmMixin::SetUdfm(udfm);
 	}
 	else
 	{
@@ -630,7 +632,7 @@ void FuzzingBase<FaultModel, FaultList>::GenerateFaultList(size_t seed)
 	}
 	else if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
 	{
-		this->faultList = FaultList(Fault::GenerateCellAwareFaultList(*this->circuit, *this->udfm));
+		this->faultList = FaultList(Fault::GenerateCellAwareFaultList(*this->circuit, *this->GetUdfm()));
 	}
 	else
 	{

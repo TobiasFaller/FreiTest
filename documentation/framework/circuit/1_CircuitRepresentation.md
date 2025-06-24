@@ -256,6 +256,7 @@ Modules (All):
 
 - `module-name`: string
 - `module-type`: string
+- `module-is-module`: bool
 - `module-is-cell`: bool
 - `module-is-primitive`: bool
 - `module-is-virtual`: bool

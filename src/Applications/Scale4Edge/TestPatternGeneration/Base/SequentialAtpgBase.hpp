@@ -20,7 +20,7 @@ class SequentialAtpgBase:
 	public virtual AtpgBase<FaultModel, FaultList>
 {
 public:
-	SequentialAtpgBase(void);
+	SequentialAtpgBase(std::string configPrefix);
 	virtual ~SequentialAtpgBase(void);
 
 	bool SetSetting(std::string key, std::string value) override;
@@ -33,6 +33,8 @@ protected:
 	CombinationalTestabilityCheck settingsCombinationalTestabilityCheck;
 	size_t settingsMaximumTimeframes;
 
+private:
+	std::string configPrefix;
 };
 
 };

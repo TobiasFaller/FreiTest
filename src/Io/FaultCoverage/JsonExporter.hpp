@@ -24,13 +24,10 @@ public:
 	JsonExporter();
 	virtual ~JsonExporter();
 
-	void ExportFaultCoverage(const Circuit::CircuitEnvironment& CircuitEnvironment, Coverage faultCoverage, std::string fileName);
+	void ExportFaultCoverage(const Circuit::CircuitEnvironment& CircuitEnvironment, const Coverage& faultCoverage, std::string fileName);
 
 private:
-	boost::property_tree::ptree ExportGroup(const Circuit::CircuitEnvironment& circuitEnvironment, Coverage faultCoverage, const Circuit::GroupMetaData* group);
-
-	std::string GetFullPinName(const Circuit::GroupMetaData* group, std::string pin);
-	std::string GetWireName(std::string wire);
+	boost::property_tree::ptree ExportGroup(const Circuit::CircuitEnvironment& circuitEnvironment, const Coverage& faultCoverage, const Circuit::GroupMetaData* group);
 
 };
 

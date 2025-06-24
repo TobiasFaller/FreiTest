@@ -109,7 +109,8 @@ SatFullScanFuzzing<FaultModel, FaultList>::SatFullScanFuzzing(void):
 	Mixin::SolverStatisticsMixin(SCALE4EDGE_ATPG_CONFIG),
 	Mixin::VcdExportMixin<FaultList>(SCALE4EDGE_ATPG_CONFIG),
 	Mixin::VcmMixin(SCALE4EDGE_ATPG_CONFIG),
-	FuzzingBase<FaultModel, FaultList>()
+	AtpgBase<FaultModel, FaultList>(SCALE4EDGE_ATPG_CONFIG),
+	FuzzingBase<FaultModel, FaultList>(SCALE4EDGE_ATPG_CONFIG)
 {
 }
 

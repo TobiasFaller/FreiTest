@@ -111,7 +111,9 @@ Cell-Aware Fault Model:
   - `Disabled`: Only simulate the test pattern for the single targeted fault
   - `Enabled`: Simulate the test pattern for all unclassified faults
   - Default: Enabled
-
+- `Scale4Edge/TestPatternGeneration/UdfmImportPath <file: string>`: The file where the UDFM (User-Defined Fault Model) is located (cell-aware fault model only).\
+  If no UDFM file is provided for a cell-aware workflow, a fatal error will occur.
+  - Default: "" (empty)
 - <span style="color: #0A5; font-weight: bold">(debug)</span>  `Scale4Edge/TestPatternGeneration/IncrementalSimulation <enabled: options>`: Disables the more efficient, incremental simulation.
   - `Disabled`: Only a naiive, slower simulation is performed.
   - `Enabled`: An optimized incremental simulation is performed.
@@ -223,10 +225,26 @@ See an example below:
 ```
 
 
-## Cell-Aware Workflows
+## Fault Compaction
 
-- `Scale4Edge/Data/Udfm/ImportFilePath <file: string>`: The file where the UDFM (User-Defined Fault Model) is located.\
+- `Scale4Edge/FaultCompaction/CompactionOrder <order: options>`: Defines the order in which test patterns are selected for inclusion
+  - `Ascending`: Apply test patterns in order of the input format, drop unnecessary patterns
+  - `Descending`: Apply test patterns in reverse order of the input format, drop unnecessary patterns
+  - Default: Ascending
+- `Scale4Edge/FaultCompaction/UdfmImportPath <file: string>`: The file where the UDFM (User-Defined Fault Model) is located (cell-aware fault model only).\
   If no UDFM file is provided for a cell-aware workflow, a fatal error will occur.
-  - Default: "" (empty) 
+  - Default: "" (empty)
+
+## Fault Coverage Export
+
+- `Scale4Edge/FaultCoverageExport/FaultCoverageFileName <filename: string>`: The file name to export the coverage as JSON format to
+  - Default: ""
+- `Scale4Edge/FaultCoverageExport/SimulationThreadLimit <threads: uint>`: The number of threads to use for simulating the test patterns in parallel
+  - Default: 0 (unlimited)
+- `Scale4Edge/FaultCoverageExport/ExportThreadLimit <threads: uint>`: The number of threads to write the per-pattern coverage files
+  - Default: 0 (unlimited)
+- `Scale4Edge/FaultCoverageExport/UdfmImportPath <file: string>`: The file where the UDFM (User-Defined Fault Model) is located (cell-aware fault model only).\
+  If no UDFM file is provided for a cell-aware workflow, a fatal error will occur.
+  - Default: "" (empty)
 
 [Previous Topic](2_Circuit.md) - [Index](../../README.md)

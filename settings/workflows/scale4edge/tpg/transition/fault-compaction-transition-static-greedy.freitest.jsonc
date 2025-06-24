@@ -1,0 +1,9 @@
+[
+	{"application": "SCALE4EDGE_GREEDY_STATIC_FAULT_COMPACTION_TRANSITION"},
+
+	{"define": "OutputDir", "value": "./output"},
+	{"setting": "DataImportDirectory", "value": "UNSPECIFIED"},
+	{"setting": "DataExportDirectory", "value": "[OutputDir]/GreedyStaticCompaction_[Circuit]"},
+
+	{"setting": "Scale4Edge/GreedyStaticFaultCompaction/CompactionOrder", "value": "Ascending"}
+]

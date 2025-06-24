@@ -1,0 +1,8 @@
+[
+	{"application": "SCALE4EDGE_LFSR_CELL_AWARE_ATPG"},
+
+	{"define": "OutputDir", "value": "./output"},
+	{"setting": "DataExportDirectory", "value": "[OutputDir]/Lfsr_[Circuit]"},
+	{"setting": "StatisticsExportFilename", "value": "[DataExportDirectory]/statistics.json"},
+	{"setting": "Scale4Edge/TestPatternGeneration/SimulationThreadLimit", "value": "0"},
+]

@@ -344,7 +344,7 @@ static bool CheckOutputLogic(Logic goodOutput, Logic badOutput)
 }
 
 template<typename FaultList, typename... Params>
-bool ExportFaults(std::ostream& output, const FaultListExchangeFormat<FaultList>& faultList, Params... params)
+bool ExportFaults(std::ostream& output, const FaultListExchangeFormat<FaultList>& faultList, const Params&... params)
 {
 	using ptree = boost::property_tree::ptree;
 	using FaultT = typename FaultList::fault_type;
@@ -528,14 +528,14 @@ bool ExportFaults(std::ostream& output, const FaultListExchangeFormat<FaultList>
 }
 
 template<typename FaultList, typename... Params>
-std::optional<FaultListExchangeFormat<FaultList>> ImportFaults(std::istream& input, const Circuit::CircuitEnvironment& circuit, Params... params)
+std::optional<FaultListExchangeFormat<FaultList>> ImportFaults(std::istream& input, const Circuit::CircuitEnvironment& circuit, const Params&... params)
 {
 	using ptree = boost::property_tree::ptree;
 	using FaultT = typename FaultList::fault_type;
 	using MetaDataT = typename FaultList::metadata_type;
 
 	const auto& mappedCircuit = circuit.GetMappedCircuit();
-	const auto parameters { std::make_tuple(std::forward<Params>(params)...) };
+	const auto parameters { std::make_tuple(std::forward<const Params&>(params)...) };
 
 	try
 	{

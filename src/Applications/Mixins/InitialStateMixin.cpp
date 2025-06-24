@@ -2,6 +2,7 @@
 #include "Basic/Settings.hpp"
 #include "Basic/Logging.hpp"
 #include "Helper/FileHandle.hpp"
+#include "Circuit/CircuitEnvironment.hpp"
 #include <boost/algorithm/string.hpp>
 
 namespace FreiTest

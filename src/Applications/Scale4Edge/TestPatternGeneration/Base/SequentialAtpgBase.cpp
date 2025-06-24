@@ -29,16 +29,17 @@ namespace Scale4Edge
 {
 
 template<typename FaultModel, typename FaultList>
-SequentialAtpgBase<FaultModel, FaultList>::SequentialAtpgBase(void):
-	Mixin::StatisticsMixin("UNINITIALIZED"),
-	Mixin::FaultStatisticsMixin<FaultList>("UNINITIALIZED"),
-	Mixin::SimulationStatisticsMixin("UNINITIALIZED"),
-	Mixin::SolverStatisticsMixin("UNINITIALIZED"),
-	Mixin::VcdExportMixin<FaultList>("UNINITIALIZED"),
-	Mixin::VcmMixin("UNINITIALIZED"),
-	AtpgBase<FaultModel, FaultList>(),
+SequentialAtpgBase<FaultModel, FaultList>::SequentialAtpgBase(std::string configPrefix):
+	Mixin::StatisticsMixin(configPrefix),
+	Mixin::FaultStatisticsMixin<FaultList>(configPrefix),
+	Mixin::SimulationStatisticsMixin(configPrefix),
+	Mixin::SolverStatisticsMixin(configPrefix),
+	Mixin::VcdExportMixin<FaultList>(configPrefix),
+	Mixin::VcmMixin(configPrefix),
+	AtpgBase<FaultModel, FaultList>(configPrefix),
 	settingsCombinationalTestabilityCheck(CombinationalTestabilityCheck::Enabled),
-	settingsMaximumTimeframes(10u)
+	settingsMaximumTimeframes(10u),
+	configPrefix(configPrefix)
 {
 }
 
@@ -48,14 +49,14 @@ SequentialAtpgBase<FaultModel, FaultList>::~SequentialAtpgBase(void) = default;
 template<typename FaultModel, typename FaultList>
 bool SequentialAtpgBase<FaultModel, FaultList>::SetSetting(std::string key, std::string value)
 {
-	if (key == "Scale4Edge/TestPatternGeneration/CombinationalTestabilityCheck")
+	if (Settings::IsOption(key, "CombinationalTestabilityCheck", configPrefix))
 	{
 		return Settings::ParseEnum(value, settingsCombinationalTestabilityCheck, {
 			{ "Disabled", CombinationalTestabilityCheck::Disabled },
 			{ "Enabled", CombinationalTestabilityCheck::Enabled },
 		});
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/SolverMaximumTimeframes")
+	if (Settings::IsOption(key, "SolverMaximumTimeframes", configPrefix))
 	{
 		return Settings::ParseSizet(value, settingsMaximumTimeframes);
 	}

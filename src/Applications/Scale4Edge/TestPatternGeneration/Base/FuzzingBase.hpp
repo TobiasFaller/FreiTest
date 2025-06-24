@@ -16,7 +16,7 @@ class FuzzingBase:
 	public virtual AtpgBase<FaultModel, FaultList>
 {
 public:
-	FuzzingBase(void);
+	FuzzingBase(std::string configPrefix);
 	virtual ~FuzzingBase(void);
 
 	void Init(void) override;
@@ -60,6 +60,7 @@ private:
 		size_t flipFlopCount;
 	};
 	std::vector<Cell> cells;
+	std::string configPrefix;
 
 };
 

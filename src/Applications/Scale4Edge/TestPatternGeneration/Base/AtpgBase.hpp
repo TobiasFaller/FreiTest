@@ -10,6 +10,7 @@
 #include "Applications/Mixins/Statistics/SolverStatisticsMixin.hpp"
 #include "Applications/Mixins/Vcd/VcdExportMixin.hpp"
 #include "Applications/Mixins/Vcm/VcmMixin.hpp"
+#include "Applications/Mixins/Udfm/UdfmMixin.hpp"
 #include "Basic/ApplicationStatistics.hpp"
 #include "Basic/Logic.hpp"
 #include "Basic/Fault/Lists/CellAwareFaultList.hpp"
@@ -42,42 +43,55 @@ class AtpgData
 template<>
 class AtpgData<Fault::SingleStuckAtFaultModel> {
 public:
-	AtpgData(void);
+	AtpgData(std::string configPrefix);
 	virtual ~AtpgData(void);
 
 	bool SetSetting(std::string key, std::string value);
+	void Init(void);
+	void Run(void);
 
 protected:
 	enum class FaultListReduction { Original, RemoveEquivalent };
 
 	FaultListReduction faultListReduction;
+
+private:
+	std::string configPrefix;
+
 };
 
 template<>
 class AtpgData<Fault::SingleTransitionDelayFaultModel> {
 public:
-	AtpgData(void);
+	AtpgData(std::string configPrefix);
 	virtual ~AtpgData(void);
 
 	bool SetSetting(std::string key, std::string value);
+	void Init(void);
+	void Run(void);
 
 protected:
 	enum class FaultListReduction { Original, RemoveEquivalent };
 
 	FaultListReduction faultListReduction;
+
+private:
+	std::string configPrefix;
+
 };
 
 template<>
-class AtpgData<Fault::CellAwareFaultModel> {
+class AtpgData<Fault::CellAwareFaultModel>:
+	public Mixin::UdfmMixin
+{
 public:
-	AtpgData(void);
+	AtpgData(std::string configPrefix);
 	virtual ~AtpgData(void);
 
 	bool SetSetting(std::string key, std::string value);
+	void Init(void);
+	void Run(void);
 
-protected:
-	std::shared_ptr<Io::Udfm::UdfmModel> udfm;
-	std::string udfmFile;
 };
 
 /**
@@ -89,16 +103,16 @@ protected:
  */
 template <typename FaultModel, typename FaultList>
 class AtpgBase:
-	public AtpgData<FaultModel>,
 	public virtual BaseApplication,
 	public virtual Mixin::FaultStatisticsMixin<FaultList>,
 	public virtual Mixin::SimulationStatisticsMixin,
 	public virtual Mixin::SolverStatisticsMixin,
 	public virtual Mixin::VcdExportMixin<FaultList>,
-	public virtual Mixin::VcmMixin
+	public virtual Mixin::VcmMixin,
+	public AtpgData<FaultModel>
 {
 public:
-	AtpgBase(void);
+	AtpgBase(std::string configPrefix);
 	virtual ~AtpgBase(void);
 
 	void Init(void) override;
@@ -180,6 +194,9 @@ protected:
 
 	mutable std::mutex parallelMutex;
 	mutable std::atomic<size_t> vcdDebugExportId;
+
+private:
+	std::string configPrefix;
 
 };
 

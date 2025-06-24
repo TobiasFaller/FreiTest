@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Applications/BaseApplication.hpp"
-#include "Tpg/LogicGenerator/LogicGenerator.hpp"
 #include "Basic/Logic.hpp"
 
 namespace FreiTest

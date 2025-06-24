@@ -34,10 +34,10 @@ private:
 };
 
 template<typename FaultList, typename... Params>
-bool ExportFaults(std::ostream& output, const FaultListExchangeFormat<FaultList>& faultList, Params... params);
+bool ExportFaults(std::ostream& output, const FaultListExchangeFormat<FaultList>& faultList, const Params&... params);
 
 template<typename FaultList, typename... Params>
-std::optional<FaultListExchangeFormat<FaultList>> ImportFaults(std::istream& input, const Circuit::CircuitEnvironment& circuit, Params... params);
+std::optional<FaultListExchangeFormat<FaultList>> ImportFaults(std::istream& input, const Circuit::CircuitEnvironment& circuit, const Params&... params);
 
 };
 };

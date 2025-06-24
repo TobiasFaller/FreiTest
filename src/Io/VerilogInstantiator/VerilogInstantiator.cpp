@@ -1010,6 +1010,7 @@ static void AddGeneralInfo(SourceInformation& info, const std::string& name, con
 {
 	info.AddProperty<std::string>("module-name", name);
 	info.AddProperty<std::string>("module-type", type);
+	info.AddProperty<bool>("module-is-module", category == GroupType::Module);
 	info.AddProperty<bool>("module-is-cell", category == GroupType::Cell);
 	info.AddProperty<bool>("module-is-primitive", category == GroupType::Primitive);
 	info.AddProperty<bool>("module-is-virtual", category == GroupType::Virtual);

@@ -1,0 +1,12 @@
+[
+	{"application": "SCALE4EDGE_FAULT_COVERAGE_EXPORT_TRANSITION"},
+
+	{"define": "OutputDir", "value": "./output"},
+	{"setting": "DataImportDirectory", "value": "UNSPECIFIED"},
+	{"setting": "DataExportDirectory", "value": "[OutputDir]/FaultCoverage_[Circuit]"},
+
+	{"setting": "Scale4Edge/FaultCoverageExport/SimulationThreadLimit", "value": "0"},
+	{"setting": "Scale4Edge/FaultCoverageExport/ExportThreadLimit", "value": "0"},
+	{"setting": "Scale4Edge/FaultCoverageExport/FaultCoverageFileName", "value": "[DataExportDirectory]/FaultCoverage_[Circuit]/coverage"},
+
+]

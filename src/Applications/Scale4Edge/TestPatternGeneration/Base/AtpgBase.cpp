@@ -107,15 +107,16 @@ template<typename PinData> struct AtpgConfig<Fault::CellAwareFaultModel, PinData
 	static size_t GetRequiredTimeframeCount(const Fault::CellAwareFaultModel& faultModel) { return faultModel.GetFault()->GetTimeframeSpread(); }
 };
 
-AtpgData<SingleStuckAtFaultModel>::AtpgData(void):
-	faultListReduction(FaultListReduction::RemoveEquivalent)
+AtpgData<SingleStuckAtFaultModel>::AtpgData(std::string configPrefix):
+	faultListReduction(FaultListReduction::RemoveEquivalent),
+	configPrefix(configPrefix)
 {
 }
 AtpgData<SingleStuckAtFaultModel>::~AtpgData(void) = default;
 
 bool AtpgData<SingleStuckAtFaultModel>::SetSetting(std::string key, std::string value)
 {
-	if (key == "Scale4Edge/TestPatternGeneration/FaultListReduction")
+	if (Settings::IsOption(key, "FaultListReduction", configPrefix))
 	{
 		return Settings::ParseEnum(value, faultListReduction, {
 			{ "Original", FaultListReduction::Original },
@@ -126,15 +127,24 @@ bool AtpgData<SingleStuckAtFaultModel>::SetSetting(std::string key, std::string 
 	return false;
 }
 
-AtpgData<SingleTransitionDelayFaultModel>::AtpgData(void):
-	faultListReduction(FaultListReduction::RemoveEquivalent)
+void AtpgData<SingleStuckAtFaultModel>::Init(void)
+{
+}
+
+void AtpgData<SingleStuckAtFaultModel>::Run(void)
+{
+}
+
+AtpgData<SingleTransitionDelayFaultModel>::AtpgData(std::string configPrefix):
+	faultListReduction(FaultListReduction::RemoveEquivalent),
+	configPrefix(configPrefix)
 {
 }
 AtpgData<SingleTransitionDelayFaultModel>::~AtpgData(void) = default;
 
 bool AtpgData<SingleTransitionDelayFaultModel>::SetSetting(std::string key, std::string value)
 {
-	if (key == "Scale4Edge/TestPatternGeneration/FaultListReduction")
+	if (Settings::IsOption(key, "FaultListReduction", configPrefix))
 	{
 		return Settings::ParseEnum(value, faultListReduction, {
 			{ "Original", FaultListReduction::Original },
@@ -145,31 +155,44 @@ bool AtpgData<SingleTransitionDelayFaultModel>::SetSetting(std::string key, std:
 	return false;
 }
 
-AtpgData<CellAwareFaultModel>::AtpgData(void):
-	udfm(std::make_shared<Io::Udfm::UdfmModel>())
+void AtpgData<SingleTransitionDelayFaultModel>::Init(void)
+{
+}
+
+void AtpgData<SingleTransitionDelayFaultModel>::Run(void)
+{
+}
+
+AtpgData<CellAwareFaultModel>::AtpgData(std::string configPrefix):
+	Mixin::UdfmMixin(configPrefix)
 {
 }
 AtpgData<CellAwareFaultModel>::~AtpgData(void) = default;
 
 bool AtpgData<CellAwareFaultModel>::SetSetting(std::string key, std::string value)
 {
-	if (key == "Scale4Edge/Data/Udfm/ImportFilePath")
-	{
-		udfmFile = value;
-		return true;
-	}
-	return false;
+	return UdfmMixin::SetSetting(key, value);
+}
+
+void AtpgData<CellAwareFaultModel>::Init(void)
+{
+	UdfmMixin::Init();
+}
+
+void AtpgData<CellAwareFaultModel>::Run(void)
+{
+	UdfmMixin::Run();
 }
 
 template <typename FaultModel, typename FaultList>
-AtpgBase<FaultModel, FaultList>::AtpgBase(void):
-	Mixin::StatisticsMixin("UNINITIALIZED"),
-	Mixin::FaultStatisticsMixin<FaultList>("UNINITIALIZED"),
-	Mixin::SimulationStatisticsMixin("UNINITIALIZED"),
-	Mixin::SolverStatisticsMixin("UNINITIALIZED"),
-	Mixin::VcdExportMixin<FaultList>("UNINITIALIZED"),
-	Mixin::VcmMixin("UNINITIALIZED"),
-	AtpgData<FaultModel>(),
+AtpgBase<FaultModel, FaultList>::AtpgBase(std::string configPrefix):
+	Mixin::StatisticsMixin(configPrefix),
+	Mixin::FaultStatisticsMixin<FaultList>(configPrefix),
+	Mixin::SimulationStatisticsMixin(configPrefix),
+	Mixin::SolverStatisticsMixin(configPrefix),
+	Mixin::VcdExportMixin<FaultList>(configPrefix),
+	Mixin::VcmMixin(configPrefix),
+	AtpgData<FaultModel>(configPrefix),
 	faultListSource(FaultListSource::FreiTest),
 	faultListFile("NOT_SPECIFIED"),
 	faultList(),
@@ -199,7 +222,8 @@ AtpgBase<FaultModel, FaultList>::AtpgBase(void):
 	faultListBegin(0u),
 	faultListEnd(std::numeric_limits<size_t>::max()),
 	parallelMutex(),
-	vcdDebugExportId(0u)
+	vcdDebugExportId(0u),
+	configPrefix(configPrefix)
 {
 	statPatternsGenerated.SetCollectValues(true);
 }
@@ -210,6 +234,7 @@ AtpgBase<FaultModel, FaultList>::~AtpgBase(void) = default;
 template <typename FaultModel, typename FaultList>
 void AtpgBase<FaultModel, FaultList>::Init(void)
 {
+	AtpgData<FaultModel>::Init();
 	Mixin::StatisticsMixin::Init();
 	Mixin::FaultStatisticsMixin<FaultList>::Init();
 	Mixin::SimulationStatisticsMixin::Init();
@@ -225,15 +250,7 @@ void AtpgBase<FaultModel, FaultList>::Run(void)
 	Parallel::SetThreads(Parallel::Arena::PatternGeneration, patternGenerationThreadLimit);
 	Parallel::SetThreads(Parallel::Arena::FaultSimulation, simulationThreadLimit);
 
-	if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
-	{
-		ASSERT(!this->udfmFile.empty()) << "No UDFM file has been specified";
-		FileHandle fileHandle(this->udfmFile, true);
-		this->udfm = Io::Udfm::ParseUdfm(fileHandle.GetStream());
-		ASSERT(this->udfm) << "Could not load UDFM file \"" << this->udfmFile
-			<< "\"! Make sure that the file exists and the name has been written correctly.";
-	}
-
+	AtpgData<FaultModel>::Run();
 	Mixin::StatisticsMixin::Run();
 	Mixin::FaultStatisticsMixin<FaultList>::Run();
 	Mixin::SimulationStatisticsMixin::Run();
@@ -267,57 +284,57 @@ void AtpgBase<FaultModel, FaultList>::PostRun(void)
 template <typename FaultModel, typename FaultList>
 bool AtpgBase<FaultModel, FaultList>::SetSetting(std::string key, std::string value)
 {
-	if (key == "Scale4Edge/TestPatternGeneration/FaultListSource")
+	if (Settings::IsOption(key, "FaultListSource", configPrefix))
 	{
 		return Settings::ParseEnum(value, faultListSource, {
 			{ "FreiTest", FaultListSource::FreiTest },
 			{ "File", FaultListSource::File },
 		});
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/FaultListFile")
+	if (Settings::IsOption(key, "FaultListFile", configPrefix))
 	{
 		faultListFile = value;
 		return true;
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/FaultSimulation")
+	if (Settings::IsOption(key, "FaultSimulation", configPrefix))
 	{
 		return Settings::ParseEnum(value, faultSimulation, {
 			{ "Disabled", FaultSimulation::Disabled },
 			{ "Enabled", FaultSimulation::Enabled },
 		});
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/TestPatternExport")
+	if (Settings::IsOption(key, "TestPatternExport", configPrefix))
 	{
 		return Settings::ParseEnum(value, testPatternExport, {
 			{ "Disabled", TestPatternExport::Disabled },
 			{ "Enabled", TestPatternExport::Enabled },
 		});
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/PatternGenerationThreadLimit")
+	if (Settings::IsOption(key, "PatternGenerationThreadLimit", configPrefix))
 	{
 		return Settings::ParseSizet(value, patternGenerationThreadLimit);
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/SolverThreadLimit")
+	if (Settings::IsOption(key, "SolverThreadLimit", configPrefix))
 	{
 		return Settings::ParseSizet(value, solverThreadLimit);
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/SolverTimeout")
+	if (Settings::IsOption(key, "SolverTimeout", configPrefix))
 	{
 		return Settings::ParseSizet(value, solverTimeout);
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/SolverTimeoutUntestability")
+	if (Settings::IsOption(key, "SolverTimeoutUntestability", configPrefix))
 	{
 		return Settings::ParseSizet(value, solverUntestabilityTimeout);
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/SimulationThreadLimit")
+	if (Settings::IsOption(key, "SimulationThreadLimit", configPrefix))
 	{
 		return Settings::ParseSizet(value, simulationThreadLimit);
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/FaultStartIndex")
+	if (Settings::IsOption(key, "FaultStartIndex", configPrefix))
 	{
 		return Settings::ParseSizet(value, faultListBegin);
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/FaultEndIndex")
+	if (Settings::IsOption(key, "FaultEndIndex", configPrefix))
 	{
 		if (Settings::ParseSizet(value, faultListEnd))
 		{
@@ -329,52 +346,52 @@ bool AtpgBase<FaultModel, FaultList>::SetSetting(std::string key, std::string va
 			return false;
 		}
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/FaultListFilter")
+	if (Settings::IsOption(key, "FaultListFilter", configPrefix))
 	{
 		faultListFilter = value;
 		return true;
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/FaultListExclude")
+	if (Settings::IsOption(key, "FaultListExclude", configPrefix))
 	{
 		faultListExclude = value;
 		return true;
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/SimulateAllFaults")
+	if (Settings::IsOption(key, "SimulateAllFaults", configPrefix))
 	{
 		return Settings::ParseEnum(value, simulateAllFaults, {
 			{ "Disabled", SimulateAllFaults::Disabled },
 			{ "Enabled", SimulateAllFaults::Enabled },
 		});
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/CheckSimulation")
+	if (Settings::IsOption(key, "CheckSimulation", configPrefix))
 	{
 		return Settings::ParseEnum(value, checkSimulation, {
 			{ "Disabled", CheckSimulation::Disabled },
 			{ "Enabled", CheckSimulation::Enabled },
 		});
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/CheckSimulationInitialState")
+	if (Settings::IsOption(key, "CheckSimulationInitialState", configPrefix))
 	{
 		return Settings::ParseEnum(value, checkSimulationInitialState, {
 			{ "Disabled", CheckSimulationInitialState::Disabled },
 			{ "CheckEqual", CheckSimulationInitialState::CheckEqual },
 		});
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/CheckSimulationInputs")
+	if (Settings::IsOption(key, "CheckSimulationInputs", configPrefix))
 	{
 		return Settings::ParseEnum(value, checkSimulationInputs, {
 			{ "Disabled", CheckSimulationInputs::Disabled },
 			{ "CheckEqual", CheckSimulationInputs::CheckEqual },
 		});
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/CheckSimulationFlipFlops")
+	if (Settings::IsOption(key, "CheckSimulationFlipFlops", configPrefix))
 	{
 		return Settings::ParseEnum(value, checkSimulationFlipFlops, {
 			{ "Disabled", CheckSimulationFlipFlops::Disabled },
 			{ "CheckEqual", CheckSimulationFlipFlops::CheckEqual },
 		});
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/CheckAtpgResult")
+	if (Settings::IsOption(key, "CheckAtpgResult", configPrefix))
 	{
 		return Settings::ParseEnum(value, checkAtpgResult, {
 			{ "Disabled", CheckAtpgResult::Disabled },
@@ -382,21 +399,21 @@ bool AtpgBase<FaultModel, FaultList>::SetSetting(std::string key, std::string va
 			{ "CheckInitial", CheckAtpgResult::CheckInitial },
 		});
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/CheckMaxIterationCovered")
+	if (Settings::IsOption(key, "CheckMaxIterationCovered", configPrefix))
 	{
 		return Settings::ParseEnum(value, checkMaxIterationCovered, {
 			{ "Disabled", CheckMaxIterationCovered::Disabled },
 			{ "Enabled", CheckMaxIterationCovered::Enabled },
 		});
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/IncrementalSimulation")
+	if (Settings::IsOption(key, "IncrementalSimulation", configPrefix))
 	{
 		return Settings::ParseEnum(value, incrementalSimulation, {
 			{ "Disabled", IncrementalSimulation::Disabled },
 			{ "Enabled", IncrementalSimulation::Enabled },
 		});
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/PrintTestPatternReport")
+	if (Settings::IsOption(key, "PrintTestPatternReport", configPrefix))
 	{
 		return Settings::ParseEnum(value, printPatternReport, {
 			{ "PrintDetail", PrintTestPatternReport::PrintDetail },
@@ -404,7 +421,7 @@ bool AtpgBase<FaultModel, FaultList>::SetSetting(std::string key, std::string va
 			{ "PrintNothing", PrintTestPatternReport::PrintNothing },
 		});
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/PrintFaultListReport")
+	if (Settings::IsOption(key, "PrintFaultListReport", configPrefix))
 	{
 		return Settings::ParseEnum(value, printFaultListReport, {
 			{ "PrintDetail", PrintFaultListReport::PrintDetail },
@@ -684,7 +701,7 @@ void AtpgBase<FaultModel, FaultList>::GenerateFaultList(void)
 				auto cellType = sourceInfo.template GetProperty<std::string>("module-type").value_or("");
 				ASSERT(cellType != "") << "The cell type attribute has to be defined.";
 
-				auto udfmFault { this->udfm->GetFault(cellType, faultName) };
+				auto udfmFault { this->GetUdfm()->GetFault(cellType, faultName) };
 				ASSERT(udfmFault) << "Could not find UDFM fault " << faultName << " for cell " << cellType << " in the UDFM.";
 
 				auto cellAwareFault { MapUdfmFaultToCell(*this->circuit, cellMetaData, udfmFault) };
@@ -830,7 +847,7 @@ void AtpgBase<FaultModel, FaultList>::GenerateFaultList(void)
 		else if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
 		{
 			generationTimer.SetTimeReference();
-			auto allFaults = Fault::GenerateCellAwareFaultList(*this->circuit, *this->udfm);
+			auto allFaults = Fault::GenerateCellAwareFaultList(*this->circuit, *this->GetUdfm());
 			generationTimer.Stop();
 
 			reductionTimer.SetTimeReference();

@@ -51,7 +51,7 @@ LfsrAtpg<FaultModel, FaultList>::LfsrAtpg(void):
 	SolverStatisticsMixin(SCALE4EDGE_ATPG_CONFIG),
 	VcdExportMixin<FaultList>(SCALE4EDGE_ATPG_CONFIG),
 	VcmMixin(SCALE4EDGE_ATPG_CONFIG),
-	AtpgBase<FaultModel, FaultList>()
+	AtpgBase<FaultModel, FaultList>(SCALE4EDGE_ATPG_CONFIG)
 {
 }
 

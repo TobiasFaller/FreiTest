@@ -46,7 +46,8 @@ TestPatternsToVcd<FaultModel, FaultList>::TestPatternsToVcd(void):
 	Mixin::SimulationStatisticsMixin("Scale4Edge/TestPatternsToVcd"),
 	Mixin::SolverStatisticsMixin("Scale4Edge/TestPatternsToVcd"),
 	Mixin::VcdExportMixin<FaultList>("Scale4Edge/TestPatternsToVcd"),
-	Mixin::VcmMixin("Scale4Edge/TestPatternsToVcd")
+	Mixin::VcmMixin("Scale4Edge/TestPatternsToVcd"),
+	AtpgBase<FaultModel, FaultList>("Scale4Edge/TestPatternsToVcd")
 {
 }
 
