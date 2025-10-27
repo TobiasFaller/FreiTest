@@ -84,7 +84,10 @@ cc_library(
 )
 cc_library(
     name = "ncip-implementation",
-    srcs = glob(["solver/bmc-ncip/src/**/*.cpp"], exclude=["solver/bmc-ncip/src/**/bmc-prover.cpp"]),
+    srcs = glob(["solver/bmc-ncip/src/**/*.cpp"], exclude=[
+        "solver/bmc-ncip/src/**/bmc-io-*.cpp",
+        "solver/bmc-ncip/src/**/bmc-prover.cpp"
+    ]),
     hdrs = glob(["solver/bmc-ncip/src/**/*.hpp"]),
     defines = ["INCLUDE_PREFIXED", "NCIP_BACKEND_MINICRAIG", "NCIP_BACKEND_CADICRAIG"],
     deps = [":minicraig-2.2.0", ":cadicraig"],
@@ -260,16 +263,19 @@ cc_library(
 cc_library(
     name = "cadical-implementation",
     srcs = glob(
-        include=["solver/sat-cadical/src/**/*.cpp"],
+        include=[
+            "solver/sat-cadical/src/**/*.cpp",
+            "solver/sat-cadical/src/**/*.c"
+        ],
         exclude=[
             "solver/sat-cadical/src/**/cadical.cpp",
-            "solver/sat-cadical/src/**/mobical.cpp"
+            "solver/sat-cadical/src/**/mobical.cpp",
+            "solver/sat-cadical/src/**/ccadical.c"
         ]
     ),
     hdrs = glob(["solver/sat-cadical/src/**/*.h*"]),
     defines = ["VERSION=\\\"2.0.0\\\""],
     copts = [
-        "-Wno-class-memaccess",
         "-Wno-parentheses",
         "-Wno-sign-compare",
         "-Wno-misleading-indentation",
@@ -278,6 +284,9 @@ cc_library(
 
         "-iquote", "libraries/solver/sat-cadical/src/"
     ],
+    cxxopts = [
+        "-Wno-class-memaccess",
+    ]
 )
 
 # -----------------------------------------------------------------------------

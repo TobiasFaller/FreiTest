@@ -149,7 +149,7 @@ public:
 		if constexpr (is_craig) {
 			std::cerr << "-T- #include <cassert>" << std::endl;
 			std::cerr << "-T- #include <iostream>" << std::endl;
-#ifdef __has_include(<minicraig-2.2.0/craig/CraigSolver.h>)
+#if __has_include(<minicraig-2.2.0/craig/CraigSolver.h>)
 			std::cerr << "-T- #include <minicraig-2.2.0/craig/CraigSolver.h>" << std::endl;
 			std::cerr << "-T- #include <minicraig-2.2.0/simp/SimpSolver.h>" << std::endl;
 			std::cerr << "-T- #include <minicraig-2.2.0/preproc/Preprocessor.h>" << std::endl;

@@ -21,8 +21,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-#define BOOST_TEST_DYN_LINK
-
 #include <boost/mpl/list.hpp>
 #include <boost/test/unit_test.hpp>
 #include <cstddef>
@@ -362,26 +360,85 @@ BOOST_AUTO_TEST_CASE(test_longest_prefix) {
 }
 
 /**
+ * for_each_prefix_of
+ */
+BOOST_AUTO_TEST_CASE(test_for_each_prefix_of) {
+  using map_type = tsl::htrie_map<char, int>;
+  using path_type = std::vector<std::string>;
+
+  map_type map(4);
+  map = {{"a", 1},      {"aa", 1},      {"aaa", 1},   {"aaaaa", 1},
+         {"aaaaaa", 1}, {"aaaaaaa", 1}, {"ab", 1},    {"abcde", 1},
+         {"abcdf", 1},  {"abcdg", 1},   {"abcdh", 1}, {"babc", 1}};
+
+  std::vector<std::pair<const char*, path_type>> test_vectors = {
+      {"a", {"a"}},
+      {"aa", {"a", "aa"}},
+      {"aaa", {"a", "aa", "aaa"}},
+      {"aaaa", {"a", "aa", "aaa"}},
+      {"ab", {"a", "ab"}},
+      {"abc", {"a", "ab"}},
+      {"abcd", {"a", "ab"}},
+      {"abcdz", {"a", "ab"}},
+      {"abcde", {"a", "ab", "abcde"}},
+      {"abcdef", {"a", "ab", "abcde"}},
+      {"abcdefg", {"a", "ab", "abcde"}},
+      {"dabc", {}},
+      {"b", {}},
+      {"bab", {}},
+      {"babd", {}},
+      {"", {}},
+  };
+
+  for (const auto& v : test_vectors) {
+    path_type p;
+    const path_type& expected = v.second;
+    auto visitor = [&p](map_type::const_iterator it) { p.push_back(it.key()); };
+    map.for_each_prefix_of(v.first, visitor);
+    BOOST_CHECK_EQUAL_COLLECTIONS(p.begin(), p.end(), expected.begin(),
+                                  expected.end());
+    if (p != expected)
+      BOOST_TEST_MESSAGE("...for test vector input '" << v.first << "'");
+  }
+}
+
+/**
  * erase_prefix
  */
 BOOST_AUTO_TEST_CASE(test_erase_prefix) {
   tsl::htrie_map<char, std::int64_t> map =
       utils::get_filled_map<tsl::htrie_map<char, std::int64_t>>(10000, 200);
 
+  auto check_nb_equal_prefix = [&map](const std::string& key,
+                                      std::ptrdiff_t nb_values) {
+    auto range = map.equal_prefix_range(key);
+    return std::distance(range.first, range.second) == nb_values;
+  };
+
+  BOOST_CHECK(check_nb_equal_prefix("Key 1", 1111));
   BOOST_CHECK_EQUAL(map.erase_prefix("Key 1"), 1111);
   BOOST_CHECK_EQUAL(map.size(), 8889);
+  BOOST_CHECK(check_nb_equal_prefix("Key 1", 0));
 
+  BOOST_CHECK(check_nb_equal_prefix("Key 22", 111));
   BOOST_CHECK_EQUAL(map.erase_prefix("Key 22"), 111);
   BOOST_CHECK_EQUAL(map.size(), 8778);
+  BOOST_CHECK(check_nb_equal_prefix("Key 2", 1000));
 
+  BOOST_CHECK(check_nb_equal_prefix("Key 333", 11));
   BOOST_CHECK_EQUAL(map.erase_prefix("Key 333"), 11);
   BOOST_CHECK_EQUAL(map.size(), 8767);
+  BOOST_CHECK(check_nb_equal_prefix("Key 3", 1100));
 
+  BOOST_CHECK(check_nb_equal_prefix("Key 4444", 1));
   BOOST_CHECK_EQUAL(map.erase_prefix("Key 4444"), 1);
   BOOST_CHECK_EQUAL(map.size(), 8766);
+  BOOST_CHECK(check_nb_equal_prefix("Key 4", 1110));
 
+  BOOST_CHECK(check_nb_equal_prefix("Key 55555", 0));
   BOOST_CHECK_EQUAL(map.erase_prefix("Key 55555"), 0);
   BOOST_CHECK_EQUAL(map.size(), 8766);
+  BOOST_CHECK(check_nb_equal_prefix("Key 5", 1111));
 
   for (auto it = map.begin(); it != map.end(); ++it) {
     BOOST_CHECK(it.key().find("Key 1") == std::string::npos);
@@ -389,6 +446,27 @@ BOOST_AUTO_TEST_CASE(test_erase_prefix) {
     BOOST_CHECK(it.key().find("Key 333") == std::string::npos);
     BOOST_CHECK(it.key().find("Key 4444") == std::string::npos);
   }
+
+  BOOST_CHECK_EQUAL(std::distance(map.begin(), map.end()), map.size());
+}
+
+BOOST_AUTO_TEST_CASE(test_erase_prefix2) {
+  tsl::htrie_map<char, std::int64_t> map =
+      utils::get_filled_map<tsl::htrie_map<char, std::int64_t>>(10000, 100);
+
+  auto check_nb_equal_prefix = [&map](const std::string& key,
+                                      std::ptrdiff_t nb_values) {
+    auto range = map.equal_prefix_range(key);
+    return std::distance(range.first, range.second) == nb_values;
+  };
+
+  for (size_t i = 0; i < 10; i++) {
+    BOOST_CHECK_EQUAL(map.erase_prefix("Key 2" + std::to_string(i)), 111);
+    BOOST_CHECK(check_nb_equal_prefix("Key 2", 1111 - (i + 1) * 111));
+  }
+  BOOST_CHECK_EQUAL(map.erase_prefix("Key 2"), 1);
+  BOOST_CHECK_EQUAL(map.size(), 8889);
+  BOOST_CHECK(check_nb_equal_prefix("Key 2", 0));
 
   BOOST_CHECK_EQUAL(std::distance(map.begin(), map.end()), map.size());
 }

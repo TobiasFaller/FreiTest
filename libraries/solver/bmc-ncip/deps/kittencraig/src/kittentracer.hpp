@@ -1,7 +1,7 @@
 #ifndef _kittentracer_hpp_INCLUDED
 #define _kittentracer_hpp_INCLUDED
 
-#ifdef __has_include(<kissat/kitten.h>)
+#if __has_include(<kissat/kitten.h>)
 # include <kissat/kitten.h>
 #else
 # include <kitten.h>
