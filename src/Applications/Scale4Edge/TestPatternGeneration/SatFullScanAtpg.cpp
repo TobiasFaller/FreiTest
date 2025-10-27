@@ -25,6 +25,7 @@
 #include "Basic/Pattern/TestPattern.hpp"
 #include "Basic/Iterator/IntegerIterator.hpp"
 #include "Circuit/CircuitEnvironment.hpp"
+#include "Helper/FileHandle.hpp"
 #include "SolverProxy/Sat/SatSolverProxy.hpp"
 #include "SolverProxy/MaxSat/MaxSatSolverProxy.hpp"
 #include "SolverProxy/Sat/Glucose421ParallelSolverProxy.hpp"
@@ -54,6 +55,7 @@
 #include "Tpg/LogicGenerator/Vcm/VcmOutputLogicEncoder.hpp"
 #include "Tpg/LogicGenerator/Vcm/VcmInputLogicEncoder.hpp"
 #include "Tpg/Vcm/VcmContext.hpp"
+#include "Io/ValueWatcherExporter/ValueWatcherExporter.hpp"
 
 using namespace SolverProxy;
 using namespace FreiTest::Basic;
@@ -367,7 +369,44 @@ void SatFullScanAtpg<FaultModel, FaultList>::GeneratePatternForFault(size_t faul
 			AtpgBase<FaultModel, FaultList>::ValidateAtpgResult(faultIndex, pattern, Pattern::OutputCapture::PrimaryAndSecondaryOutputs, *logicGenerator, simConfig);
 		}
 
+		Helper::ValueWatcher circuitWatcher { };
+		Helper::ValueWatcher vcmWatcher { };
+		this->circuitWatcherImporter->ApplyWatchers(circuitWatcher, *this->circuit, vcmContext.GetTags(), vcmContext.GetTarget());
+		if (this->vcmEnable == VcmMixin::VcmEnable::Enabled)
+		{
+			this->vcmWatcherImporter->ApplyWatchers(vcmWatcher, *this->vcmCircuit, vcmContext.GetTags(), vcmContext.GetTarget());
+		}
+
+		auto circuitWatches { circuitWatcher.GetWatcherValues<PinData, GoodTag>(logicGenerator->GetContext()) };
+		std::vector<Helper::ValueWatcher::WatcherValues> vcmWatches;
+		if (this->vcmEnable == VcmMixin::VcmEnable::Enabled)
+		{
+			vcmWatches = vcmWatcher.GetWatcherValues<VcmPinData, GoodTag>(vcmLogicGenerator->GetContext());
+		}
+
+		std::vector<Helper::ValueWatcher::WatcherValues> watchedValues;
+		watchedValues.reserve(circuitWatches.size() + vcmWatches.size());
+		watchedValues.insert(watchedValues.end(), circuitWatches.begin(), circuitWatches.end());
+		watchedValues.insert(watchedValues.end(), vcmWatches.begin(), vcmWatches.end());
+
+		Helper::ValuePrinter printer { };
+		printer.SetTitle(vcmContext.GetDisplayName());
+		printer.SetTimeframeTitles(+[](size_t timeframe) { return "Timeframe #" + std::to_string(timeframe); });
+		printer.SetEqualColumnWidths(true);
+		this->circuitPrinterImporter->ApplyPrinters(printer, vcmContext.GetTags(), vcmContext.GetTarget());
+		if (this->vcmEnable == VcmMixin::VcmEnable::Enabled)
+		{
+			printer.AddDivider(Helper::ValuePrinter::DivideType::BoldSolid);
+			this->vcmPrinterImporter->ApplyPrinters(printer, vcmContext.GetTags(), vcmContext.GetTarget());
+		}
+		LOG(INFO) << std::endl << printer.ToPrintable(watchedValues);
+
 		size_t testPatternIndex = this->testPatterns.emplace_back(pattern);
+		if (!this->watcherExportPath.empty())
+		{
+			FileHandle watchersHandle(boost::str(boost::format("%s/pattern-%d.json") % this->watcherExportPath % testPatternIndex), false);
+			Io::ExportWatchers(watchersHandle.GetOutStream(), watchedValues);
+		}
 		AtpgBase<FaultModel, FaultList>::RunFaultSimulation(vcmContext, faultIndex, testPatternIndex, Pattern::OutputCapture::PrimaryAndSecondaryOutputs, simConfig);
 
 		if (metadata->faultStatus != Fault::FaultStatus::FAULT_STATUS_DETECTED)

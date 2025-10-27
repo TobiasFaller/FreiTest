@@ -8,6 +8,8 @@
 #include "Basic/Pattern/TestPattern.hpp"
 #include "Simulation/CircuitSimulationResult.hpp"
 #include "Tpg/Vcm/VcmContext.hpp"
+#include "Io/ValuePrinterImporter/ValuePrinterImporter.hpp"
+#include "Io/ValueWatcherImporter/ValueWatcherImporter.hpp"
 
 namespace FreiTest
 {
@@ -70,6 +72,19 @@ protected:
 
 	std::string vcmConfiguration;
 	std::map<std::string, VcmConfiguration> vcmConfigurations;
+
+	// Watcher and printer options
+	std::string circuitWatcherImportFilename;
+	std::string circuitPrinterImportFilename;
+	std::unique_ptr<Io::ValueWatcherImporter> circuitWatcherImporter;
+	std::unique_ptr<Io::ValuePrinterImporter> circuitPrinterImporter;
+
+	std::string vcmWatcherImportFilename;
+	std::string vcmPrinterImportFilename;
+	std::unique_ptr<Io::ValueWatcherImporter> vcmWatcherImporter;
+	std::unique_ptr<Io::ValuePrinterImporter> vcmPrinterImporter;
+
+	std::string watcherExportPath;
 
 private:
 	std::string vcmConfigPrefix;

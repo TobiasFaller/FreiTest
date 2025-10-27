@@ -51,6 +51,15 @@ Mixin::VcmMixin::VcmMixin(std::string configPrefix):
 	vcmParameters(),
 	vcmConfiguration("NO_CONFIGURATION_SELECTED"),
 	vcmConfigurations(),
+	circuitWatcherImportFilename(),
+	circuitPrinterImportFilename(),
+	circuitWatcherImporter(std::make_unique<Io::ValueWatcherImporter>()),
+	circuitPrinterImporter(std::make_unique<Io::ValuePrinterImporter>()),
+	vcmWatcherImportFilename(),
+	vcmPrinterImportFilename(),
+	vcmWatcherImporter(std::make_unique<Io::ValueWatcherImporter>()),
+	vcmPrinterImporter(std::make_unique<Io::ValuePrinterImporter>()),
+	watcherExportPath(),
 	vcmConfigPrefix(configPrefix),
 	vcmStatistics()
 {
@@ -247,6 +256,31 @@ bool Mixin::VcmMixin::SetSetting(std::string key, std::string value)
 
 		return true;
 	}
+	if (Settings::IsOption(key, "CircuitWatcherImportFilename", vcmConfigPrefix))
+	{
+		circuitWatcherImportFilename = value;
+		return true;
+	}
+	if (Settings::IsOption(key, "CircuitPrinterImportFilename", vcmConfigPrefix))
+	{
+		circuitPrinterImportFilename = value;
+		return true;
+	}
+	if (Settings::IsOption(key, "VcmWatcherImportFilename", vcmConfigPrefix))
+	{
+		vcmWatcherImportFilename = value;
+		return true;
+	}
+	if (Settings::IsOption(key, "VcmPrinterImportFilename", vcmConfigPrefix))
+	{
+		vcmPrinterImportFilename = value;
+		return true;
+	}
+	if (Settings::IsOption(key, "WatcherExportPath", vcmConfigPrefix))
+	{
+		watcherExportPath = value;
+		return true;
+	}
 
 	return false;
 }
@@ -257,9 +291,51 @@ void Mixin::VcmMixin::Init(void)
 
 void Mixin::VcmMixin::Run(void)
 {
+	if (!circuitWatcherImportFilename.empty())
+	{
+		LOG(INFO) << "Loading circuit value watchers from file " << circuitWatcherImportFilename;
+
+		FileHandle handle { circuitWatcherImportFilename , true };
+		if (!circuitWatcherImporter->LoadWatchers(handle.GetStream(), "circuit/", this->circuit->GetName() + "/"))
+		{
+			LOG(FATAL) << "Could not load circuit value watchers from file " << circuitWatcherImportFilename;
+		}
+	}
+	if (!circuitPrinterImportFilename.empty())
+	{
+		LOG(INFO) << "Loading circuit printers from file " << circuitPrinterImportFilename;
+
+		FileHandle handle { circuitPrinterImportFilename , true };
+		if (!circuitPrinterImporter->LoadPrinters(handle.GetStream(), "circuit/"))
+		{
+			LOG(FATAL) << "Could not load circuit value printers from file " << circuitPrinterImportFilename;
+		}
+	}
+
 	if (vcmEnable == VcmEnable::Enabled)
 	{
 		LoadVcmCircuit();
+
+		if (!vcmWatcherImportFilename.empty())
+		{
+			LOG(INFO) << "Loading VCM value watchers from file " << vcmWatcherImportFilename;
+
+			FileHandle handle { vcmWatcherImportFilename , true };
+			if (!vcmWatcherImporter->LoadWatchers(handle.GetStream(), "vcm/", this->vcmCircuit->GetName() + "/"))
+			{
+				LOG(FATAL) << "Could not load VCM value watchers from file " << vcmWatcherImportFilename;
+			}
+		}
+		if (!vcmPrinterImportFilename.empty())
+		{
+			LOG(INFO) << "Loading VCM printers from file " << vcmPrinterImportFilename;
+
+			FileHandle handle { vcmPrinterImportFilename , true };
+			if (!vcmPrinterImporter->LoadPrinters(handle.GetStream(), "vcm/"))
+			{
+				LOG(FATAL) << "Could not load vcm value printers from file " << vcmPrinterImportFilename;
+			}
+		}
 	}
 }
 
@@ -496,7 +572,7 @@ bool Mixin::VcmMixin::SimulateVcmPattern(const Vcm::VcmContext& context, Pattern
 			case Vcm::VcmOutputType::InitialConstraint:
 				constraintsFulfilled &= (timeframe != 0u) | (value == Logic::LOGIC_ONE);
 				DVLOG(6) << "VCM: Initial Constraint " << vcmOutput.vcmPort->GetName()
-					<< (((timeframe != 0u) | (value == Logic::LOGIC_ONE)) ? " is satisfied" : " is unsatisfied")
+					<< (((timeframe != 0u) || (value == Logic::LOGIC_ONE)) ? " is satisfied" : " is unsatisfied")
 					<< " in timeframe " << timeframe;
 				break;
 

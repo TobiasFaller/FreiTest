@@ -81,6 +81,11 @@ void TestPatternsToStatistics<FaultModel, FaultList>::Run(void)
 		vcmContext.AddTags(it->second.GetTags());
 		vcmContext.AddVcmParameters(it->second.GetParameters());
 	}
+	if (this->vcmEnable == Mixin::VcmMixin::VcmEnable::Enabled)
+	{
+		vcmContext.SetVcmStartState(std::vector<Basic::Logic>(this->vcmCircuit->GetMappedCircuit().GetNumberOfSecondaryInputs(), Basic::Logic::LOGIC_ZERO));
+	}
+
 	auto const inputCapture = (*patternResult).GetInputCapture();
 	auto const outputCapture = [&]() -> Pattern::OutputCapture {
 		switch (inputCapture)
@@ -109,7 +114,7 @@ void TestPatternsToStatistics<FaultModel, FaultList>::Run(void)
 	for (auto pattern : (*patternResult).GetTestPatterns())
 	{
 		size_t testPatternIndex = this->testPatterns.emplace_back(*pattern);
-		LOG(INFO) << "Pattern "<< testPatternIndex;
+		LOG(INFO) << "Pattern " << (testPatternIndex + 1u) << " of " << patternResult->GetNumberOfPatterns();
 		AtpgBase<FaultModel, FaultList>::RunFaultSimulation(vcmContext, std::numeric_limits<size_t>::max(), testPatternIndex, outputCapture, simConfig);
 	}
 

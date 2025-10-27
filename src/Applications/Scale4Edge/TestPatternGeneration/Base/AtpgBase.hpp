@@ -144,6 +144,7 @@ protected:
 	void GenerateFaultList(void);
 	template<typename PinData>
 	void ValidateAtpgResult(size_t faultIndex, Pattern::TestPattern& pattern, Pattern::OutputCapture capture, Tpg::LogicGenerator<PinData>& logicGenerator, const Simulation::SimulationConfig& simConfig) const;
+	void DebugAtpgResult(const Simulation::SimulationResult& result, const Circuit::MappedCircuit& circuit, const std::string& name);
 
 	void RunFaultSimulation(const Tpg::Vcm::VcmContext& context, size_t faultIndex, size_t patternIndex, Pattern::OutputCapture capture, const Simulation::SimulationConfig& simConfig);
 	bool CheckSensitization(const FaultModel& faultModel, const Simulation::SimulationResult& goodResult) const;

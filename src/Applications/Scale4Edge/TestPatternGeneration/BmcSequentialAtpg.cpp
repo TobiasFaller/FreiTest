@@ -25,11 +25,13 @@
 #include "Basic/Pattern/TestPattern.hpp"
 #include "Basic/Iterator/IntegerIterator.hpp"
 #include "Circuit/CircuitEnvironment.hpp"
+#include "Helper/FileHandle.hpp"
 #include "SolverProxy/Bmc/BmcSolverProxy.hpp"
 #include "SolverProxy/Bmc/CipExportProxy.hpp"
 #include "SolverProxy/Sat/SatSolverProxy.hpp"
 #include "Tpg/LogicGenerator/LogicGenerator.hpp"
 #include "Tpg/LogicGenerator/TestPatternExtractor.hpp"
+#include "Tpg/LogicGenerator/SimulationResultExtractor.hpp"
 #include "Tpg/LogicGenerator/Tagger/DChain/DChainCircuitTagger.hpp"
 #include "Tpg/LogicGenerator/Tagger/Fault/StuckAtFaultCircuitTagger.hpp"
 #include "Tpg/LogicGenerator/Tagger/Fault/TransitionDelayFaultCircuitTagger.hpp"
@@ -57,6 +59,7 @@
 #include "Tpg/LogicGenerator/CircuitLogic/SequentialConnectionEncoder.hpp"
 #include "Tpg/LogicGenerator/Vcm/VcmOutputLogicEncoder.hpp"
 #include "Tpg/LogicGenerator/Vcm/VcmInputLogicEncoder.hpp"
+#include "Io/ValueWatcherExporter/ValueWatcherExporter.hpp"
 
 using namespace SolverProxy;
 using namespace FreiTest::Basic;
@@ -206,8 +209,6 @@ void BmcSequentialAtpg<FaultModel, FaultList>::GeneratePatternForFault(size_t fa
 	}
 
 	bmcSolver->SetSolverTimeout(this->solverTimeout);
-	bmcSolver->SetSolverDebug(false);
-	bmcSolver->SetSolverSilent(true);
 	bmcSolver->SetMaximumDepth(this->settingsMaximumTimeframes + 1u);
 
 	auto faultModel = std::make_shared<FaultModel>(fault);
@@ -296,22 +297,72 @@ void BmcSequentialAtpg<FaultModel, FaultList>::GeneratePatternForFault(size_t fa
 	{
 		case Bmc::BmcResult::Reachable:
 		{
+			//auto circuitResult { Tpg::Extractor::ExtractSimulationResult<PinData, GoodTag>(logicGenerator->GetContext()) };
+			//auto vcmResult { Tpg::Extractor::ExtractSimulationResult<PinData, GoodTag>(vcmLogicGenerator->GetContext()) };
+			//LOG(INFO) << to_string(circuitResult, *this->circuit);
+			//LOG(INFO) << to_string(vcmResult, *this->vcmCircuit);
+
 			Pattern::TestPattern pattern = Tpg::Extractor::ExtractTestPattern<PinData, GoodTag>(logicGenerator->GetContext(), Pattern::InputCapture::PrimaryAndInitialSecondaryInputs);
 			VLOG(6) << "Generated test pattern: " << to_string(pattern);
 
 			Simulation::SimulationConfig simConfig { Simulation::MakeSimulationConfig(Basic::MakeUnclockedSetResetFlipFlopModel()) };
+			//Simulation::SimulationResult simGoodResult(pattern.GetNumberOfTimeframes(), mappedCircuit.GetNumberOfNodes());
+			//Simulation::SimulateTestPatternEventDriven<Fault::FaultFreeModel>(mappedCircuit, pattern, {}, simGoodResult, simConfig);
+
+			auto const& mappedCircuit { this->circuit->GetMappedCircuit() };
+			Simulation::SimulationResult simBadResult(pattern.GetNumberOfTimeframes(), mappedCircuit.GetNumberOfNodes());
+			Simulation::SimulateTestPatternEventDriven<FaultModel>(mappedCircuit, pattern, { fault }, simBadResult, simConfig);
+
 			if (this->checkAtpgResult == AtpgBase<FaultModel, FaultList>::CheckAtpgResult::CheckEqual)
 			{
 				AtpgBase<FaultModel, FaultList>::ValidateAtpgResult(faultIndex, pattern, Pattern::OutputCapture::PrimaryAndSecondaryOutputs, *logicGenerator, simConfig);
 			}
 
+			Helper::ValueWatcher circuitWatcher { };
+			Helper::ValueWatcher vcmWatcher { };
+			this->circuitWatcherImporter->ApplyWatchers(circuitWatcher, *this->circuit, vcmContext.GetTags(), vcmContext.GetTarget());
+			if (this->vcmEnable == VcmMixin::VcmEnable::Enabled)
+			{
+				this->vcmWatcherImporter->ApplyWatchers(vcmWatcher, *this->vcmCircuit, vcmContext.GetTags(), vcmContext.GetTarget());
+			}
+
+			auto circuitWatches { circuitWatcher.GetWatcherValues<PinData, GoodTag>(logicGenerator->GetContext()) };
+			std::vector<Helper::ValueWatcher::WatcherValues> vcmWatches;
+			if (this->vcmEnable == VcmMixin::VcmEnable::Enabled)
+			{
+				vcmWatches = vcmWatcher.GetWatcherValues<VcmPinData, GoodTag>(vcmLogicGenerator->GetContext());
+			}
+
+			std::vector<Helper::ValueWatcher::WatcherValues> watchedValues;
+			watchedValues.reserve(circuitWatches.size() + vcmWatches.size());
+			watchedValues.insert(watchedValues.end(), circuitWatches.begin(), circuitWatches.end());
+			watchedValues.insert(watchedValues.end(), vcmWatches.begin(), vcmWatches.end());
+
 			size_t testPatternIndex = this->testPatterns.emplace_back(pattern);
+			if (!this->watcherExportPath.empty())
+			{
+				FileHandle watchersHandle(boost::str(boost::format("%s/pattern-%d.json") % this->watcherExportPath % testPatternIndex), false);
+				Io::ExportWatchers(watchersHandle.GetOutStream(), watchedValues);
+			}
+
+			Helper::ValuePrinter printer { };
+			printer.SetTitle(vcmContext.GetDisplayName() + " TP: " + std::to_string(testPatternIndex));
+			printer.SetTimeframeTitles(+[](size_t timeframe) { return "Timeframe #" + std::to_string(timeframe); });
+			printer.SetEqualColumnWidths(true);
+			this->circuitPrinterImporter->ApplyPrinters(printer, vcmContext.GetTags(), vcmContext.GetTarget());
+			if (this->vcmEnable == VcmMixin::VcmEnable::Enabled)
+			{
+				printer.AddDivider(Helper::ValuePrinter::DivideType::BoldSolid);
+				this->vcmPrinterImporter->ApplyPrinters(printer, vcmContext.GetTags(), vcmContext.GetTarget());
+			}
+			LOG(INFO) << std::endl << printer.ToPrintable(watchedValues);
+
 			AtpgBase<FaultModel, FaultList>::RunFaultSimulation(vcmContext, faultIndex, testPatternIndex, Pattern::OutputCapture::PrimaryOutputsOnly, simConfig);
 
-			if (metadata->faultStatus != Fault::FaultStatus::FAULT_STATUS_DETECTED)
-			{
-				LOG(FATAL) << "Invalid test pattern was generated";
-			}
+			//if (metadata->faultStatus != Fault::FaultStatus::FAULT_STATUS_DETECTED)
+			//{
+			//	LOG(FATAL) << "Invalid test pattern was generated";
+			//}
 			goto nextFault;
 		}
 

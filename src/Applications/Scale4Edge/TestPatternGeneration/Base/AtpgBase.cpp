@@ -1148,7 +1148,9 @@ void AtpgBase<FaultModel, FaultList>::RunFaultSimulation(const Tpg::Vcm::VcmCont
 							<< mappedCircuit.GetNode(nodeId)->GetName() << ". Good: "
 							<< to_string(goodResult[timeframe][nodeId]) << ", Bad: "
 							<< to_string(badResult[timeframe][nodeId]) << ", Bad (Check): "
-							<< to_string(checkResult[timeframe][nodeId]);
+							<< to_string(checkResult[timeframe][nodeId]) << std::endl
+							<< "Good:  " << to_string(badResult) << std::endl
+							<< "Check: " << to_string(checkResult);
 					}
 				}
 			}
@@ -1257,6 +1259,15 @@ void AtpgBase<FaultModel, FaultList>::RunFaultSimulation(const Tpg::Vcm::VcmCont
 				{
 					if (faultIndex == targetFaultIndex)
 					{
+						const auto& vcmMappedCircuit { vcmCircuit->GetMappedCircuit() };
+						Simulation::SimulationConfig simConfig { Simulation::MakeSimulationConfig(Basic::MakeUnclockedSetResetFlipFlopModel()) };
+						Simulation::SimulationResult vcmResult(vcmPattern.GetNumberOfTimeframes(), vcmMappedCircuit.GetNumberOfNodes());
+						Simulation::SimulateTestPatternEventDriven<Fault::FaultFreeModel>(vcmMappedCircuit, vcmPattern, {}, vcmResult, simConfig);
+
+						DebugAtpgResult(goodResult, mappedCircuit, "circuit-good");
+						DebugAtpgResult(badResult, mappedCircuit, "circuit-bad");
+						DebugAtpgResult(vcmResult, vcmMappedCircuit, "vcm");
+
 						LOG(FATAL) << "The test pattern " << patternIndex << " does not test the fault " << faultIndex
 							<< " (" + to_string(*fault) << ") according to VCM";
 					}
@@ -2018,6 +2029,15 @@ std::string AtpgBase<FaultModel, FaultList>::DebugFaultLocation(const Simulation
 		LOG(FATAL) << "Fault model not implemented";
 		__builtin_unreachable();
 	}
+}
+
+template<typename FaultModel, typename FaultList>
+void AtpgBase<FaultModel, FaultList>::DebugAtpgResult(const Simulation::SimulationResult& result, const Circuit::MappedCircuit& circuit, const std::string& name)
+{
+	FileHandle handleTrace { boost::str(boost::format("%s-trace.txt") % name), false };
+	FileHandle handleCompact { boost::str(boost::format("%s-compact.txt") % name), false };
+	handleTrace.GetOutStream() << to_string(result, circuit);
+	handleCompact.GetOutStream() << to_string(result);
 }
 
 template class AtpgBase<SingleStuckAtFaultModel, SingleStuckAtFaultList>;
