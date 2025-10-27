@@ -1,0 +1,8 @@
+[
+	{"application": "POLITO_MACISH_SAFE_FAULT_ANALYSIS_CELL_AWARE"},
+
+	{"setting": "DataExportDirectory", "value": "[OutputDir]/[CircuitName]_SafeFaultAnalysisCellAware"},
+
+	{"setting": "PoliTO/MacishSafeFaultAnalysis/Complete", "value": "Incomplete"},
+
+]

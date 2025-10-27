@@ -1,0 +1,15 @@
+[
+    { "name" : "CLOCK_EN", "endianess": "little", "signals": [ "CLOCK_EN_g" ], "tags" : [ "*" ], "targets": ["*"] },
+    { "name" : "A", "endianess": "little", "signals": [ "A_g" ], "tags" : [ "*" ], "targets": ["*"] },
+    { "name" : "B", "endianess": "little", "signals": [ "B_g" ], "tags" : [ "*" ], "targets": ["*"] },
+    { "name" : "ZERO", "endianess": "little", "signals": [ "ZERO_g" ], "tags" : [ "*" ], "targets": ["*"] },
+    { "name" : "MAC_OUT", "endianess": "little", "signals": [ "MAC_OUT_result" ], "tags" : [ "*" ], "targets": ["*"] },
+
+    { "name" : "MAC_OUT_exact", "endianess": "little", "signals": [ "MAC_OUT_exact_result" ], "tags" : [ "*" ], "targets": ["*"] },
+    { "name" : "MAC_OUT_faulty", "endianess": "little", "signals": [ "MAC_OUT_faulty_result" ], "tags" : [ "*" ], "targets": ["*"] },
+    { "name" : "MAC_OUT_faultfree", "endianess": "little", "signals": [ "MAC_OUT_faultfree_result" ], "tags" : [ "*" ], "targets": ["*"] },
+    { "name" : "MAC_DIFFP_faulty", "endianess": "little", "signals": [ "MAC_DIFFP_faulty_result" ], "tags" : [ "*" ], "targets": ["*"] },
+    { "name" : "MAC_DIFFN_faulty", "endianess": "little", "signals": [ "MAC_DIFFN_faulty_result" ], "tags" : [ "*" ], "targets": ["*"] },
+    { "name" : "MAC_DIFFP_faultfree", "endianess": "little", "signals": [ "MAC_DIFFP_faultfree_result" ], "tags" : [ "*" ], "targets": ["*"] },
+    { "name" : "MAC_DIFFN_faultfree", "endianess": "little", "signals": [ "MAC_DIFFN_faultfree_result" ], "tags" : [ "*" ], "targets": ["*"] },
+]

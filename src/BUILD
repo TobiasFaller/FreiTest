@@ -282,6 +282,8 @@ cc_library(
 
         # Add parallel support
         "-ltbb",
+
+        "-lmpfr",
     ],
     linkstatic = True,
     alwayslink = True,

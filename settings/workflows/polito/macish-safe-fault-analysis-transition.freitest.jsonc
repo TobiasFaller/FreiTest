@@ -1,0 +1,8 @@
+[
+	{"application": "POLITO_MACISH_SAFE_FAULT_ANALYSIS_TRANSITION"},
+
+	{"setting": "DataExportDirectory", "value": "[OutputDir]/[CircuitName]_SafeFaultAnalysisTransitionDelay"},
+
+	{"setting": "PoliTO/MacishSafeFaultAnalysis/Complete", "value": "Incomplete"},
+
+]

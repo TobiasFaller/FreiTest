@@ -22,7 +22,7 @@ FROM base AS builder
 # Remove infinite loop from symlink /usr/lib/jvm/default-jvm/jre
 # since jre points to the current directory.
 RUN apk add --no-cache \
-    cmake g++ gdb boost-dev gmp-dev zlib-dev xz-dev \
+    cmake g++ gdb boost-dev gmp-dev mpfr-dev zlib-dev xz-dev \
     python3 py3-pip py3-libxml2 wget \
     make unzip zip gnuplot pigz libstdc++ coreutils linux-headers \
     git openjdk21-jdk \
@@ -81,7 +81,7 @@ RUN bazel --max_idle_secs=0 build --config=$BUILD_CONFIG --config=$BUILD_MARCH $
   && rm -rf ~/.cache/bazel/
 
 RUN mkdir -p /output/lib/ \
-  && cp /usr/lib/lib{boost,tbb,gmp,z,lzma,icu}*.so* /output/lib/
+  && cp /usr/lib/lib{boost,tbb,gmp,mpfr,z,lzma,icu}*.so* /output/lib/
 
 # -----------------------------------------------------------------------------
 # Final container

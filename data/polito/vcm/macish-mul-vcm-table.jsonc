@@ -1,0 +1,14 @@
+[
+    { "type": "watcher", "name": "A", "watcher": "A", "format": "hexadecimal", "alignment": "internal", "prefix": "yes" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "B", "watcher": "B", "format": "hexadecimal", "alignment": "internal", "prefix": "yes" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "O", "watcher": "O", "format": "hexadecimal", "alignment": "internal", "prefix": "yes" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "divider", "style": "bold-dashed", "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "title", "name": "Summary", "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "MUL OUT exact", "watcher": "MUL_OUT_exact", "format": "hexadecimal", "alignment": "internal", "prefix": "yes" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "MUL OUT fault-free", "watcher": "MUL_OUT_faultfree", "format": "hexadecimal", "alignment": "internal", "prefix": "yes" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "MUL OUT faulty", "watcher": "MUL_OUT_faulty", "format": "hexadecimal", "alignment": "internal", "prefix": "yes" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "MUL +DIFF fault-free", "watcher": "MUL_DIFFP_faultfree", "format": "hexadecimal", "alignment": "internal", "prefix": "yes" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "MUL -DIFF fault-free", "watcher": "MUL_DIFFN_faultfree", "format": "hexadecimal", "alignment": "internal", "prefix": "yes" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "MUL +DIFF faulty", "watcher": "MUL_DIFFP_faulty", "format": "hexadecimal", "alignment": "internal", "prefix": "yes" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "MUL -DIFF faulty", "watcher": "MUL_DIFFN_faulty", "format": "hexadecimal", "alignment": "internal", "prefix": "yes" , "tags": [ "*" ], "targets": [ "*" ] },
+]

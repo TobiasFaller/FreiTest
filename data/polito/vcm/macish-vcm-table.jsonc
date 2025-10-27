@@ -1,0 +1,16 @@
+[
+    { "type": "watcher", "name": "CLOCK_EN", "watcher": "CLOCK_EN", "format": "binary", "alignment": "internal", "prefix": "no" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "ZERO", "watcher": "ZERO", "format": "binary", "alignment": "internal", "prefix": "no" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "A", "watcher": "A", "format": "hexadecimal", "alignment": "internal", "prefix": "yes" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "B", "watcher": "B", "format": "hexadecimal", "alignment": "internal", "prefix": "yes" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "MAC_OUT", "watcher": "MAC_OUT", "format": "hexadecimal", "alignment": "internal", "prefix": "yes" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "divider", "style": "bold-dashed", "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "title", "name": "Summary", "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "MAC OUT exact", "watcher": "MAC_OUT_exact", "format": "hexadecimal", "alignment": "internal", "prefix": "yes" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "MAC OUT fault-free", "watcher": "MAC_OUT_faultfree", "format": "hexadecimal", "alignment": "internal", "prefix": "yes" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "MAC OUT faulty", "watcher": "MAC_OUT_faulty", "format": "hexadecimal", "alignment": "internal", "prefix": "yes" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "MAC +DIFF fault-free", "watcher": "MAC_DIFFP_faultfree", "format": "hexadecimal", "alignment": "internal", "prefix": "yes" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "MAC -DIFF fault-free", "watcher": "MAC_DIFFN_faultfree", "format": "hexadecimal", "alignment": "internal", "prefix": "yes" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "MAC +DIFF faulty", "watcher": "MAC_DIFFP_faulty", "format": "hexadecimal", "alignment": "internal", "prefix": "yes" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "MAC -DIFF faulty", "watcher": "MAC_DIFFN_faulty", "format": "hexadecimal", "alignment": "internal", "prefix": "yes" , "tags": [ "*" ], "targets": [ "*" ] },
+]

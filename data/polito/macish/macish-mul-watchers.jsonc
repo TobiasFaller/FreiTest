@@ -1,0 +1,5 @@
+[
+    {"name" : "A", "endianess": "little", "signals": [ "A" ], "tags" : [ "*" ], "targets": ["*"]},
+    {"name" : "B", "endianess": "little", "signals": [ "B" ], "tags" : [ "*" ], "targets": ["*"]},
+    {"name" : "O", "endianess": "little", "signals": [ "O" ], "tags" : [ "*" ], "targets": ["*"]},
+]

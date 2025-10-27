@@ -1,0 +1,9 @@
+[
+    { "type": "watcher", "name": "CLOCK", "watcher": "CLOCK", "format": "binary", "alignment": "internal", "prefix": "no" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "CLOCK_EN", "watcher": "CLOCK_EN", "format": "binary", "alignment": "internal", "prefix": "no" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "ARESET", "watcher": "ARESET", "format": "binary", "alignment": "internal", "prefix": "no" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "ZERO", "watcher": "ZERO", "format": "binary", "alignment": "internal", "prefix": "no" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "A", "watcher": "A", "format": "hexadecimal", "alignment": "internal", "prefix": "yes" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "B", "watcher": "B", "format": "hexadecimal", "alignment": "internal", "prefix": "yes" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "MAC_OUT", "watcher": "MAC_OUT", "format": "hexadecimal", "alignment": "internal", "prefix": "yes" , "tags": [ "*" ], "targets": [ "*" ] },
+]

@@ -24,7 +24,7 @@ RUN yum install --setopt=skip_missing_names_on_install=False -y wget \
     gcc-toolset-9-elfutils gcc-toolset-9-ltrace gcc-toolset-9-make gcc-toolset-9-perftools gcc-toolset-9-strace \
     gcc-toolset-9-libasan-devel gcc-toolset-9-libatomic-devel gcc-toolset-9-libitm-devel \
     gcc-toolset-9-liblsan-devel gcc-toolset-9-libstdc++-devel gcc-toolset-9-libtsan-devel \
-    which bazel bzip2-devel gmp-devel zlib-devel xz-devel \
+    which bazel bzip2-devel gmp-devel mpfr-devel zlib-devel xz-devel \
     python3 python3-devel gnuplot pigz \
     git \
   && python3 -m pip install lxml
@@ -113,7 +113,7 @@ RUN source scl_source enable gcc-toolset-9 \
 RUN mkdir -p /output/lib/ \
 	&& cp -v /opt/rh/gcc-toolset-9/root/usr/lib/gcc/x86_64-redhat-linux/9/lib*.so* /output/lib/ \
 	&& cp -v /usr/lib/lib{boost,tbb,icu}*.so* /output/lib/ \
-	&& cp -v /usr/lib64/lib{gmp,z,lzma}*.so* /output/lib/
+	&& cp -v /usr/lib64/lib{gmp,mpfr,z,lzma}*.so* /output/lib/
 
 # -----------------------------------------------------------------------------
 # Final container

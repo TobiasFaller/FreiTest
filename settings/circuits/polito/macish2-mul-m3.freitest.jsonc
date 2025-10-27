@@ -1,0 +1,15 @@
+[
+	{"define": "OutputDir", "value": "./output"},
+	{"define": "LibraryDir", "value": "./data/cell-libraries/nangate"},
+	{"define": "CircuitDir", "value": "./data/polito/macish"},
+
+	{"setting": "CircuitSourceType", "value": "Verilog"},
+	{"setting": "CircuitName", "value": "M3"},
+	{"setting": "CircuitBaseDirectory", "value": "[CircuitDir]"},
+    {"setting": "TopLevelModuleName", "value": "M3"},
+	{"setting": "VerilogLibraryFilename", "value": "[LibraryDir]/nangate45_freitest.v"},
+	{"setting": "VerilogImportFilename", "value": "output/mul2-m3-nangate45.v"},
+	{"setting": "VerilogExportPreprocessedFilename", "value" : "[DataExportDirectory]/[Circuit].exported-preprocessed.v"},
+	{"setting": "VerilogExportProcessedFilename", "value" : "[DataExportDirectory]/[Circuit].exported-processed.v"},
+
+]

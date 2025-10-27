@@ -133,12 +133,12 @@ docker_sysroot: docker_build
 public:
 	# Publishes FreiTest to public git repository
 	mkdir -p public; true
-	cd public && \
-	    git clone git@github.com:TobiasFaller/FreiTest.git . \
-			|| (git fetch --all && git rebase origin/main); \
-		true
-	python3 scripts/copy_files.py \
-		--config public.txt --source . --destination public
+	(git --git-dir=public/.git --work-tree=public clone git@github.com:TobiasFaller/FreiTest.git \
+		|| (git --git-dir=public/.git --work-tree=public fetch --all \
+			&& git --git-dir=public/.git --work-tree=public rebase origin/main)) \
+		&& git --git-dir=public/.git --work-tree=public reset --hard HEAD
+	rm -rf public/*; true
+	python3 scripts/copy_files.py --config public.txt --source . --destination public
 	find public -type d -exec chmod 755 {} \;
 	find public -type f -exec chmod 644 {} \;
 	cd public; git add .

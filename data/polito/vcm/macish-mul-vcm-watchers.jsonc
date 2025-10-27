@@ -1,0 +1,13 @@
+[
+    { "name" : "A", "endianess": "little", "signals": [ "A_g" ], "tags" : [ "*" ], "targets": ["*"] },
+    { "name" : "B", "endianess": "little", "signals": [ "B_g" ], "tags" : [ "*" ], "targets": ["*"] },
+    { "name" : "O", "endianess": "little", "signals": [ "O_g" ], "tags" : [ "*" ], "targets": ["*"] },
+
+    { "name" : "MUL_OUT_exact", "endianess": "little", "signals": [ "MUL_OUT_exact_result" ], "tags" : [ "*" ], "targets": ["*"] },
+    { "name" : "MUL_OUT_faulty", "endianess": "little", "signals": [ "MUL_OUT_faulty_result" ], "tags" : [ "*" ], "targets": ["*"] },
+    { "name" : "MUL_OUT_faultfree", "endianess": "little", "signals": [ "MUL_OUT_faultfree_result" ], "tags" : [ "*" ], "targets": ["*"] },
+    { "name" : "MUL_DIFFP_faulty", "endianess": "little", "signals": [ "MUL_DIFFP_faulty_result" ], "tags" : [ "*" ], "targets": ["*"] },
+    { "name" : "MUL_DIFFN_faulty", "endianess": "little", "signals": [ "MUL_DIFFN_faulty_result" ], "tags" : [ "*" ], "targets": ["*"] },
+    { "name" : "MUL_DIFFP_faultfree", "endianess": "little", "signals": [ "MUL_DIFFP_faultfree_result" ], "tags" : [ "*" ], "targets": ["*"] },
+    { "name" : "MUL_DIFFN_faultfree", "endianess": "little", "signals": [ "MUL_DIFFN_faultfree_result" ], "tags" : [ "*" ], "targets": ["*"] },
+]

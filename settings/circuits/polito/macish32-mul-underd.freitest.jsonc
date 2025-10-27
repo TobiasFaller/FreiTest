@@ -1,0 +1,30 @@
+[
+	{"define": "OutputDir", "value": "./output"},
+	{"define": "LibraryDir", "value": "./data/cell-libraries/nangate"},
+	{"define": "CircuitDir", "value": "./data/polito/macish"},
+	{"define": "VcmDir", "value": "./data/polito/vcm"},
+
+	{"setting": "CircuitSourceType", "value": "Verilog"},
+	{"setting": "CircuitName", "value": "MUL32_UNDERD"},
+	{"setting": "CircuitBaseDirectory", "value": "[CircuitDir]"},
+    {"setting": "TopLevelModuleName", "value": "MUL32_UNDERD"},
+	{"setting": "VerilogLibraryFilename", "value": "[LibraryDir]/nangate45_freitest.v"},
+	{"setting": "VerilogImportFilename", "value": "output/mul32-underd-nangate45.v"},
+	{"setting": "VerilogExportPreprocessedFilename", "value" : "[DataExportDirectory]/[Circuit].exported-preprocessed.v"},
+	{"setting": "VerilogExportProcessedFilename", "value" : "[DataExportDirectory]/[Circuit].exported-processed.v"},
+	{"setting": "PoliTO/MacishSafeFaultAnalysis/CircuitWatcherImportFilename", "value": "[CircuitDir]/macish-mul-watchers.jsonc", "optional": true},
+	{"setting": "PoliTO/MacishSafeFaultAnalysis/CircuitPrinterImportFilename", "value": "[CircuitDir]/macish-mul-table.jsonc", "optional": true},
+
+	{"setting": "PoliTO/MacishSafeFaultAnalysis/VcmBaseDirectory", "value": "[VcmDir]", "optional": true},
+	{"setting": "PoliTO/MacishSafeFaultAnalysis/VcmImportFilename", "value": "output/macish32-mul-vcm-nangate45.v", "optional": true},
+	{"setting": "PoliTO/MacishSafeFaultAnalysis/VcmTopLevelModuleName", "value": "MUL32_VCM", "optional": true},
+	{"setting": "PoliTO/MacishSafeFaultAnalysis/VcmLibraryFilename", "value": "[LibraryDir]/nangate45_freitest.v", "optional": true},
+	{"setting": "PoliTO/MacishSafeFaultAnalysis/VcmExportPreprocessedFilename", "value": "[DataExportDirectory]/[Circuit]-vcm.preprocessed.v", "optional": true},
+	{"setting": "PoliTO/MacishSafeFaultAnalysis/VcmExportProcessedFilename", "value": "[DataExportDirectory]/[Circuit]-vcm.processed.v", "optional": true},
+	{"setting": "PoliTO/MacishSafeFaultAnalysis/VcmWatcherImportFilename", "value": "[VcmDir]/macish-mul-vcm-watchers.jsonc", "optional": true},
+	{"setting": "PoliTO/MacishSafeFaultAnalysis/VcmPrinterImportFilename", "value": "[VcmDir]/macish-mul-vcm-table.jsonc", "optional": true},
+
+	{"setting": "PoliTO/MacishSafeFaultAnalysis/Target", "value": "Multiplier", "optional": true},
+	{"setting": "PoliTO/MacishSafeFaultAnalysis/Bits", "value": "32", "optional": true},
+
+]

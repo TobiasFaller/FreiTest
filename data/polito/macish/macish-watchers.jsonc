@@ -1,0 +1,9 @@
+[
+    {"name" : "CLOCK", "endianess": "little", "signals": [ "CLOCK" ], "tags" : [ "*" ], "targets": ["*"]},
+    {"name" : "CLOCK_EN", "endianess": "little", "signals": [ "CLOCK_EN" ], "tags" : [ "*" ], "targets": ["*"]},
+    {"name" : "ARESET", "endianess": "little", "signals": [ "ARESET" ], "tags" : [ "*" ], "targets": ["*"]},
+    {"name" : "ZERO", "endianess": "little", "signals": [ "ZERO" ], "tags" : [ "*" ], "targets": ["*"]},
+    {"name" : "A", "endianess": "little", "signals": [ "A" ], "tags" : [ "*" ], "targets": ["*"]},
+    {"name" : "B", "endianess": "little", "signals": [ "B" ], "tags" : [ "*" ], "targets": ["*"]},
+    {"name" : "MAC_OUT", "endianess": "little", "signals": [ "MAC_OUT" ], "tags" : [ "*" ], "targets": ["*"]},
+]

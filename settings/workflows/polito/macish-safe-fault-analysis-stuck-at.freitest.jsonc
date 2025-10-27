@@ -1,0 +1,8 @@
+[
+	{"application": "POLITO_MACISH_SAFE_FAULT_ANALYSIS_STUCK_AT"},
+
+	{"setting": "DataExportDirectory", "value": "[OutputDir]/[CircuitName]_SafeFaultAnalysisStuckAt"},
+
+	{"setting": "PoliTO/MacishSafeFaultAnalysis/Complete", "value": "Incomplete"},
+
+]

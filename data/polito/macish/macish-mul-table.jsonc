@@ -1,0 +1,5 @@
+[
+    { "type": "watcher", "name": "A", "watcher": "A", "format": "hexadecimal", "alignment": "internal", "prefix": "yes" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "B", "watcher": "B", "format": "hexadecimal", "alignment": "internal", "prefix": "yes" , "tags": [ "*" ], "targets": [ "*" ] },
+    { "type": "watcher", "name": "O", "watcher": "O", "format": "hexadecimal", "alignment": "internal", "prefix": "yes" , "tags": [ "*" ], "targets": [ "*" ] },
+]
