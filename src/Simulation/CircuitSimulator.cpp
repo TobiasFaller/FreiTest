@@ -42,7 +42,7 @@ template<> struct SimulationParams<CellAwareFaultModel> {
 static const constexpr ssize_t TRANSITION_UNKNOWN = -1;
 static const constexpr ssize_t TRANSITION_NONE = -2;
 
-static void ApplyTestPatternToResult(const MappedCircuit& circuit, const TestPattern& pattern, SimulationResult& result, const SimulationConfig& config);
+static void ApplyTestPatternToTimeframe(const MappedCircuit& circuit, const TestPattern& pattern, SimulationResult& result, const SimulationConfig& config, size_t timeframe);
 static void CopySecondaryOutputsFromPreviousTimeframe(const MappedCircuit& circuit, SimulationResult& result, size_t timeframeId, const SimulationConfig& config);
 
 template<typename FaultModel>
@@ -65,31 +65,19 @@ SimulationConfig MakeSimulationConfig(Basic::SequentialConfig sequentialConfig)
 	};
 }
 
-static void ApplyTestPatternToResult(const MappedCircuit& circuit, const TestPattern& pattern, SimulationResult& result, const SimulationConfig& config)
+static void ApplyTestPatternToTimeframe(const MappedCircuit& circuit, const TestPattern& pattern, SimulationResult& result, const SimulationConfig& config, size_t timeframe)
 {
-	for (size_t timeframe = 0u; timeframe < pattern.GetNumberOfTimeframes(); ++timeframe)
+	for (auto [primaryInput, node] : circuit.EnumeratePrimaryInputs())
 	{
-		for (auto [primaryInput, node] : circuit.EnumeratePrimaryInputs())
-		{
-			result[timeframe][node->GetNodeId()] = pattern.GetPrimaryInput(timeframe, primaryInput);
-		}
+		result[timeframe][node->GetNodeId()] = pattern.GetPrimaryInput(timeframe, primaryInput);
 	}
 
-	if (config.sequentialMode == SequentialMode::FullScan)
-	{
-		for (size_t timeframe = 0u; timeframe < pattern.GetNumberOfTimeframes(); ++timeframe)
-		{
-			for (auto [secondaryInput, node] : circuit.EnumerateSecondaryInputs())
-			{
-				result[timeframe][node->GetNodeId()] = pattern.GetSecondaryInput(timeframe, secondaryInput);
-			}
-		}
-	}
-	else if (config.sequentialMode == SequentialMode::Functional)
+	if (config.sequentialMode == SequentialMode::FullScan
+		|| (config.sequentialMode == SequentialMode::Functional && timeframe == 0u))
 	{
 		for (auto [secondaryInput, node] : circuit.EnumerateSecondaryInputs())
 		{
-			result[0u][node->GetNodeId()] = pattern.GetSecondaryInput(0u, secondaryInput);
+			result[timeframe][node->GetNodeId()] = pattern.GetSecondaryInput(timeframe, secondaryInput);
 		}
 	}
 }
@@ -213,22 +201,9 @@ static Logic GetLogicValue(const MappedCircuit& circuit, const SimulationResult&
 		const auto& states { fault->GetStateMachine() };
 		const auto& currentState { states[params.state] };
 
-		bool evaluate = false;
-		for (const auto& [node, port] : fault->GetEffectNodesAndPorts())
-		{
-			if (__builtin_expect((node->GetNodeId() == nodeId) && (port.portType == portType)
-				&& (port.portNumber == portNumber), false))
-			{
-				evaluate = true;
-				break;
-			}
-		}
-		if (!evaluate)
-		{
-			return originalValue;
-		}
-
-		if (params.transition == TRANSITION_UNKNOWN)
+		// Only evaluate after the last condition value has been settled.
+		// Only used when sequential mode is false.
+		if ((params.transition == TRANSITION_UNKNOWN) && (nodeId == fault->GetMaxConditionNodeId()))
 		{
 			params.transition = TRANSITION_NONE;
 			size_t index { 0u };
@@ -254,8 +229,7 @@ static Logic GetLogicValue(const MappedCircuit& circuit, const SimulationResult&
 				index++;
 			}
 		}
-
-		if (params.transition >= 0)
+		else if ((params.transition >= 0) && (nodeId >= fault->GetMinEffectNodeId()) && (nodeId <= fault->GetMaxEffectNodeId()))
 		{
 			auto const& transition = currentState.transitions[params.transition];
 			for (auto const& effect : transition.effects)
@@ -319,11 +293,14 @@ static bool IsFaultLocation(const FaultModel& faultModel, [[maybe_unused]] size_
 	}
 	else if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
 	{
-		for (const auto& nodeAndPort : faultModel.GetFault()->GetEffectNodesAndPorts())
+		if ((nodeId >= faultModel.GetFault()->GetMinEffectNodeId()) && (nodeId <= faultModel.GetFault()->GetMaxEffectNodeId()))
 		{
-			if (__builtin_expect(nodeAndPort.node->GetNodeId() == nodeId, false))
+			for (const auto& nodeAndPort : faultModel.GetFault()->GetEffectNodesAndPorts())
 			{
-				return true;
+				if (__builtin_expect(nodeAndPort.node->GetNodeId() == nodeId, false))
+				{
+					return true;
+				}
 			}
 		}
 		return false;
@@ -378,6 +355,11 @@ static std::vector<size_t> GetFaultLocations(const FaultModel& faultModel, const
 		{
 			faultyNodes.push_back(nodeAndPort.node->GetNodeId());
 		}
+
+		// Add the condition node id as "faulty node" to trigger evaluation
+		// of the conditions. Otherwise, the node might not be simulated
+		// and therefore, the fault model not evaluated.
+		faultyNodes.push_back(faultModel.GetFault()->GetMaxConditionNodeId());
 
 		return faultyNodes;
 	}
@@ -952,19 +934,22 @@ void SimulateTestPatternNaive(const MappedCircuit& circuit, const TestPattern& p
 	if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
 	{
 		params.state = 0;
-		params.transition = TRANSITION_UNKNOWN;
+		params.transition = faultModel.GetFault()->IsSequential()
+			? (faultModel.GetFault()->GetStateMachine()[params.state].transitions.size() > 0u ? 0u : TRANSITION_NONE)
+			: TRANSITION_UNKNOWN;
 	}
-
-	ApplyTestPatternToResult(circuit, pattern, result, config);
 
 	for (size_t timeframeId = 0u; timeframeId < pattern.GetNumberOfTimeframes(); ++timeframeId)
 	{
 		SimulationTimeframe& timeframe = result[timeframeId];
 
+[[maybe_unused]]
+resimulate:
 		if (timeframeId != 0u)
 		{
 			CopySecondaryOutputsFromPreviousTimeframe(circuit, result, timeframeId, config);
 		}
+		ApplyTestPatternToTimeframe(circuit, pattern, result, config, timeframeId);
 
 		// Traverse the graph from start to end
 		for (size_t nodeId = 0; nodeId < circuit.GetNumberOfNodes(); nodeId++)
@@ -975,9 +960,28 @@ void SimulateTestPatternNaive(const MappedCircuit& circuit, const TestPattern& p
 		if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
 		{
 			auto const& currentState { faultModel.GetFault()->GetStateMachine()[params.state] };
+			if (faultModel.GetFault()->IsSequential() && (params.transition != TRANSITION_NONE))
+			{
+				for (auto const& condition: currentState.transitions[params.transition].conditions)
+				{
+					auto& [node, port] = condition.nodeAndPort;
+					assert (condition.nodeAndPort.port.portType == PortType::Input);
+					auto driverNodeId = node->GetDriverForPort(port)->GetNodeId();
+					if (!IsConstraintTrueForLogic(result[timeframeId][driverNodeId], condition.logicConstraints[0u]))
+					{
+						params.transition = ((static_cast<size_t>(params.transition) + 1u) < currentState.transitions.size())
+							? (params.transition + 1u)
+							: TRANSITION_NONE; // Exhausted all transitions
+						goto resimulate;
+					}
+				}
+			}
+
 			auto const targetState { (params.transition >= 0) ? currentState.transitions[params.transition].toState : 0 };
 			params.state = targetState;
-			params.transition = TRANSITION_UNKNOWN;
+			params.transition = faultModel.GetFault()->IsSequential()
+				? (faultModel.GetFault()->GetStateMachine()[params.state].transitions.size() > 0u ? 0u : TRANSITION_NONE)
+				: TRANSITION_UNKNOWN;
 			assert (params.state < static_cast<size_t>(faultModel.GetFault()->GetStateMachine().size()));
 		}
 	}
@@ -991,11 +995,10 @@ void SimulateTestPatternEventDriven(const MappedCircuit& circuit, const TestPatt
 	if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
 	{
 		params.state = 0;
-		params.transition = TRANSITION_UNKNOWN;
+		params.transition = faultModel.GetFault()->IsSequential()
+			? (faultModel.GetFault()->GetStateMachine()[params.state].transitions.size() > 0u ? 0u : TRANSITION_NONE)
+			: TRANSITION_UNKNOWN;
 	}
-
-	// Initialize the circuit inputs
-	ApplyTestPatternToResult(circuit, pattern, result, config);
 
 	std::vector<bool> startNodes(circuit.GetNumberOfNodes(), false);
 	for (auto [nodeId, node] : circuit.EnumerateNodes())
@@ -1017,11 +1020,14 @@ void SimulateTestPatternEventDriven(const MappedCircuit& circuit, const TestPatt
 	{
 		SimulationTimeframe& timeframe = result[timeframeId];
 
+[[maybe_unused]]
+resimulate:
 		if (timeframeId != 0u)
 		{
 			std::fill(activeNodes.begin(), activeNodes.end(), false);
 			CopySecondaryOutputsFromPreviousTimeframe(circuit, result, timeframeId, config);
 		}
+		ApplyTestPatternToTimeframe(circuit, pattern, result, config, timeframeId);
 
 		// Traverse the graph from start to end
 		for(auto [nodeId, node] : circuit.EnumerateNodes())
@@ -1049,9 +1055,28 @@ void SimulateTestPatternEventDriven(const MappedCircuit& circuit, const TestPatt
 		if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
 		{
 			auto const& currentState { faultModel.GetFault()->GetStateMachine()[params.state] };
+			if (faultModel.GetFault()->IsSequential() && (params.transition != TRANSITION_NONE))
+			{
+				for (auto const& condition: currentState.transitions[params.transition].conditions)
+				{
+					auto& [node, port] = condition.nodeAndPort;
+					assert (condition.nodeAndPort.port.portType == PortType::Input);
+					auto driverNodeId = node->GetDriverForPort(port)->GetNodeId();
+					if (!IsConstraintTrueForLogic(result[timeframeId][driverNodeId], condition.logicConstraints[0u]))
+					{
+						params.transition = ((static_cast<size_t>(params.transition) + 1u) < currentState.transitions.size())
+							? (params.transition + 1u)
+							: TRANSITION_NONE; // Exhausted all transitions
+						goto resimulate;
+					}
+				}
+			}
+
 			auto const targetState { (params.transition >= 0) ? currentState.transitions[params.transition].toState : 0 };
 			params.state = targetState;
-			params.transition = TRANSITION_UNKNOWN;
+			params.transition = faultModel.GetFault()->IsSequential()
+				? (faultModel.GetFault()->GetStateMachine()[params.state].transitions.size() > 0u ? 0u : TRANSITION_NONE)
+				: TRANSITION_UNKNOWN;
 			assert (params.state < static_cast<size_t>(faultModel.GetFault()->GetStateMachine().size()));
 		}
 	}
@@ -1065,7 +1090,9 @@ void SimulateTestPatternEventDrivenIncremental(const MappedCircuit& circuit, con
 	if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
 	{
 		params.state = 0;
-		params.transition = TRANSITION_UNKNOWN;
+		params.transition = faultModel.GetFault()->IsSequential()
+			? (faultModel.GetFault()->GetStateMachine()[params.state].transitions.size() > 0u ? 0u : TRANSITION_NONE)
+			: TRANSITION_UNKNOWN;
 	}
 
 	auto faultyNodes = GetFaultLocations(faultModel, circuit);
@@ -1091,6 +1118,8 @@ void SimulateTestPatternEventDrivenIncremental(const MappedCircuit& circuit, con
 		const SimulationTimeframe& baseTimeframe = base[timeframeId];
 		SimulationTimeframe& resultTimeframe = result[timeframeId];
 
+[[maybe_unused]]
+resimulate:
 		if (timeframeId != 0u)
 		{
 			std::fill(activeNodes.begin(), activeNodes.end(), false);
@@ -1105,6 +1134,7 @@ void SimulateTestPatternEventDrivenIncremental(const MappedCircuit& circuit, con
 				}
 			}
 		}
+		// The primary inputs have already been applied by the reference simulation.
 
 		for (size_t nodeId : faultyNodes)
 		{
@@ -1140,9 +1170,30 @@ void SimulateTestPatternEventDrivenIncremental(const MappedCircuit& circuit, con
 		if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
 		{
 			auto const& currentState { faultModel.GetFault()->GetStateMachine()[params.state] };
+			if (faultModel.GetFault()->IsSequential() && (params.transition >= 0))
+			{
+				for (auto const& condition: currentState.transitions[params.transition].conditions)
+				{
+					auto& [node, port] = condition.nodeAndPort;
+					assert (condition.nodeAndPort.port.portType == PortType::Input);
+					auto driverNodeId = node->GetDriverForPort(port)->GetNodeId();
+					if (!IsConstraintTrueForLogic(result[timeframeId][driverNodeId], condition.logicConstraints[0u]))
+					{
+						// Reset result to initial good values so we can run an incremental simulation again.
+						result[timeframeId] = base[timeframeId];
+						params.transition = ((static_cast<size_t>(params.transition) + 1u) < currentState.transitions.size())
+							? (params.transition + 1u)
+							: TRANSITION_NONE; // Exhausted all transitions
+						goto resimulate;
+					}
+				}
+			}
+
 			auto const targetState { (params.transition >= 0) ? currentState.transitions[params.transition].toState : 0 };
 			params.state = targetState;
-			params.transition = TRANSITION_UNKNOWN;
+			params.transition = faultModel.GetFault()->IsSequential()
+				? (faultModel.GetFault()->GetStateMachine()[params.state].transitions.size() > 0u ? 0u : TRANSITION_NONE)
+				: TRANSITION_UNKNOWN;
 			assert (params.state < static_cast<size_t>(faultModel.GetFault()->GetStateMachine().size()));
 		}
 	}

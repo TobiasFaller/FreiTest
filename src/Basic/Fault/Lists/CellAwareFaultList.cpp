@@ -227,7 +227,8 @@ std::pair<std::vector<CellAwareFault>, std::vector<size_t>> FilterCellAwareFault
 	for (size_t faultIndex { 0 }; faultIndex < faultList.size(); faultIndex++)
 	{
 		auto const* group { faultList[faultIndex].GetCell() };
-		auto const result { std::regex_match(group->GetHierarchyName(), patternRegex) };
+		auto const fullName { group->GetHierarchyName() + "/" + faultList[faultIndex].GetUserDefinedFault()->GetFaultName() };
+		auto const result { std::regex_match(fullName, patternRegex) };
 		if ((type == FilterPatternType::Normal && !result)
 			|| (type == FilterPatternType::Inverted && result))
 		{

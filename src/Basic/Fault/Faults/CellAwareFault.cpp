@@ -34,7 +34,12 @@ CellAwareFault::CellAwareFault(
 	_states(),
 	_conditionNodesAndPorts(),
 	_effectNodesAndPorts(),
-	_timeframeSpread(0u)
+	_timeframeSpread(0u),
+	_minConditionNodeId(std::numeric_limits<size_t>::max()),
+	_maxConditionNodeId(0u),
+	_minEffectNodeId(std::numeric_limits<size_t>::max()),
+	_maxEffectNodeId(0u),
+	_sequential(false)
 {
 	for (const auto& alternative : alternatives)
 	{
@@ -42,13 +47,40 @@ CellAwareFault::CellAwareFault(
 		{
 			_conditionNodesAndPorts.push_back(condition.nodeAndPort);
 			_timeframeSpread = std::max(_timeframeSpread, condition.logicConstraints.size());
+			_minConditionNodeId = std::min(_minConditionNodeId, condition.nodeAndPort.node->GetNodeId());
+			_maxConditionNodeId = std::max(_maxConditionNodeId, condition.nodeAndPort.node->GetNodeId());
 		}
 		for (const auto& effect : alternative.effects)
 		{
 			_effectNodesAndPorts.push_back(effect.nodeAndPort);
 			_timeframeSpread = std::max(_timeframeSpread, effect.logicConstraints.size());
+			_minEffectNodeId = std::min(_minEffectNodeId, effect.nodeAndPort.node->GetNodeId());
+			_maxEffectNodeId = std::max(_maxEffectNodeId, effect.nodeAndPort.node->GetNodeId());
 		}
 	}
+
+	auto const is_sequential = [&](auto const& self, const Circuit::GroupMetaData* group) -> bool {
+		for (auto const* node : group->GetMappedNodes())
+		{
+			auto const type { node->GetCellType() };
+			if (type == CellType::S_IN || type == CellType::S_OUT
+				|| type == CellType::S_OUT_CLK || type == CellType::S_OUT_EN)
+			{
+				return true;
+			}
+		}
+
+		for (auto const* subgroup : group->GetSubGroups())
+		{
+			if (self(self, subgroup))
+			{
+				return true;
+			}
+		}
+
+		return false;
+	};
+	_sequential = is_sequential(is_sequential, cell);
 
 	std::sort(_conditionNodesAndPorts.begin(), _conditionNodesAndPorts.end());
 	std::sort(_effectNodesAndPorts.begin(), _effectNodesAndPorts.end());
@@ -68,12 +100,13 @@ CellAwareFault::CellAwareFault(
 	auto const get_or_create_transition = [&](auto transitionType, ssize_t alternative, size_t state, size_t targetState, auto conditions, auto effects) -> CellAwareTransition& {
 #ifndef NDEBUG
 		for (auto& condition : conditions) {
-			assert(condition.logicConstraints[0] == LogicConstraint::ONLY_LOGIC_ZERO
-				|| condition.logicConstraints[0] == LogicConstraint::ONLY_LOGIC_ONE
-				|| condition.logicConstraints[0] == LogicConstraint::ONLY_LOGIC_DONT_CARE);
+			assert(condition.logicConstraints[0] == LogicConstraint::NO_CONSTRAINT
+				|| condition.logicConstraints[0] == LogicConstraint::ONLY_LOGIC_ZERO
+				|| condition.logicConstraints[0] == LogicConstraint::ONLY_LOGIC_ONE);
 		}
 		for (auto& effect : effects) {
-			assert(effect.logicConstraints[0] == LogicConstraint::ONLY_LOGIC_ZERO
+			assert(effect.logicConstraints[0] == LogicConstraint::NO_CONSTRAINT
+				|| effect.logicConstraints[0] == LogicConstraint::ONLY_LOGIC_ZERO
 				|| effect.logicConstraints[0] == LogicConstraint::ONLY_LOGIC_ONE
 				|| effect.logicConstraints[0] == LogicConstraint::ONLY_LOGIC_DONT_CARE);
 		}
@@ -238,10 +271,16 @@ const std::vector<CellAwareAlternative>& CellAwareFault::GetAlternatives(void) c
 	return _alternatives;
 }
 
+const std::vector<CellAwareState>& CellAwareFault::GetStateMachine(void) const
+{
+	return _states;
+}
+
 const std::vector<NodeAndPort>& CellAwareFault::GetConditionNodesAndPorts(void) const
 {
 	return _conditionNodesAndPorts;
 }
+
 const std::vector<NodeAndPort>& CellAwareFault::GetEffectNodesAndPorts(void) const
 {
 	return _effectNodesAndPorts;
@@ -252,9 +291,29 @@ size_t CellAwareFault::GetTimeframeSpread(void) const
 	return _timeframeSpread;
 }
 
-const std::vector<CellAwareState>& CellAwareFault::GetStateMachine(void) const
+size_t CellAwareFault::GetMinConditionNodeId(void) const
 {
-	return _states;
+	return _minConditionNodeId;
+}
+
+size_t CellAwareFault::GetMaxConditionNodeId(void) const
+{
+	return _maxConditionNodeId;
+}
+
+size_t CellAwareFault::GetMinEffectNodeId(void) const
+{
+	return _minEffectNodeId;
+}
+
+size_t CellAwareFault::GetMaxEffectNodeId(void) const
+{
+	return _maxEffectNodeId;
+}
+
+bool CellAwareFault::IsSequential(void) const
+{
+	return _sequential;
 }
 
 std::string to_string(const CellAwareFault& fault)

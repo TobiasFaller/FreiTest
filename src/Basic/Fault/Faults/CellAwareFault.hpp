@@ -60,12 +60,17 @@ public:
 	const std::shared_ptr<Io::Udfm::UdfmFault>& GetUserDefinedFault(void) const;
 	const Circuit::GroupMetaData* GetCell(void) const;
 	const std::vector<CellAwareAlternative>& GetAlternatives(void) const;
+	const std::vector<CellAwareState>& GetStateMachine(void) const;
 
 	const std::vector<Circuit::MappedCircuit::NodeAndPort>& GetConditionNodesAndPorts(void) const;
 	const std::vector<Circuit::MappedCircuit::NodeAndPort>& GetEffectNodesAndPorts(void) const;
 
 	size_t GetTimeframeSpread(void) const;
-	const std::vector<CellAwareState>& GetStateMachine(void) const;
+	size_t GetMinConditionNodeId(void) const;
+	size_t GetMaxConditionNodeId(void) const;
+	size_t GetMinEffectNodeId(void) const;
+	size_t GetMaxEffectNodeId(void) const;
+	bool IsSequential(void) const;
 
 private:
 	const std::shared_ptr<Io::Udfm::UdfmFault> _userDefinedFault;
@@ -77,6 +82,12 @@ private:
 	std::vector<Circuit::MappedCircuit::NodeAndPort> _conditionNodesAndPorts;
 	std::vector<Circuit::MappedCircuit::NodeAndPort> _effectNodesAndPorts;
 	size_t _timeframeSpread;
+
+	size_t _minConditionNodeId;
+	size_t _maxConditionNodeId;
+	size_t _minEffectNodeId;
+	size_t _maxEffectNodeId;
+	bool _sequential;
 };
 
 std::string to_string(const CellAwareFault& fault);

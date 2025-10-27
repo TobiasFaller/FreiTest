@@ -18,6 +18,8 @@ namespace Io
 namespace Udfm
 {
 
+static void CheckUdfm(const std::unique_ptr<UdfmModel>& udfm);
+
 std::unique_ptr<UdfmModel> ParseUdfm(std::istream& input)
 {
 	ASSERT(input.good()) << "Got bad istream";
@@ -39,6 +41,7 @@ std::unique_ptr<UdfmModel> ParseUdfm(std::istream& input)
 		std::unique_ptr<UdfmModel> udfm;
 		if (x3::phrase_parse(curr, end, UdfmGrammar::udfm, UdfmGrammar::skipper, udfm))
 		{
+			CheckUdfm(udfm);
 			return udfm;
 		}
 
@@ -52,6 +55,45 @@ std::unique_ptr<UdfmModel> ParseUdfm(std::istream& input)
 	}
 
 	return { };
+}
+
+static void CheckUdfm(const std::unique_ptr<UdfmModel>& udfm)
+{
+	for (auto [cellName, cell] : udfm->GetCells())
+	{
+		for (auto [faultName, fault] : cell->GetFaults())
+		{
+			size_t alternativeIndex { 0u };
+			for (auto const& alternative : fault->GetAlternatives())
+			{
+				size_t length { 0u };
+				for (auto [name, condition] : alternative->GetTestConditions())
+				{
+					length = std::max(length, condition.size());
+				}
+				for (auto [name, effect] : alternative->GetTestEffects())
+				{
+					length = std::max(length, effect.size());
+				}
+
+				for (auto [name, condition] : alternative->GetTestConditions())
+				{
+					ASSERT(condition.size() == length) << "Cell " << cellName
+						<< " Fault " << faultName << " Alternative " << alternativeIndex
+						<< " Condition " << name << " expected length of " << length
+						<< " got " << condition.size() << " instead";
+				}
+				for (auto [name, effect] : alternative->GetTestEffects())
+				{
+					ASSERT(effect.size() == length) << "Cell " << cellName
+						<< " Fault " << faultName << " Alternative " << alternativeIndex
+						<< " Effect " << name << " expected length of " << length
+						<< " got " << effect.size() << " instead";
+				}
+				alternativeIndex++;
+			}
+		}
+	}
 }
 
 };
