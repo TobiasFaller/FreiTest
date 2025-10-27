@@ -76,7 +76,7 @@ static bool MapBusToConnections(InstantiationContext& context, const NameContext
 static bool MapInstantiationToConnections(InstantiationContext& context, const NameContext& names, const Instantiation& instantiation, const Module& module, PassedContext& outPorts);
 
 // Extend this list to globally mute printing warnings regarding these attributes
-const std::vector<std::string> KNOWN_ATTRIBUTES = { "top", "src", "module_not_derived", "unused_bits", "keep_hierarchy", "hdlname", "wiretype", "force_downto" };
+const std::vector<std::string> KNOWN_ATTRIBUTES = { "top", "src", "module_not_derived", "unused_bits", "keep_hierarchy", "hdlname", "wiretype", "force_downto", "dynports" };
 const std::vector<std::string> KNOWN_PARAMETERS = { };
 template<typename Collection>
 static bool ReportUnknownElements(const Collection& elements, const std::vector<std::string>& known, const std::string& message);
@@ -146,7 +146,7 @@ std::unique_ptr<ModuleInstance> VerilogInstantiator::Instantiate(const Modules& 
 			}
 
 			std::vector<size_t> connections;
-			for (size_t index : IterateVectorMinToMax(port.size))
+			for (size_t index : IterateVectorTopToDown(port.size))
 			{
 				// Create a cell for the gate
 				const std::string portName { boost::str(boost::format("%s [%u]") % port.name % index) };
@@ -214,7 +214,6 @@ std::unique_ptr<ModuleInstance> VerilogInstantiator::Instantiate(const Modules& 
 						__builtin_unreachable();
 				}
 			}
-			AddPort(context, port.name, port.size.top, port.size.bottom, PortTypeToInstance(port.type), PORT_NO_INDEX, connections);
 			passedContext.ports.emplace_back(port.name, port.size, std::move(connections), port.type);
 		}
 
@@ -288,12 +287,13 @@ std::unique_ptr<ModuleInstance> VerilogInstantiator::Instantiate(const Modules& 
 	}
 	else
 	{
-		LOG(ERROR) << "The top-level module " << name << " was not found";
+		LOG(WARNING) << "The top-level module " << name << " was not found";
 		LOG(WARNING) << "Modules available:";
 		for (auto& module : modules.modules)
 		{
 			LOG(WARNING) << module.name << (module.libraryModule ? " (library)" : "");
 		}
+		LOG(ERROR) << "Can't instantiate top-level module";
 	}
 	return { };
 }
@@ -584,10 +584,17 @@ static bool InstantiatePorts(InstantiationContext& context, const Module& module
 		if (auto it = passed.ports.get<flattened_index_tag>().find(port.name);
 			it != passed.ports.get<flattened_index_tag>().end())
 		{
-			connections = it->connections;
-			if (connections.size() < port.size.size())
+			// Connections are stored left to right, extend the source connections if required.
+			std::vector<size_t> sourceConnections { it->connections };
+			std::reverse(sourceConnections.begin(), sourceConnections.end());
+			sourceConnections.resize(port.size.size(), GATE_NO_CONNECTION);
+			std::reverse(sourceConnections.begin(), sourceConnections.end());
+
+			size_t sourceIndex { 0u };
+			for (auto& index : IterateVectorTopToDown(port.size))
 			{
-				connections.resize(port.size.size(), GATE_NO_CONNECTION);
+				connections[index - port.size.min()] = sourceConnections[sourceIndex];
+				sourceIndex++;
 			}
 		}
 		for (auto index : IterateVectorMinToMax(port.size))
