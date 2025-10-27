@@ -46,6 +46,26 @@ void TestPattern::SetSecondaryInput(size_t timeframe, size_t inputNumber, Logic 
 	_secondaryInputs[timeframe][inputNumber] = value;
 }
 
+void TestPattern::SetPrimaryInputs(size_t timeframe, const std::vector<Logic>& values)
+{
+	_primaryInputs[timeframe] = values;
+}
+
+void TestPattern::SetSecondaryInputs(size_t timeframe, const std::vector<Logic>& values)
+{
+	_secondaryInputs[timeframe] = values;
+}
+
+void TestPattern::SetPrimaryInputs(const std::vector<std::vector<Logic>>& values)
+{
+	_primaryInputs = values;
+}
+
+void TestPattern::SetSecondaryInputs(const std::vector<std::vector<Logic>>& values)
+{
+	_secondaryInputs = values;
+}
+
 Logic TestPattern::GetPrimaryInput(size_t timeframe, size_t inputNumber) const
 {
 	ASSERT(_primaryInputs.size() > timeframe) << "Testpattern does not include this timeframe " << std::to_string(timeframe);
@@ -82,6 +102,26 @@ std::vector<Logic>& TestPattern::GetSecondaryInputs(size_t timeframe)
 {
 	ASSERT(_secondaryInputs.size() > timeframe) << "Testpattern does not include this timeframe " << std::to_string(timeframe);
 	return _secondaryInputs[timeframe];
+}
+
+std::vector<std::vector<Basic::Logic>> const& TestPattern::GetPrimaryInputs(void) const
+{
+	return _primaryInputs;
+}
+
+std::vector<std::vector<Basic::Logic>> const& TestPattern::GetSecondaryInputs(void) const
+{
+	return _secondaryInputs;
+}
+
+std::vector<std::vector<Basic::Logic>>& TestPattern::GetPrimaryInputs(void)
+{
+	return _primaryInputs;
+}
+
+std::vector<std::vector<Basic::Logic>>& TestPattern::GetSecondaryInputs(void)
+{
+	return _secondaryInputs;
 }
 
 size_t TestPattern::GetNumberOfTimeframes(void) const

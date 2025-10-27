@@ -24,6 +24,12 @@ public:
 	void SetPrimaryInput(size_t timeframe, size_t inputNumber, Basic::Logic value);
 	void SetSecondaryInput(size_t timeframe, size_t inputNumber, Basic::Logic value);
 
+	void SetPrimaryInputs(size_t timeframe, const std::vector<Basic::Logic>& values);
+	void SetSecondaryInputs(size_t timeframe, const std::vector<Basic::Logic>& values);
+
+	void SetPrimaryInputs(const std::vector<std::vector<Basic::Logic>>& values);
+	void SetSecondaryInputs(const std::vector<std::vector<Basic::Logic>>& values);
+
 	Basic::Logic GetPrimaryInput(size_t timeframe, size_t inputNumber) const;
 	Basic::Logic GetSecondaryInput(size_t timeframe, size_t inputNumber) const;
 
@@ -31,6 +37,11 @@ public:
 	std::vector<Basic::Logic> const& GetSecondaryInputs(size_t timeframe) const;
 	std::vector<Basic::Logic>& GetPrimaryInputs(size_t timeframe);
 	std::vector<Basic::Logic>& GetSecondaryInputs(size_t timeframe);
+
+	std::vector<std::vector<Basic::Logic>> const& GetPrimaryInputs(void) const;
+	std::vector<std::vector<Basic::Logic>> const& GetSecondaryInputs(void) const;
+	std::vector<std::vector<Basic::Logic>>& GetPrimaryInputs(void);
+	std::vector<std::vector<Basic::Logic>>& GetSecondaryInputs(void);
 
 	size_t GetNumberOfTimeframes(void) const;
 	size_t GetNumberOfPrimaryInputs(void) const;
