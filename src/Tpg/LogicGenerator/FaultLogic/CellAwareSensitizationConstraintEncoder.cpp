@@ -76,6 +76,16 @@ bool CellAwareSensitizationConstraintEncoder<PinData>::ConstrainTimeframe(Genera
 
 	auto satSolver = std::dynamic_pointer_cast<SatSolverProxy>(context.GetSolver());
 	auto bmcSolver = std::dynamic_pointer_cast<BmcSolverProxy>(context.GetSolver());
+	if (bmcSolver)
+	{
+		if (timeframeId != 0)
+		{
+			return true;
+		}
+
+		bmcSolver->SetTargetClauseType(ClauseType::Transition);
+		bmcSolver->SetTargetVariableType(VariableType::Auxiliary);
+	}
 
 	const auto& fault { _faultModel->GetFault() };
 	const auto& stateMachine { fault->GetStateMachine() };
@@ -213,10 +223,6 @@ bool CellAwareSensitizationConstraintEncoder<PinData>::PostConstrainCircuit(Gene
 template<typename PinData>
 bool CellAwareSensitizationConstraintEncoder<PinData>::ConstrainCircuit(GeneratorContext<PinData>& context)
 {
-	DASSERT(context.GetNumberOfTimeframesForTarget(GenerationTarget::ConstraintEncoding) > 0u) << "No timeframes have been generated";
-	DASSERT(_sensitizations.size() == context.GetNumberOfTimeframesForTarget(GenerationTarget::ConstraintEncoding))
-		<< "The fault sensitization module was not invoked for all timeframes";
-
 	auto& encoder = context.GetEncoder();
 	if (!_allowEmptySensitization)
 	{
@@ -261,32 +267,15 @@ bool CellAwareSensitizationConstraintEncoder<PinData>::ConstrainCircuit(Generato
 	auto bmcSolver = std::dynamic_pointer_cast<BmcSolverProxy>(context.GetSolver());
 	if (bmcSolver)
 	{
-		bmcSolver->SetTargetClauseType(ClauseType::Transition);
-		bmcSolver->SetTargetVariableType(VariableType::Latch);
-		auto sensitizationLatch = encoder.template NewLogicContainer<LogicContainer01>();
-
-		bmcSolver->SetTargetClauseType(ClauseType::Transition);
-		bmcSolver->SetTargetVariableType(VariableType::Auxiliary);
+		auto sensitizationLatch = encoder.template NewStateContainer<LogicContainer01>();
 		auto differenceOutput = (_targetTimeframe == CellAwareSensitizationTimeframe::Last)
 			? _sensitizations.back()
 			// The sensitization does not need to happen in the last timeframe.
 			// Generate OR-gate to include the previous output value of the latch.
 			: encoder.EncodeOr(_sensitizations.back(), sensitizationLatch);
-
-		bmcSolver->SetTargetClauseType(ClauseType::Transition);
-		bmcSolver->SetTargetVariableType(VariableType::Auxiliary);
-		bmcSolver->CommitTimeframeClause( differenceOutput.l0, 0u, -sensitizationLatch.l0, 1u);
-		bmcSolver->CommitTimeframeClause(-differenceOutput.l0, 0u,  sensitizationLatch.l0, 1u);
-
-		// Initialize fault sensitization to 0
-		bmcSolver->SetTargetClauseType(ClauseType::Initial);
-		bmcSolver->SetTargetVariableType(VariableType::Auxiliary);
-		encoder.EncodeLogicValue(sensitizationLatch, Logic::LOGIC_ZERO);
-
-		// Require fault sensitization to be 1
-		bmcSolver->SetTargetClauseType(ClauseType::Target);
-		bmcSolver->SetTargetVariableType(VariableType::Auxiliary);
-		encoder.EncodeLogicValue(sensitizationLatch, Logic::LOGIC_ONE);
+		encoder.EncodeNextState(sensitizationLatch, differenceOutput);
+		encoder.EncodeInitialStateValue(sensitizationLatch, Logic::LOGIC_ZERO);
+		encoder.EncodeTargetStateValue(sensitizationLatch, Logic::LOGIC_ONE);
 	}
 
 	return true;

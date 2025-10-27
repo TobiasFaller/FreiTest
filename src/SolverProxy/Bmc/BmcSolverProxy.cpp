@@ -124,7 +124,9 @@ BmcSolverProxy::BmcSolverProxy(BmcSolver solver):
 	_currentClause(),
 	_lastResult(BmcResult::MaxIterationsReached),
 	_lastDepth(0u),
-	_solvesSinceReset(0u)
+	_solvesSinceReset(0u),
+	_variableTypeSet(true),
+	_clauseTypeSet(true)
 {
 }
 
@@ -201,6 +203,7 @@ BaseLiteral BmcSolverProxy::ConvertSolverToProxy(BaseLiteral lit) const
 
 BaseLiteral BmcSolverProxy::NewLiteral(void)
 {
+	if (!_variableTypeSet) Logging::Panic();
 	_numberOfVariables++;
 	_variableTypes.emplace_back(_activeVariableType);
 	return BaseLiteral::MakeFromVariable(_numberOfVariables);
@@ -219,6 +222,7 @@ void BmcSolverProxy::AddLiteral(BaseLiteral literal)
 
 void BmcSolverProxy::CommitClause(void)
 {
+	if (!_clauseTypeSet) Logging::Panic();
 	_activeClauseDB->push_back(_currentClause);
 	_currentClause.clear();
 	_numberOfClauses++;
@@ -278,6 +282,7 @@ size_t BmcSolverProxy::GetLastDepth(void) const
 
 void BmcSolverProxy::SetTargetClauseType(ClauseType clauseType)
 {
+	_clauseTypeSet = true;
 	_activeClauseType = clauseType;
 	switch (clauseType)
 	{
@@ -306,6 +311,7 @@ ClauseType BmcSolverProxy::GetTargetClauseType(void) const
 
 void BmcSolverProxy::SetTargetVariableType(VariableType variableType)
 {
+	_variableTypeSet = true;
 	_activeVariableType = variableType;
 }
 

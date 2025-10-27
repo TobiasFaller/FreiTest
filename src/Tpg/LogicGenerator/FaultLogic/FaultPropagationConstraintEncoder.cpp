@@ -129,14 +129,8 @@ bool FaultPropagationConstraintEncoder<PinData>::ConstrainTimeframe(GeneratorCon
 template<typename PinData>
 bool FaultPropagationConstraintEncoder<PinData>::ConstrainCircuit(GeneratorContext<PinData>& context)
 {
-	DASSERT(context.GetNumberOfTimeframesForTarget(GenerationTarget::ConstraintEncoding) > 0u) << "No timeframes have been generated";
-	DASSERT(_primaryDifferenceOutputs.size() == context.GetNumberOfTimeframesForTarget(GenerationTarget::ConstraintEncoding))
-		<< "The fault propagation module was not invoked for all timeframes";
-	DASSERT(_secondaryDifferenceOutputs.size() == context.GetNumberOfTimeframesForTarget(GenerationTarget::ConstraintEncoding))
-		<< "The fault propagation module was not invoked for all timeframes";
-
-    LogicEncoder& encoder = context.GetEncoder();
-	const LogicContainer01 constantZero = encoder.NewLogicContainer<LogicContainer01>(Logic::LOGIC_ZERO);
+    auto& encoder = context.GetEncoder();
+	const auto constantZero = encoder.template NewLogicContainer<LogicContainer01>(Logic::LOGIC_ZERO);
 	const auto is_all_zero = [&constantZero](auto begin, auto end) -> bool {
 		return std::all_of(begin, end, [&constantZero](const LogicContainer01& value) {
 			return value == constantZero;
@@ -193,15 +187,15 @@ bool FaultPropagationConstraintEncoder<PinData>::ConstrainCircuit(GeneratorConte
 	auto satSolver = std::dynamic_pointer_cast<SatSolverProxy>(context.GetSolver());
 	if (satSolver)
 	{
-		const auto force_logic1 = [&](LogicContainer01 constraint) {
+		const auto force_logic1 = [&](LogicContainer01 container) {
 			if (context.IsIncremental())
 			{
-				auto assumption { encoder.EncodeLogicValueDetector(constraint, Logic::LOGIC_ONE) };
+				auto assumption { encoder.EncodeLogicValueDetector(container, Logic::LOGIC_ONE) };
 				satSolver->AddAssumption(assumption.l0);
 			}
 			else
 			{
-				encoder.EncodeLogicValue(constraint, Logic::LOGIC_ONE);
+				encoder.EncodeLogicValue(container, Logic::LOGIC_ONE);
 			}
 		};
 
@@ -248,13 +242,7 @@ bool FaultPropagationConstraintEncoder<PinData>::ConstrainCircuit(GeneratorConte
 	auto bmcSolver = std::dynamic_pointer_cast<BmcSolverProxy>(context.GetSolver());
 	if (bmcSolver)
 	{
-		bmcSolver->SetTargetClauseType(ClauseType::Transition);
-		bmcSolver->SetTargetVariableType(VariableType::Latch);
-		auto propagationLatch = encoder.NewLogicContainer<LogicContainer01>();
-
-		// Generate OR-tree for the final propagation latch
-		bmcSolver->SetTargetClauseType(ClauseType::Transition);
-		bmcSolver->SetTargetVariableType(VariableType::Auxiliary);
+		auto propagationLatch = encoder.template NewStateContainer<LogicContainer01>();
 
 		LogicContainer01 differenceOutput;
 		switch (_target)
@@ -282,21 +270,9 @@ bool FaultPropagationConstraintEncoder<PinData>::ConstrainCircuit(GeneratorConte
 			// Generate OR-gate to include the previous output value of the latch.
 			differenceOutput = encoder.EncodeOr(differenceOutput, propagationLatch);
 		}
-
-		bmcSolver->SetTargetClauseType(ClauseType::Transition);
-		bmcSolver->SetTargetVariableType(VariableType::Auxiliary);
-		bmcSolver->CommitTimeframeClause( differenceOutput.l0, 0u, -propagationLatch.l0, 1u);
-		bmcSolver->CommitTimeframeClause(-differenceOutput.l0, 0u,  propagationLatch.l0, 1u);
-
-		// Initialize fault propagation to 0
-		bmcSolver->SetTargetClauseType(ClauseType::Initial);
-		bmcSolver->SetTargetVariableType(VariableType::Auxiliary);
-		encoder.EncodeLogicValue(propagationLatch, Logic::LOGIC_ZERO);
-
-		// Require fault propagation to be 1
-		bmcSolver->SetTargetClauseType(ClauseType::Target);
-		bmcSolver->SetTargetVariableType(VariableType::Auxiliary);
-		encoder.EncodeLogicValue(propagationLatch, Logic::LOGIC_ONE);
+		encoder.EncodeNextState(propagationLatch, differenceOutput);
+		encoder.EncodeInitialStateValue(propagationLatch, Logic::LOGIC_ZERO);
+		encoder.EncodeTargetStateValue(propagationLatch, Logic::LOGIC_ONE);
 	}
 
     return true;

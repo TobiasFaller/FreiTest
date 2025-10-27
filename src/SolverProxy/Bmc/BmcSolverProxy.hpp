@@ -108,6 +108,9 @@ public:
 
 	using ISolverProxy::CommitClause;
 
+	void ResetVariableType(void) { _variableTypeSet = false; }
+	void ResetClauseType(void) { _clauseTypeSet = false; }
+
 protected:
 	BaseLiteral ConvertProxyToSolver(BaseLiteral lit) const;
 	BaseLiteral ConvertSolverToProxy(BaseLiteral lit) const;
@@ -136,6 +139,9 @@ protected:
 	BmcResult _lastResult;
 	size_t _lastDepth;
 	size_t _solvesSinceReset;
+
+	bool _variableTypeSet;
+	bool _clauseTypeSet;
 
 };
 

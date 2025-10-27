@@ -126,10 +126,9 @@ bool ConstraintEncoder<PinData, Tag>::ConstrainCircuit(GeneratorContext<PinData>
 					auto indicator = context.GetUnaryCounter().GetIndicatorForIndex(counterTimeframeId);
 
 					encoder.EncodeLogicValue(
-						encoder.EncodeAnd(
-							encoder.EncodeLogicValueConstraintDetector(container, constraint),
-							(dependency == UnaryCounterDependency::SpecifiedTimeframe)
-								? indicator : -indicator
+						encoder.EncodeOr(
+							-((dependency == UnaryCounterDependency::SpecifiedTimeframe) ? indicator : -indicator),
+							encoder.EncodeLogicValueConstraintDetector(container, constraint)
 						), Logic::LOGIC_ONE);
 					break;
 				}
@@ -139,7 +138,7 @@ bool ConstraintEncoder<PinData, Tag>::ConstrainCircuit(GeneratorContext<PinData>
 
 	const size_t timeframes = context.GetNumberOfTimeframesForTarget(GenerationTarget::ConstraintEncoding);
 	const auto constrain_timeframe = [&](size_t counterTimeframeId, size_t generatorTimeframeId, UnaryCounterDependency dependency) {
-		Timeframe<PinData>& timeframe = context.GetTimeframe(counterTimeframeId);
+		auto& timeframe = context.GetTimeframe(counterTimeframeId);
 		for (auto [nodeId, node] : circuit.EnumerateNodes())
 		{
 			const auto constraint = _generator(context, generatorTimeframeId, nodeId);
@@ -150,11 +149,11 @@ bool ConstraintEncoder<PinData, Tag>::ConstrainCircuit(GeneratorContext<PinData>
 
 			DVLOG(3) << "Constraining node " << node->GetName() << " / " << get_tag_name_v<Tag>
 				<< " with " << to_string(constraint) << " in tf " << std::to_string(counterTimeframeId);
-			auto container = timeframe.template GetContainer<Tag>(
-				context, nodeId, PortType::Output, 0u, interceptor);
+
 			// It can happen that for SAT-instances some parts are not encoded.
 			// As we don't want to burden the developer of the workflow excluding
 			// the non-encoded parts manually we do this automatically here.
+			auto container { timeframe.template GetContainer<Tag>(context, nodeId, PortType::Output, 0u, interceptor) };
 			if (container.IsSet())
 			{
 				encode_requirement(counterTimeframeId, container, constraint, dependency);
@@ -165,7 +164,7 @@ bool ConstraintEncoder<PinData, Tag>::ConstrainCircuit(GeneratorContext<PinData>
 	if (satSolver)
 	{
 		// Encode for all timeframes as it is manually unrolled
-		for (size_t timeframe = 0u; timeframe < timeframes; ++timeframe)
+		for (size_t timeframe { 0u }; timeframe < timeframes; ++timeframe)
 		{
 			constrain_timeframe(timeframe, timeframe, UnaryCounterDependency::SpecifiedTimeframe);
 		}
@@ -173,22 +172,20 @@ bool ConstraintEncoder<PinData, Tag>::ConstrainCircuit(GeneratorContext<PinData>
 
 	if (bmcSolver)
 	{
-		bmcSolver->SetTargetClauseType(ClauseType::Initial);
-		bmcSolver->SetTargetVariableType(VariableType::Auxiliary);
-		constrain_timeframe(0u, 0u, UnaryCounterDependency::None);
-
 		bmcSolver->SetTargetClauseType(ClauseType::Transition);
 		bmcSolver->SetTargetVariableType(VariableType::Auxiliary);
+
 		switch (_dependency)
 		{
 		case TimeframeDependency::TimeframeDependent:
-			for (size_t timeframe = 1u; timeframe < timeframes; ++timeframe)
+			for (size_t timeframe { 0u }; timeframe < timeframes; timeframe++)
 			{
 				constrain_timeframe(timeframe, timeframe, UnaryCounterDependency::SpecifiedTimeframe);
 			}
 			break;
 
 		case TimeframeDependency::InitThenIndependent:
+			constrain_timeframe(0u, 0u, UnaryCounterDependency::SpecifiedTimeframe);
 			constrain_timeframe(0u, 1u, UnaryCounterDependency::AllOtherTimeframes);
 			break;
 

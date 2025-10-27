@@ -5,10 +5,12 @@
 #include "Circuit/CircuitEnvironment.hpp"
 #include "SolverProxy/ISolverProxy.hpp"
 #include "SolverProxy/Sat/SatSolverProxy.hpp"
+#include "SolverProxy/Bmc/BmcSolverProxy.hpp"
 #include "Tpg/LogicGenerator/GeneratorContext.hpp"
 
 using namespace SolverProxy;
 using namespace SolverProxy::Sat;
+using namespace SolverProxy::Bmc;
 using namespace FreiTest::Basic;
 using namespace FreiTest::Circuit;
 
@@ -121,6 +123,10 @@ bool LogicGenerator<PinData>::TagCircuit(void)
 	for (std::shared_ptr<ICircuitTagger<PinData>>& encoder : _circuitTaggers)
 	{
 		DVLOG(6) << "Calling TagCircuit on encoder " << encoder->GetName();
+		if (auto solver = std::dynamic_pointer_cast<BmcSolverProxy>(_context.GetSolver()); solver) {
+			solver->ResetClauseType();
+			solver->ResetVariableType();
+		}
 		if (!encoder->TagCircuit(_context))
 		{
 			DVLOG(3) << "Encoder " << encoder->GetName() << " has canceled the generation process during TagCircuit";
@@ -235,6 +241,10 @@ bool LogicGenerator<PinData>::EncodeCircuit(void)
 	for (auto& encoder : _circuitEncoders)
 	{
 		DVLOG(6) << "Calling EncodeCircuit on encoder " << encoder->GetName();
+		if (auto solver = std::dynamic_pointer_cast<Bmc::BmcSolverProxy>(_context.GetSolver()); solver) {
+			solver->ResetClauseType();
+			solver->ResetVariableType();
+		}
 		if (!encoder->EncodeCircuit(_context))
 		{
 			DVLOG(3) << "Encoder " << encoder->GetName() << " has canceled the generation process during EncodeCircuit";
@@ -251,6 +261,10 @@ bool LogicGenerator<PinData>::PreEncodeCircuit(void)
 	for (auto& encoder : _circuitEncoders)
 	{
 		DVLOG(6) << "Calling PreEncodeCircuit on encoder " << encoder->GetName();
+		if (auto solver = std::dynamic_pointer_cast<Bmc::BmcSolverProxy>(_context.GetSolver()); solver) {
+			solver->ResetClauseType();
+			solver->ResetVariableType();
+		}
 		if (!encoder->PreEncodeCircuit(_context))
 		{
 			DVLOG(3) << "Encoder " << encoder->GetName() << " has canceled the generation process during PreEncodeCircuit";
@@ -267,6 +281,10 @@ bool LogicGenerator<PinData>::PostEncodeCircuit(void)
 	for (auto& encoder : _circuitEncoders)
 	{
 		DVLOG(6) << "Calling PostEncodeCircuit on encoder " << encoder->GetName();
+		if (auto solver = std::dynamic_pointer_cast<Bmc::BmcSolverProxy>(_context.GetSolver()); solver) {
+			solver->ResetClauseType();
+			solver->ResetVariableType();
+		}
 		if (!encoder->PostEncodeCircuit(_context))
 		{
 			DVLOG(3) << "Encoder " << encoder->GetName() << " has canceled the generation process during PostEncodeCircuit";
@@ -294,6 +312,10 @@ bool LogicGenerator<PinData>::EncodeTimeframe(size_t timeframe)
 	for (auto& encoder : _circuitEncoders)
 	{
 		DVLOG(6) << "Calling EncodeTimeframe on encoder " << encoder->GetName();
+		if (auto solver = std::dynamic_pointer_cast<Bmc::BmcSolverProxy>(_context.GetSolver()); solver) {
+			solver->ResetClauseType();
+			solver->ResetVariableType();
+		}
 		if (!encoder->EncodeTimeframe(_context, timeframe))
 		{
 			DVLOG(3) << "Encoder " << encoder->GetName() << " has canceled the generation process during EncodeTimeframe";
@@ -310,6 +332,10 @@ bool LogicGenerator<PinData>::PreEncodeTimeframe(size_t timeframe)
 	for (auto& encoder : _circuitEncoders)
 	{
 		DVLOG(6) << "Calling PreEncodeTimeframe on encoder " << encoder->GetName() << " with timeframe " << timeframe;
+		if (auto solver = std::dynamic_pointer_cast<Bmc::BmcSolverProxy>(_context.GetSolver()); solver) {
+			solver->ResetClauseType();
+			solver->ResetVariableType();
+		}
 		if (!encoder->PreEncodeTimeframe(_context, timeframe))
 		{
 			DVLOG(3) << "Encoder " << encoder->GetName() << " has canceled the generation process during PreEncodeTimeframe";
@@ -326,6 +352,10 @@ bool LogicGenerator<PinData>::PostEncodeTimeframe(size_t timeframe)
 	for (auto& encoder : _circuitEncoders)
 	{
 		DVLOG(6) << "Calling PostEncodeTimeframe on encoder " << encoder->GetName() << " with timeframe " << timeframe;
+		if (auto solver = std::dynamic_pointer_cast<Bmc::BmcSolverProxy>(_context.GetSolver()); solver) {
+			solver->ResetClauseType();
+			solver->ResetVariableType();
+		}
 		if (!encoder->PostEncodeTimeframe(_context, timeframe))
 		{
 			DVLOG(3) << "Encoder " << encoder->GetName() << " has canceled the generation process during PostEncodeTimeframe";
@@ -342,6 +372,10 @@ bool LogicGenerator<PinData>::EncodeNode(size_t timeframe, size_t node)
 	for (auto& encoder : _circuitEncoders)
 	{
 		DVLOG(9) << "Calling EncodeNode on encoder " << encoder->GetName() << " with timeframe " << timeframe << " and node " << node;
+		if (auto solver = std::dynamic_pointer_cast<Bmc::BmcSolverProxy>(_context.GetSolver()); solver) {
+			solver->ResetClauseType();
+			solver->ResetVariableType();
+		}
 		if (!encoder->EncodeNode(_context, timeframe, node))
 		{
 			DVLOG(3) << "Encoder " << encoder->GetName() << " has canceled the generation process during EncodeNode";
@@ -358,6 +392,10 @@ bool LogicGenerator<PinData>::PreEncodeNode(size_t timeframe, size_t node)
 	for (auto& encoder : _circuitEncoders)
 	{
 		DVLOG(9) << "Calling PreEncodeNode on encoder " << encoder->GetName() << " with timeframe " << timeframe << " and node " << node;
+		if (auto solver = std::dynamic_pointer_cast<Bmc::BmcSolverProxy>(_context.GetSolver()); solver) {
+			solver->ResetClauseType();
+			solver->ResetVariableType();
+		}
 		if (!encoder->PreEncodeNode(_context, timeframe, node))
 		{
 			DVLOG(3) << "Encoder " << encoder->GetName() << " has canceled the generation process during PreEncodeNode";
@@ -374,6 +412,10 @@ bool LogicGenerator<PinData>::PostEncodeNode(size_t timeframe, size_t node)
 	for (auto& encoder : _circuitEncoders)
 	{
 		DVLOG(9) << "Calling PostEncodeNode on encoder " << encoder->GetName() << " with timeframe " << timeframe << " and node " << node;
+		if (auto solver = std::dynamic_pointer_cast<Bmc::BmcSolverProxy>(_context.GetSolver()); solver) {
+			solver->ResetClauseType();
+			solver->ResetVariableType();
+		}
 		if (!encoder->PostEncodeNode(_context, timeframe, node))
 		{
 			DVLOG(3) << "Encoder " << encoder->GetName() << " has canceled the generation process during PostEncodeNode";
@@ -407,6 +449,10 @@ bool LogicGenerator<PinData>::ConstrainCircuit(void)
 	for (auto& encoder : _constraintEncoders)
 	{
 		DVLOG(6) << "Calling ConstrainCircuit on encoder " << encoder->GetName();
+		if (auto solver = std::dynamic_pointer_cast<Bmc::BmcSolverProxy>(_context.GetSolver()); solver) {
+			solver->ResetClauseType();
+			solver->ResetVariableType();
+		}
 		if (!encoder->ConstrainCircuit(_context))
 		{
 			DVLOG(3) << "Encoder " << encoder->GetName() << " has canceled the generation process during ConstrainCircuit";
@@ -423,6 +469,10 @@ bool LogicGenerator<PinData>::PreConstrainCircuit(void)
 	for (auto& encoder : _constraintEncoders)
 	{
 		DVLOG(6) << "Calling PreConstrainCircuit on encoder " << encoder->GetName();
+		if (auto solver = std::dynamic_pointer_cast<Bmc::BmcSolverProxy>(_context.GetSolver()); solver) {
+			solver->ResetClauseType();
+			solver->ResetVariableType();
+		}
 		if (!encoder->PreConstrainCircuit(_context))
 		{
 			DVLOG(3) << "Encoder " << encoder->GetName() << " has canceled the generation process during PreConstrainCircuit";
@@ -439,6 +489,10 @@ bool LogicGenerator<PinData>::PostConstrainCircuit(void)
 	for (auto& encoder : _constraintEncoders)
 	{
 		DVLOG(6) << "Calling PostConstrainCircuit on encoder " << encoder->GetName();
+		if (auto solver = std::dynamic_pointer_cast<Bmc::BmcSolverProxy>(_context.GetSolver()); solver) {
+			solver->ResetClauseType();
+			solver->ResetVariableType();
+		}
 		if (!encoder->PostConstrainCircuit(_context))
 		{
 			DVLOG(3) << "Encoder " << encoder->GetName() << " has canceled the generation process during PostConstrainCircuit";
@@ -455,6 +509,10 @@ bool LogicGenerator<PinData>::ConstrainTimeframe(size_t timeframe)
 	for (auto& encoder : _constraintEncoders)
 	{
 		DVLOG(6) << "Calling ConstrainTimeframe on encoder " << encoder->GetName() << " with timeframe " << timeframe;
+		if (auto solver = std::dynamic_pointer_cast<Bmc::BmcSolverProxy>(_context.GetSolver()); solver) {
+			solver->ResetClauseType();
+			solver->ResetVariableType();
+		}
 		if (!encoder->ConstrainTimeframe(_context, timeframe))
 		{
 			DVLOG(3) << "Encoder " << encoder->GetName() << " has canceled the generation process during ConstrainTimeframe";
@@ -471,6 +529,10 @@ bool LogicGenerator<PinData>::PreConstrainTimeframe(size_t timeframe)
 	for (auto& encoder : _constraintEncoders)
 	{
 		DVLOG(6) << "Calling PreConstrainTimeframe on encoder " << encoder->GetName() << " with timeframe " << timeframe;
+		if (auto solver = std::dynamic_pointer_cast<Bmc::BmcSolverProxy>(_context.GetSolver()); solver) {
+			solver->ResetClauseType();
+			solver->ResetVariableType();
+		}
 		if (!encoder->PreConstrainTimeframe(_context, timeframe))
 		{
 			DVLOG(3) << "Encoder " << encoder->GetName() << " has canceled the generation process during PreConstrainTimeframe";
@@ -487,6 +549,10 @@ bool LogicGenerator<PinData>::PostConstrainTimeframe(size_t timeframe)
 	for (auto& encoder : _constraintEncoders)
 	{
 		DVLOG(6) << "Calling PostConstrainTimeframe on encoder " << encoder->GetName() << " with timeframe " << timeframe;
+		if (auto solver = std::dynamic_pointer_cast<Bmc::BmcSolverProxy>(_context.GetSolver()); solver) {
+			solver->ResetClauseType();
+			solver->ResetVariableType();
+		}
 		if (!encoder->PostConstrainTimeframe(_context, timeframe))
 		{
 			DVLOG(3) << "Encoder " << encoder->GetName() << " has canceled the generation process during PostConstrainTimeframe";

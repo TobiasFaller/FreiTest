@@ -60,6 +60,11 @@ bool VcmOutputLogicEncoder<PinData>::PostEncodeTimeframe(GeneratorContext<PinDat
 			case Vcm::VcmOutputType::TransitionConstraint:
 			case Vcm::VcmOutputType::TargetConstraint:
 			{
+				if (bmcSolver)
+				{
+					bmcSolver->SetTargetVariableType(SolverProxy::Bmc::VariableType::Auxiliary);
+					bmcSolver->SetTargetClauseType(SolverProxy::Bmc::ClauseType::Transition);
+				}
 				auto const condition {
 					encoder.template ConvertLogicContainer<LogicContainer>(
 					encoder.EncodeLogicValueDetector(container, Logic::LOGIC_ONE))
