@@ -1,4 +1,4 @@
-[Previous Topic](2_Circuit.md) - [Index](../../README.md)
+[Previous Topic](3_Fuzzing.md) - [Index](../../README.md) - [Next](5_Polito.md)
 
 # Scale4Edge Applications
 
@@ -247,4 +247,4 @@ See an example below:
   If no UDFM file is provided for a cell-aware workflow, a fatal error will occur.
   - Default: "" (empty)
 
-[Previous Topic](2_Circuit.md) - [Index](../../README.md)
+[Previous Topic](3_Fuzzing.md) - [Index](../../README.md) - [Next](5_Polito.md)

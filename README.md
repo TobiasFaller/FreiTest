@@ -13,6 +13,8 @@ This project does not have the aim to provide a full ATPG flow and lacks most fe
 On top of the FreiTest framework so-called _workflows_ provide executable utilities for research, each designed for a specific purpose.
 All of the workflows are integrated into a single executable named _freitest_ that handles command line parsing, configuration file processing and circuit loading.
 
+Contact: Uni Freiburg [Tobias Faller &lt;fallert@tf.uni-freiburg.de&gt;](mailto:fallert@tf.uni-freiburg.de)
+
 ## Documentation
 
 - **First Steps**
@@ -21,6 +23,12 @@ All of the workflows are integrated into a single executable named _freitest_ th
   - [**Build Setup**](documentation/framework/first_steps/3_BuildSetup.md)
   - [**Running FreiTest**](documentation/framework/first_steps/4_RunningFreiTest.md)
   - [**Developing Applications**](documentation/framework/first_steps/5_DevelopingApplication.md)
+- Applications
+  - [Utility Applications](documentation/applications/1_Utility.md)
+  - [Circuit Applications](documentation/applications/2_Circuit.md)
+  - [Fuzzing Applications](documentation/applications/3_Fuzzing.md)
+  - [Scale4Edge Applications](documentation/applications/4_Scale4Edge.md)
+  - [PoliTO Applications](documentation/applications/5_Polito.md)
 - Verilog Circuit Import
   - [Cricuit Representation](documentation/framework/circuit/1_CircuitRepresentation.md)
   - [Verilog Instantiator](documentation/framework/circuit/2_VerilogInstantiator.md)
@@ -32,10 +40,6 @@ All of the workflows are integrated into a single executable named _freitest_ th
   - [Logic Encoding](documentation/framework/tpg/3_LogicEncoding.md)
   - [Logic Generator](documentation/framework/tpg/4_LogicGenerator.md)
   - [Circuit Simulator](documentation/framework/tpg/5_CircuitSimulator.md)
-- Applications
-  - [Utility Applications](documentation/applications/1_Utility.md)
-  - [Circuit Applications](documentation/applications/2_Circuit.md)
-  - [Scale4Edge Applications](documentation/applications/3_Scale4Edge.md)
 
 
 ## Where is the code?
@@ -46,9 +50,11 @@ Find the current progress below:
 
 - [X] Data / Cell-Libraries: Provide a generic cell-library verilog implementation to eliminate dependency on proprietary cell-libraries
 - [X] Data / Cell-Libraries: Provide a generic cell-library liberty file for synthesis
+- [X] Data / Cell-Libraries: Provide a generic cell-library SPICE implementation
 - [X] Data / Benchmarks: Provide generated benchmarks for generic cell-library (through automatic generation)
 - [X] Data / Benchmarks: Provide ISCAS85, ISCAS89, ITC99, IWS05 benchmarks for generic cell-library (through automatic download and synthesis)
 - [X] Data / Benchmarks: Provide DarkRISCV and PicoRV32 processors for generic cell-library (through automatic download and synthesis)
+- [X] Data / Polito: Provide implementation for MACISH
 - [ ] Data / Fault Models: Provide cell-aware fault model for generic cell-library
 - [X] Script: Generator for generic benchmark circuits and VCMs for generic cell-library
 - [X] Script: Synthesis for ISCAS85, ISCAS89, ITC99, IWS05 benchmarks for generic cell-library
@@ -63,20 +69,26 @@ Find the current progress below:
 - [ ] Code: Provide open-source SBST ATPG workflows (Scale4Edge)
 - [ ] Code: Provide open-source switching activity ATPG workflows (PoliTO)
 - [ ] Code: Provide open-source untestability ATPG workflows (PoliTO)
+- [X] Code: Provide open-source MACISH safe-fault workflows (PoliTO)
+- [X] Code: Provide fuzzing workflows
 - [X] Code: Provide circuit export workflows
 - [X] Documentation: Provide core FreiTest framework
 - [X] Documentation: Provide open-source basic ATPG workflows (Scale4Edge)
 - [ ] Documentation: Provide open-source SBST ATPG workflows (Scale4Edge)
 - [ ] Documentation: Provide open-source switching activity ATPG workflows (PoliTO)
 - [ ] Documentation: Provide open-source untestability ATPG workflows (PoliTO)
+- [X] Documentation: Provide open-source MACISH safe-fault workflows (PoliTO)
+- [X] Documentation: Provide fuzzing workflows
 - [X] Documentation: Provide circuit export workflows
 - [X] Configuration: Provide core FreiTest framework
 - [X] Configuration: Provide open-source basic ATPG workflows (Scale4Edge)
 - [ ] Configuration: Provide open-source SBST ATPG workflows (Scale4Edge)
 - [ ] Configuration: Provide open-source switching activity ATPG workflows (PoliTO)
 - [ ] Configuration: Provide open-source untestability ATPG workflows (PoliTO)
+- [X] Configuration: Provide open-source MACISH safe-fault workflows (PoliTO)
+- [X] Configuration: Provide fuzzing workflows
 - [X] Configuration: Provide circuit export workflows
 
 ---
 
-This work is supported in part by the German Federal Ministry of Education and Research (BMBF) within the project Scale4Edge under contract no. 16ME0132.
+This work is supported in part by the German Federal Ministry of Research, Technology and Space (BMFTR) within the project Scale4Edge under contract no. 16ME0132.
