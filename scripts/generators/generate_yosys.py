@@ -17,6 +17,7 @@ if __name__ == '__main__':
 	parser.add_argument('--parameter-path', dest='parameters_path', required=False, help='The verilog parameters source file to use when parsing the sources')
 	parser.add_argument('--execute', dest='execute', required=False, default=False, action='store_true', help='Execute the generated script with yosys')
 	parser.add_argument('--debug', dest='debug', required=False, default=False, action='store_true', help='Enable debug output of YoSys')
+	parser.add_argument('--slang', dest='slang', required=False, default=False, action='store_true', help='Enable slang frontend for Verilog')
 	args = parser.parse_args()
 
 	debug = 'debug ' if args.debug else ''
@@ -40,11 +41,15 @@ if __name__ == '__main__':
 	with open(args.output_script_path, 'wt', encoding='UTF-8') as stream:
 		for input_file in args.input_paths:
 			if args.input_format == 'verilog':
-				stream.write(f'{debug}read_verilog -sv {" ".join(f"-D{define}" for define in defines)} {" ".join(f"-I{path}" for path in args.input_include_paths)} {input_file}\n')
+				if args.slang:
+					stream.write(f'{debug}read_slang --top {args.top_module} {" ".join(f"-D{define}" for define in defines)} {" ".join(f"-I{path}" for path in args.input_include_paths)} {input_file}\n')
+				else:
+					stream.write(f'{debug}read_verilog -sv {" ".join(f"-D{define}" for define in defines)} {" ".join(f"-I{path}" for path in args.input_include_paths)} {input_file}\n')
 			elif args.input_format == 'blif':
 				stream.write(f'{debug}read_blif {input_file}; rename -top {args.top_module}\n')
 		stream.write('\n')
-		stream.write(f'{debug}chparam {" ".join(f"-set {param.split('=', 1)[0]} \"{param.split('=', 1)[1]}\"" for param in parameters)} {args.top_module}\n')
+		if parameters:
+			stream.write(f'{debug}chparam {" ".join(f"-set {param.split('=', 1)[0]} \"{param.split('=', 1)[1]}\"" for param in parameters)} {args.top_module}\n')
 		stream.write(f'{debug}hierarchy -top {args.top_module}\n')
 		stream.write(f'{debug}proc\n')
 		stream.write(f'{debug}flatten\n')
@@ -57,4 +62,7 @@ if __name__ == '__main__':
 		stream.write(f'{debug}write_verilog {args.output_circuit_path}\n')
 
 	if args.execute:
-		subprocess.run(f'yosys -s {args.output_script_path}', shell=True, check=True)
+		if args.slang:
+			subprocess.run(f'yosys -m slang -s {args.output_script_path}', shell=True, check=True)
+		else:
+			subprocess.run(f'yosys -s {args.output_script_path}', shell=True, check=True)

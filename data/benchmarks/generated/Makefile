@@ -1,19 +1,22 @@
 PROJECT_ROOT ?= ../../..
 SCRIPT_PATH ?= ${PROJECT_ROOT}/scripts
 GENERIC_CELL_LIBRARY ?= ${PROJECT_ROOT}/data/cell-libraries/generic/generic_meta.json
+GENERIC_CELL_VERILOG ?= ${PROJECT_ROOT}/data/cell-libraries/generic/generic_functional.v
 
 SEEDS_TINY_PATH ?= seeds_tiny.txt
 SEEDS_SMALL_PATH ?= seeds_small.txt
 SEEDS_MEDIUM_PATH ?= seeds_medium.txt
 SEEDS_LARGE_PATH ?= seeds_large.txt
 SEEDS_HUGE_PATH ?= seeds_huge.txt
+SEEDS_ENDIANESS_PATH ?= seeds_endianess.txt
 OUTUPT_TINY_PATH ?= tiny
 OUTUPT_SMALL_PATH ?= small
 OUTUPT_MEDIUM_PATH ?= medium
 OUTUPT_LARGE_PATH ?= large
 OUTUPT_HUGE_PATH ?= huge
+OUTUPT_ENDIANESS_PATH ?= endianess
 
-.PHONY: default help clean mrproper build tiny small medium large huge generate
+.PHONY: default help clean mrproper build tiny small medium large huge endianess generate
 
 default: build-generic
 
@@ -42,6 +45,7 @@ mrproper: clean
 %-generic:
 	$(MAKE) $* \
 		CELL_LIBRARY=${GENERIC_CELL_LIBRARY} \
+		CELL_VERILOG=${GENERIC_CELL_VERILOG} \
 		OUTPUT_SUFFIX=-generic
 
 build:
@@ -53,36 +57,120 @@ build:
 
 tiny:
 	$(MAKE) generate \
-		CI=5 CO=3 CF=3 CG=15 VI=3 VO=1 VF=0 VG=3 \
+		CI=5 CO=3 CF=3 CG=15 VI=3 VO=1 VF=0 VG=3 CM=1 CSM=0 CNS=0 CWB=0 CPB=0 \
 		SEEDS_PATH=${SEEDS_TINY_PATH} OUTPUT_PATH=${OUTUPT_TINY_PATH}
 
 small:
 	$(MAKE) generate \
-		CI=10 CO=5 CF=10 CG=50 VI=5 VO=2 VF=1 VG=10 \
+		CI=10 CO=5 CF=10 CG=50 VI=5 VO=2 VF=1 VG=10 CM=1 CSM=0 CNS=0 CWB=0 CPB=0 \
 		SEEDS_PATH=${SEEDS_SMALL_PATH} OUTPUT_PATH=${OUTUPT_SMALL_PATH}
 
 medium:
 	$(MAKE) generate \
-		CI=25 CO=10 CF=25 CG=500 VI=10 VO=3 VF=2 VG=25 \
+		CI=25 CO=10 CF=25 CG=500 VI=10 VO=3 VF=2 VG=25 CM=1 CSM=0 CNS=0 CWB=0 CPB=0 \
 		SEEDS_PATH=${SEEDS_MEDIUM_PATH} OUTPUT_PATH=${OUTUPT_MEDIUM_PATH}
 
 large:
 	$(MAKE) generate \
-		CI=50 CO=20 CF=250 CG=50000 VI=20 VO=10 VF=10 VG=500 \
+		CI=50 CO=20 CF=250 CG=50000 VI=20 VO=10 VF=10 VG=500 CM=1 CSM=0 CNS=0 CWB=0 CPB=0 \
 		SEEDS_PATH=${SEEDS_LARGE_PATH} OUTPUT_PATH=${OUTUPT_LARGE_PATH}
 
 huge:
 	$(MAKE) generate \
-		CI=50 CO=20 CF=1000 CG=500000 VI=20 VO=10 VF=10 VG=500 \
+		CI=50 CO=20 CF=1000 CG=500000 VI=20 VO=10 VF=10 VG=500 CM=1 CSM=0 CNS=0 CWB=0 CPB=0 \
 		SEEDS_PATH=${SEEDS_HUGE_PATH} OUTPUT_PATH=${OUTUPT_HUGE_PATH}
+
+endianess:
+	$(MAKE) generate \
+		CI=5 CO=3 CF=3 CG=15 VI=3 VO=1 VF=0 VG=3 CM=5 CSM=3 CNS=3 CWB=3 CPB=3 \
+		SEEDS_PATH=${SEEDS_ENDIANESS_PATH} OUTPUT_PATH=${OUTUPT_ENDIANESS_PATH}
+	$(MAKE) stimulate \
+		SEEDS_PATH=${SEEDS_ENDIANESS_PATH} OUTPUT_PATH=${OUTUPT_ENDIANESS_PATH}
+	$(MAKE) verilate \
+		SEEDS_PATH=${SEEDS_ENDIANESS_PATH} OUTPUT_PATH=${OUTUPT_ENDIANESS_PATH}
+	$(MAKE) run_freitest \
+		SEEDS_PATH=${SEEDS_ENDIANESS_PATH} OUTPUT_PATH=${OUTUPT_ENDIANESS_PATH}
+	$(MAKE) run_verilator \
+		SEEDS_PATH=${SEEDS_ENDIANESS_PATH} OUTPUT_PATH=${OUTUPT_ENDIANESS_PATH}
+	$(MAKE) run_compare \
+		SEEDS_PATH=${SEEDS_ENDIANESS_PATH} OUTPUT_PATH=${OUTUPT_ENDIANESS_PATH}
 
 generate:
 	mkdir -p ${OUTPUT_PATH}; true
 	i=1; while read seed; do python3 ${SCRIPT_PATH}/generators/generate_benchmark.py \
 		--seed $$seed \
 		--library-path ${CELL_LIBRARY} \
-		--circuit-path ${OUTPUT_PATH}/benchmark$$i${OUTPUT_SUFFIX}.v --circuit-name benchmark --circuit-inputs ${CI} --circuit-outputs ${CO} --circuit-flipflops ${CF} --circuit-gates ${CG} \
-		--vcm-path ${OUTPUT_PATH}/benchmark$$i${OUTPUT_SUFFIX}-vcm.v --vcm-name vcm --vcm-inputs ${VI} --vcm-constraints ${VO} --vcm-flipflops ${VF} --vcm-gates ${VG} \
+		--circuit-path ${OUTPUT_PATH}/benchmark$$i${OUTPUT_SUFFIX}.v \
+			--circuit-name benchmark --circuit-inputs ${CI} --circuit-outputs ${CO} \
+			--circuit-flipflops ${CF} --circuit-gates ${CG} --circuit-modules ${CM} \
+			--circuit-submodules ${CSM} --circuit-nosubmodules ${CNS} \
+			--circuit-wire-busses ${CWB} --circuit-port-busses ${CPB} \
+		--vcm-path ${OUTPUT_PATH}/benchmark$$i${OUTPUT_SUFFIX}-vcm.v \
+			--vcm-name vcm --vcm-inputs ${VI} --vcm-constraints ${VO} \
+			--vcm-flipflops ${VF} --vcm-gates ${VG} \
 		--meta-path ${OUTPUT_PATH}/benchmark$$i${OUTPUT_SUFFIX}-meta.json; \
+		i=$$(($$i + 1)); \
+	done < ${SEEDS_PATH}
+
+verilate:
+	mkdir -p ${OUTPUT_PATH}; true
+	i=1; while read seed; do python3 ${SCRIPT_PATH}/generators/generate_verilator.py \
+		--circuit-metadata ${OUTPUT_PATH}/benchmark$$i${OUTPUT_SUFFIX}-meta.json \
+		--circuit-verilog ${OUTPUT_PATH}/benchmark$$i${OUTPUT_SUFFIX}.v \
+		--library-path ${CELL_VERILOG} \
+		--output-path ${OUTPUT_PATH}/benchmark$$i; \
+		i=$$(($$i + 1)); \
+	done < ${SEEDS_PATH}
+
+stimulate:
+	mkdir -p ${OUTPUT_PATH}; true
+	i=1; while read seed; do python3 ${SCRIPT_PATH}/generators/generate_stimuli.py \
+		--circuit-metadata ${OUTPUT_PATH}/benchmark$$i${OUTPUT_SUFFIX}-meta.json \
+		--stimuli-seed 0 \
+		--stimuli-timeframes 1000 \
+		--output-txt ${OUTPUT_PATH}/benchmark$$i-stimuli.txt \
+		--output-json ${OUTPUT_PATH}/benchmark$$i-stimuli.json; \
+		i=$$(($$i + 1)); \
+	done < ${SEEDS_PATH}
+
+run_freitest:
+	mkdir -p ${OUTPUT_PATH}; true
+	i=1; while read seed; do \
+		mkdir -p data/benchmarks/generated/endianess/benchmark$${i}_sat; \
+		mkdir -p data/benchmarks/generated/endianess/benchmark$${i}_sim; \
+		(cd ${PROJECT_ROOT}; \
+		./bazel-bin/src/freitest \
+			--Settings settings/workflows/fuzzing/fuzzing-sat.freitest.jsonc \
+			--Settings settings/circuits/benchmarks/public-generic.freitest.jsonc \
+			--CircuitName endianess/benchmark$$i \
+			--Fuzzing/Stimuli data/benchmarks/generated/endianess/benchmark$$i-stimuli.json \
+			--DataExportDirectory data/benchmarks/generated/endianess/benchmark$${i}_sat; \
+		./bazel-bin/src/freitest \
+			--Settings settings/workflows/fuzzing/fuzzing-simulation.freitest.jsonc \
+			--Settings settings/circuits/benchmarks/public-generic.freitest.jsonc \
+			--CircuitName endianess/benchmark$$i \
+			--Fuzzing/Stimuli data/benchmarks/generated/endianess/benchmark$$i-stimuli.json \
+			--DataExportDirectory data/benchmarks/generated/endianess/benchmark$${i}_sim; \
+		); \
+		i=$$(($$i + 1)); \
+	done < ${SEEDS_PATH}
+
+run_verilator:
+	mkdir -p ${OUTPUT_PATH}; true
+	i=1; while read seed; do \
+		mkdir -p ${OUTPUT_PATH}/benchmark$${i}_ver; \
+		cat ${OUTPUT_PATH}/benchmark$$i-stimuli.txt \
+			| ${OUTPUT_PATH}/benchmark$$i/Vbenchmark \
+			> ${OUTPUT_PATH}/benchmark$${i}_ver/trace.txt; \
+		i=$$(($$i + 1)); \
+	done < ${SEEDS_PATH}
+
+run_compare:
+	mkdir -p ${OUTPUT_PATH}; true
+	i=1; while read seed; do \
+		if [ $(cmp -s ${OUTPUT_PATH}/benchmark$${i}_ver/trace.txt ${OUTPUT_PATH}/benchmark$${i}_sat/trace.txt) ] \
+				|| [ $(cmp -s ${OUTPUT_PATH}/benchmark$${i}_ver/trace.txt ${OUTPUT_PATH}/benchmark$${i}_sim/trace.txt) ]; then \
+			echo "Benchmark $${i} doesn't match"; \
+		fi; \
 		i=$$(($$i + 1)); \
 	done < ${SEEDS_PATH}
