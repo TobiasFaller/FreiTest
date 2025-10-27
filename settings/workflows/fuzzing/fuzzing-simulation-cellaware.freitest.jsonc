@@ -1,0 +1,6 @@
+[
+    {"application": "FUZZING_SIMULATION_CELL_AWARE"},
+
+	{"define": "OutputDir", "value": "./output"},
+	{"setting": "DataExportDirectory", "value": "[OutputDir]/FuzzingSimCellAware_[Circuit]"},
+]

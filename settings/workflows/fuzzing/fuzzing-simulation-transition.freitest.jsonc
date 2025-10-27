@@ -1,0 +1,6 @@
+[
+    {"application": "FUZZING_SIMULATION_TRANSITION_DELAY"},
+
+	{"define": "OutputDir", "value": "./output"},
+	{"setting": "DataExportDirectory", "value": "[OutputDir]/FuzzingSimTransitionDelay_[Circuit]"},
+]

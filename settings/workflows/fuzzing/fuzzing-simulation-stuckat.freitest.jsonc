@@ -1,0 +1,6 @@
+[
+    {"application": "FUZZING_SIMULATION_STUCK_AT"},
+
+	{"define": "OutputDir", "value": "./output"},
+	{"setting": "DataExportDirectory", "value": "[OutputDir]/FuzzingSimStuckAt_[Circuit]"},
+]

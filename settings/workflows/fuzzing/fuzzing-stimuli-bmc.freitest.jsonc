@@ -1,0 +1,6 @@
+[
+    {"application": "FUZZING_STIMULI_BMC"},
+
+	{"define": "OutputDir", "value": "./output"},
+	{"setting": "DataExportDirectory", "value": "[OutputDir]/FuzzingStimBmc_[Circuit]"},
+]

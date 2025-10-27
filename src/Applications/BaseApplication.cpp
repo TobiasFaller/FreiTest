@@ -16,6 +16,10 @@
 #include "Applications/Circuit/ExportCircuitVerilog.hpp"
 #include "Applications/Circuit/ExportCircuitCells.hpp"
 #include "Applications/Circuit/ExportCircuitCnf.hpp"
+#include "Applications/Fuzzing/StimSatFuzzing.hpp"
+#include "Applications/Fuzzing/StimBmcFuzzing.hpp"
+#include "Applications/Fuzzing/StimSimFuzzing.hpp"
+#include "Applications/Fuzzing/FaultSimulationFuzzing.hpp"
 #include "Applications/Scale4Edge/TestPatternGeneration/SatFullScanAtpg.hpp"
 #include "Applications/Scale4Edge/TestPatternGeneration/SatFullScanFuzzing.hpp"
 #include "Applications/Scale4Edge/TestPatternGeneration/SatSequentialAtpg.hpp"
@@ -28,6 +32,8 @@
 #include "Applications/Scale4Edge/FaultCompaction/GreedyStaticFaultCompaction.hpp"
 #include "Applications/Scale4Edge/FaultCompaction/SatStaticFaultCompaction.hpp"
 #include "Applications/Scale4Edge/FaultCoverageExport/FaultCoverageExport.hpp"
+#include "Applications/PoliTO/MacishMultiplierFaultStatistics.hpp"
+#include "Applications/PoliTO/MacishSafeFaultAnalysis.hpp"
 #include "Basic/Fault/Lists/SingleStuckAtFaultList.hpp"
 #include "Basic/Fault/Models/SingleStuckAtFaultModel.hpp"
 #include "Basic/Fault/Lists/SingleTransitionDelayFaultList.hpp"
@@ -106,6 +112,19 @@ unique_ptr<BaseApplication> BaseApplication::Create(std::string application)
 	if (application == "CIRCUIT_EXPORT_CNF")
 		return std::make_unique<FreiTest::Application::ExportCircuit::ExportCircuitCnf>();
 
+	if (application == "FUZZING_STIMULI_SAT")
+		return std::make_unique<FreiTest::Application::Fuzzing::StimSatFuzzing>();
+	if (application == "FUZZING_STIMULI_BMC")
+		return std::make_unique<FreiTest::Application::Fuzzing::StimBmcFuzzing>();
+	if (application == "FUZZING_STIMULI_SIMULATION")
+		return std::make_unique<FreiTest::Application::Fuzzing::StimSimFuzzing>();
+	if (application == "FUZZING_SIMULATION_STUCK_AT")
+		return std::make_unique<FreiTest::Application::Fuzzing::FaultSimulationFuzzing<Fault::SingleStuckAtFaultModel, Fault::SingleStuckAtFaultList>>();
+	if (application == "FUZZING_SIMULATION_TRANSITION_FAULT")
+		return std::make_unique<FreiTest::Application::Fuzzing::FaultSimulationFuzzing<Fault::SingleTransitionDelayFaultModel, Fault::SingleTransitionDelayFaultList>>();
+	if (application == "FUZZING_SIMULATION_CELL_AWARE")
+		return std::make_unique<FreiTest::Application::Fuzzing::FaultSimulationFuzzing<Fault::CellAwareFaultModel, Fault::CellAwareFaultList>>();
+
 	if (application == "SCALE4EDGE_SAT_FULLSCAN_STUCK_AT_ATPG")
 		return std::make_unique<FreiTest::Application::Scale4Edge::SatFullScanAtpg<Fault::SingleStuckAtFaultModel, Fault::SingleStuckAtFaultList>>();
 	if (application == "SCALE4EDGE_SAT_SEQUENTIAL_STUCK_AT_ATPG")
@@ -180,6 +199,15 @@ unique_ptr<BaseApplication> BaseApplication::Create(std::string application)
 		return std::make_unique<FreiTest::Application::Scale4Edge::SatStaticFaultCompaction<Fault::CellAwareFaultModel, Fault::CellAwareFaultList>>();
 	if (application == "SCALE4EDGE_FAULT_COVERAGE_EXPORT_CELL_AWARE")
 		return std::make_unique<FreiTest::Application::Scale4Edge::FaultCoverageExport<Fault::CellAwareFaultModel, Fault::CellAwareFaultList>>();
+
+	if (application == "POLITO_MACISH_MULTIPLIER_FAULT_STATISTICS")
+		return std::make_unique<FreiTest::Application::PoliTO::MacishMultiplierFaultStatistics>();
+	if (application == "POLITO_MACISH_SAFE_FAULT_ANALYSIS_STUCK_AT")
+		return std::make_unique<FreiTest::Application::PoliTO::MacishSafeFaultAnalysis<Fault::SingleStuckAtFaultModel, Fault::SingleStuckAtFaultList>>();
+	if (application == "POLITO_MACISH_SAFE_FAULT_ANALYSIS_TRANSITION")
+		return std::make_unique<FreiTest::Application::PoliTO::MacishSafeFaultAnalysis<Fault::SingleTransitionDelayFaultModel, Fault::SingleTransitionDelayFaultList>>();
+	if (application == "POLITO_MACISH_SAFE_FAULT_ANALYSIS_CELL_AWARE")
+		return std::make_unique<FreiTest::Application::PoliTO::MacishSafeFaultAnalysis<Fault::CellAwareFaultModel, Fault::CellAwareFaultList>>();
 
 
 	LOG(FATAL) << "The application " << application << " was not found!";

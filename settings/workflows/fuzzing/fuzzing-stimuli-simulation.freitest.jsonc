@@ -1,0 +1,6 @@
+[
+    {"application": "FUZZING_STIMULI_SIMULATION"},
+
+	{"define": "OutputDir", "value": "./output"},
+	{"setting": "DataExportDirectory", "value": "[OutputDir]/FuzzingStimSimulation_[Circuit]"},
+]
