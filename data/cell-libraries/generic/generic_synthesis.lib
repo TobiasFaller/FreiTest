@@ -110,7 +110,7 @@ library (generic) {
 	}
 
 	cell (MUX) {
-		area : 4.0;
+		area : 6.0;
 		pin (IN1) {
 			direction : input;
 		}
@@ -126,8 +126,51 @@ library (generic) {
 		}
 	}
 
-	cell (DFF) {
+	cell (DL) {
 		area : 6.0;
+		ff (IQ , IQN) {
+			enable : "ENABLE";
+			data_in : "IN1";
+		}
+		pin (IN1) {
+			direction : input;
+			data_in_type : data;
+		}
+		pin (ENABLE) {
+			direction : input;
+		}
+		pin (OUT) {
+			direction : output;
+			function : "IQ";
+		}
+	}
+
+	cell (DLR) {
+		area : 7.0;
+		ff (IQ , IQN) {
+			enable : "ENABLE";
+			clear: "ARESET";
+			data_in : "IN1";
+		}
+		pin (IN1) {
+			direction : input;
+			data_in_type : data;
+		}
+		pin (ENABLE) {
+			direction : input;
+		}
+		pin (ARESET) {
+			direction : input;
+			data_in_type : clear;
+		}
+		pin (OUT) {
+			direction : output;
+			function : "IQ";
+		}
+	}
+
+	cell (DFF) {
+		area : 11.0;
 		ff (IQ , IQN) {
 			clocked_on : "CLOCK";
 			next_state : "IN1";
@@ -137,6 +180,29 @@ library (generic) {
 			nextstate_type : data;
 		}
 		pin (CLOCK) {
+			direction : input;
+		}
+		pin (OUT) {
+			direction : output;
+			function : "IQ";
+		}
+	}
+
+	cell (DFFR) {
+		area : 13.0;
+		ff (IQ , IQN) {
+			clocked_on : "CLOCK";
+			next_state : "IN1";
+			clear      : "ARESET";
+		}
+		pin (IN1) {
+			direction : input;
+			nextstate_type : data;
+		}
+		pin (CLOCK) {
+			direction : input;
+		}
+		pin (ARESET) {
 			direction : input;
 		}
 		pin (OUT) {

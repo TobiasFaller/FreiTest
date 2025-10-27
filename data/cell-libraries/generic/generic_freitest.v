@@ -39,6 +39,22 @@ module MUX(input IN1, input IN2, input IN3, output OUT);
 	mux gate(OUT, IN1, IN2, IN3);
 endmodule
 
+module DL(input IN1, input ENABLE, output OUT);
+	wire set;
+	wire reset;
+	wire qn;
+	tie0 gate_set(set);
+	tie0 gate_reset(reset);
+	dlatch gate(.d(IN1), .enable(ENABLE), .set(set), .reset(reset), .q(OUT), .qn(qn));
+endmodule
+
+module DLR(input IN1, input ENABLE, input ARESET, output OUT);
+	wire set;
+	wire qn;
+	tie0 gate_set(set);
+	dlatch gate(.d(IN1), .enable(ENABLE), .set(set), .reset(ARESET), .q(OUT), .qn(qn));
+endmodule
+
 module DFF(input IN1, input CLOCK, output OUT);
 	wire set;
 	wire reset;
@@ -46,6 +62,13 @@ module DFF(input IN1, input CLOCK, output OUT);
 	tie0 gate_set(set);
 	tie0 gate_reset(reset);
 	dflipflop gate(.d(IN1), .clock(CLOCK), .set(set), .reset(reset), .q(OUT), .qn(qn));
+endmodule
+
+module DFFR(input IN1, input CLOCK, input ARESET, output OUT);
+	wire set;
+	wire qn;
+	tie0 gate_set(set);
+	dflipflop gate(.d(IN1), .clock(CLOCK), .set(set), .reset(ARESET), .q(OUT), .qn(qn));
 endmodule
 
 `endcelldefine

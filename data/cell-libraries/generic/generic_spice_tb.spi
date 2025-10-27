@@ -1,0 +1,92 @@
+TESTBENCH
+.include ./generic_spice.spi
+.include ./generic_spice_model.spi
+
+VDD  SVDD    0 DC 1.8
+VCLK SCLOCK  0 PULSE(0 1.8   1n 1n 1n  9n  20n)
+VENA SENABLE 0 PULSE(0 1.8  10n 1n 1n  4n  20n)
+VIN1 SIN1    0 PULSE(0 1.8  20n 1n 1n 19n  40n)
+VIN2 SIN2    0 PULSE(0 1.8  40n 1n 1n 39n  80n)
+VIN3 SIN3    0 PULSE(0 1.8  80n 1n 1n 79n 160n)
+VRST SARESET 0 PULSE(0 1.8 -10n 1n 1n 18n 170n)
+
+XBUF  IN1                       OUT_BUF  VDD 0 BUF
+XAND  IN1 IN2                   OUT_AND  VDD 0 AND
+XOR   IN1 IN2                   OUT_OR   VDD 0 OR
+XXOR  IN1 IN2                   OUT_XOR  VDD 0 XOR
+XINV  IN1                       OUT_INV  VDD 0 INV
+XNAND IN1 IN2                   OUT_NAND VDD 0 NAND
+XNOR  IN1 IN2                   OUT_NOR  VDD 0 NOR
+XXNOR IN1 IN2                   OUT_XNOR VDD 0 XNOR
+XMUX  IN1 IN2 IN3               OUT_MUX  VDD 0 MUX
+XDL   IN1                ENABLE OUT_DL   VDD 0 DL
+XDLR  IN1         ARESET ENABLE OUT_DLR  VDD 0 DLR
+XDFF  IN1                CLOCK  OUT_DFF  VDD 0 DFF
+XDFFR IN1         ARESET CLOCK  OUT_DFFR VDD 0 DFFR
+
+.control
+set wr_singlescale
+tran 0.25n 1610n
+wrdata generic_sim_buf.txt            V(IN1)                         V(OUT_BUF)
+wrdata generic_sim_and.txt            V(IN1) V(IN2)                  V(OUT_AND)
+wrdata generic_sim_or.txt             V(IN1) V(IN2)                  V(OUT_OR)
+wrdata generic_sim_xor.txt            V(IN1) V(IN2)                  V(OUT_XOR)
+wrdata generic_sim_inv.txt            V(IN1)                         V(OUT_INV)
+wrdata generic_sim_nand.txt           V(IN1) V(IN2)                  V(OUT_NAND)
+wrdata generic_sim_nor.txt            V(IN1) V(IN2)                  V(OUT_NOR)
+wrdata generic_sim_xnor.txt           V(IN1) V(IN2)                  V(OUT_XNOR)
+wrdata generic_sim_mux.txt            V(IN1) V(IN2) V(IN3)           V(OUT_MUX)
+wrdata generic_sim_dl.txt   V(ENABLE) V(IN1)                         V(OUT_DL)
+wrdata generic_sim_dlr.txt  V(ENABLE) V(IN1)               V(ARESET) V(OUT_DLR)
+wrdata generic_sim_dff.txt  V(CLOCK)  V(IN1)                         V(OUT_DFF)
+wrdata generic_sim_dffr.txt V(CLOCK)  V(IN1)               V(ARESET) V(OUT_DFFR)
+exit
+.endc
+
+* Non ideal input signals
+RDD  SVDD    VDD    1m
+RCLK SCLOCK  CLOCK  1m
+RENA SENABLE ENABLE 1m
+RIN1 SIN1    IN1    1m
+RIN2 SIN2    IN2    1m
+RIN3 SIN3    IN3    1m
+RRST SARESET ARESET 1m
+
+CDD  SVDD    0 1p
+CCLK SCLOCK  0 1p
+CENA SENABLE 0 1p
+CIN1 SIN1    0 1p
+CIN2 SIN2    0 1p
+CIN3 SIN3    0 1p
+CRST SARESET 0 1p
+
+* Non ideal output signals
+RBUF  OUT_BUF  0 1G
+RAND  OUT_AND  0 1G
+ROR   OUT_OR   0 1G
+RXOR  OUT_XOR  0 1G
+RINV  OUT_INV  0 1G
+RNAND OUT_NAND 0 1G
+RNOR  OUT_NOR  0 1G
+RXNOR OUT_XNOR 0 1G
+RMUX  OUT_MUX  0 1G
+RDL   OUT_DL   0 1G
+RDLR  OUT_DLR  0 1G
+RDFF  OUT_DFF  0 1G
+RDFFR OUT_DFFR 0 1G
+
+CBUF  OUT_BUF  0 1p
+CAND  OUT_AND  0 1p
+COR   OUT_OR   0 1p
+CXOR  OUT_XOR  0 1p
+CINV  OUT_INV  0 1p
+CNAND OUT_NAND 0 1p
+CNOR  OUT_NOR  0 1p
+CXNOR OUT_XNOR 0 1p
+CMUX  OUT_MUX  0 1p
+CDL   OUT_DL   0 1p
+CDLR  OUT_DLR  0 1p
+CDFF  OUT_DFF  0 1p
+CDFFR OUT_DFFR 0 1p
+
+.end

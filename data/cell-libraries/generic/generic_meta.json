@@ -45,11 +45,35 @@
 			"inputs": ["IN1", "IN2", "IN3"],
 			"outputs": ["OUT"]
 		},
+		"DL": {
+			"sequential": true,
+			"latch": true,
+			"inputs": ["IN1"],
+			"outputs": ["OUT"],
+			"clocks": ["ENABLE"]
+		},
+		"DLR": {
+			"sequential": true,
+			"latch": true,
+			"inputs": ["IN1"],
+			"outputs": ["OUT"],
+			"clocks": ["ENABLE"],
+			"resets": ["ARESET"]
+		},
 		"DFF": {
 			"sequential": true,
+			"flipflop": true,
 			"inputs": ["IN1"],
 			"outputs": ["OUT"],
 			"clocks": ["CLOCK"]
+		},
+		"DFFR": {
+			"sequential": true,
+			"flipflop": true,
+			"inputs": ["IN1"],
+			"outputs": ["OUT"],
+			"clocks": ["CLOCK"],
+			"resets": ["ARESET"]
 		}
 	}
 }
