@@ -23,21 +23,22 @@ public:
 	void Run(void) override;
 
 protected:
-	enum class UdfmType { FullScan, Functional };
 	void GenerateCircuit(size_t seed);
-	void GenerateFaultModel(size_t seed, UdfmType udfmType);
+	void GenerateFaultModel(size_t seed);
 	void GenerateFaultList(size_t seed);
 
 	size_t configSeed = 0;
 	size_t configNumCircuits = 1000;
-	size_t configNumSimulations = 10000;
-	size_t configNumInputsMin = 10, configNumInputsMax = 20;
-	size_t configNumOutputsMin = 10, configNumOutputsMax = 20;
-	size_t configNumCellsMin = 1, configNumCellsMax = 20;
+	size_t configNumSimulations = 100;
+	size_t configNumInputsMin = 3, configNumInputsMax = 20;
+	size_t configNumOutputsMin = 1, configNumOutputsMax = 10;
+	size_t configNumCellsMin = 5, configNumCellsMax = 20;
 	size_t configNumCellInputsMin = 2, configNumCellInputsMax = 5;
-	size_t configNumUdfmFaultsMin = 1, configNumUdfmFaultsMax = 5;
-	size_t configNumUdfmAltsMin = 1, configNumUdfmAltsMax = 5;
-	size_t configNumUdfmDontCare = 4;
+
+	// Cell-aware state-machine fault model
+	size_t configNumFaultsMin = 1, configNumFaultsMax = 3;
+	size_t configNumBranchesMin = 1, configNumBranchesMax = 5;
+	size_t configNumDontCare = 4;
 
 	// Quick preset for development
 	// size_t configSeed = 1;
@@ -47,9 +48,14 @@ protected:
 	// size_t configNumOutputsMin = 1, configNumOutputsMax = 1;
 	// size_t configNumCellsMin = 1, configNumCellsMax = 1;
 	// size_t configNumCellInputsMin = 3, configNumCellInputsMax = 3;
-	// size_t configNumUdfmFaultsMin = 1, configNumUdfmFaultsMax = 1;
-	// size_t configNumUdfmAltsMin = 1, configNumUdfmAltsMax = 3;
-	// size_t configNumUdfmDontCare = 8;
+	// size_t configNumFaultsMin = 1, configNumFaultsMax = 1;
+	// size_t configNumBranchesMin = 1, configNumBranchesMax = 3;
+	// size_t configNumDontCare = 8;
+
+	const std::string& GetCircuitName(void) const { return this->circuit->GetName(); }
+	size_t GetNumberOfInputs(void) const { return inputs.size(); }
+	size_t GetNumberOfOutputs(void) const { return outputs.size(); }
+	size_t GetNumberOfCells(void) const { return cells.size(); }
 
 private:
 	struct Cell {
@@ -59,6 +65,8 @@ private:
 		std::vector<std::string> logic;
 		size_t flipFlopCount;
 	};
+	std::vector<std::string> inputs;
+	std::vector<std::string> outputs;
 	std::vector<Cell> cells;
 	std::string configPrefix;
 

@@ -1,5 +1,5 @@
 [
-	{"application": "SCALE4EDGE_SAT_STATIC_FAULT_COMPACTION_TRANSITION"},
+	{"application": "SCALE4EDGE_SAT_STATIC_FAULT_COMPACTION_TRANSITION_DELAY"},
 
 	{"define": "OutputDir", "value": "./output"},
 	{"setting": "DataImportDirectory", "value": "UNSPECIFIED"},

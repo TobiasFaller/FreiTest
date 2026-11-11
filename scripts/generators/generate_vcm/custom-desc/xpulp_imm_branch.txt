@@ -1,0 +1,2 @@
+imm1[12:12|10:5] imm2[4:0] rs1[4:0] b010 imm1[4:1|11:11] b1100011 P.BEQIMM % p.beqimm rs1, imm2, imm1
+imm1[12:12|10:5] imm2[4:0] rs1[4:0] b011 imm1[4:1|11:11] b1100011 P.BNEIMM % p.bneimm rs1, imm2, imm1

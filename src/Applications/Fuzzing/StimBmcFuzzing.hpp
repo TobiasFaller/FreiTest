@@ -29,6 +29,8 @@ private:
     std::string stimuliPath;
     Pattern::TestPattern stimuli;
 
+	std::vector<const Circuit::MappedNode*> clockInputs;
+    std::vector<const Circuit::MappedNode*> resetInputs;
     std::vector<const Circuit::MappedNode*> primaryInputs;
     std::vector<const Circuit::MappedNode*> primaryOutputs;
     std::vector<const Circuit::MappedNode*> secondaryInputs;

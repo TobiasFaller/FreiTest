@@ -39,7 +39,9 @@ private:
 	std::vector<std::vector<BadContainer>> _badContainerForTimeframe;
 	std::vector<std::vector<DiffContainer>> _diffContainerForTimeframe;
 	std::vector<std::vector<Tpg::LogicContainer01>> _transitionInitialValidForTimeframe;
-	std::vector<std::vector<Tpg::LogicContainer01>> _transitionInitialValueForTimeframe;
+	std::vector<std::vector<get_pin_data_container_t<PinData, BadTag>>> _transitionInitialValueForTimeframe;
+	std::vector<std::vector<Tpg::LogicContainer01>> _transitionSettledValidForTimeframe;
+	std::vector<std::vector<get_pin_data_container_t<PinData, BadTag>>> _transitionSettledValueForTimeframe;
 
 };
 

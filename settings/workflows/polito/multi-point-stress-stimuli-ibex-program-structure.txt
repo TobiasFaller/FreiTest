@@ -1,0 +1,64 @@
+PROLOGUE_BEGIN
+	.macro EXIT reg
+		li \reg, 0x00ff2000
+		sw zero, 0x0(\reg)
+		nop # Mandatory to exit success checks.
+		nop # Otherwise pipeline fetches Xs
+		nop # and triggers assertions.
+		nop #
+	.endm
+
+	.section .text.start
+	.global _start
+	.type _start, @function
+
+	_start:
+
+	/* initialize registers, STARTING STATE */
+		li x1,  0x0
+		li x2,  0x0
+		li x3,  0x0
+		li x4,  0x0
+		li x5,  0x0
+		li x6,  0x0
+		li x7,  0x0
+		li x8,  0x0
+		li x9,  0x0
+		li x10, 0x0
+		li x11, 0x0
+		li x12, 0x0
+		li x13, 0x0
+		li x14, 0x0
+		li x15, 0x0
+		li x16, 0x0
+		li x17, 0x0
+		li x18, 0x0
+		li x19, 0x0
+		li x20, 0x0
+		li x21, 0x0
+		li x22, 0x0
+		li x23, 0x0
+		li x24, 0x0
+		li x25, 0x0
+		li x26, 0x0
+		li x27, 0x0
+		li x28, 0x0
+		li x29, 0x0
+		li x30, 0x0
+		li x31, 0x0
+		jal x0, _synchronization_point
+
+	.balign 4
+	_synchronization_point:
+		nop
+		nop
+		nop
+		nop
+PROLOGUE_END
+//
+//
+//
+//
+EPILOGUE_BEGIN
+    EXIT t1
+EPILOGUE_END

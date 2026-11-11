@@ -1,6 +1,6 @@
 # FreiTest Framework (Freiburg Test Suite)
 
-![FreiTest Logo](logo.png)
+![FreiTest Logo](documentation/logo.png)
 
 This is a **research framework** for Automated Test Pattern Generation (ATPG).
 It contains components for fault list generation, circuit iteration, SAT gate encoding and fault simulation.
@@ -55,7 +55,7 @@ Find the current progress below:
 - [X] Data / Benchmarks: Provide ISCAS85, ISCAS89, ITC99, IWS05 benchmarks for generic cell-library (through automatic download and synthesis)
 - [X] Data / Benchmarks: Provide DarkRISCV and PicoRV32 processors for generic cell-library (through automatic download and synthesis)
 - [X] Data / Polito: Provide implementation for MACISH
-- [ ] Data / Fault Models: Provide cell-aware fault model for generic cell-library
+- [X] Data / Fault Models: Provide cell-aware fault model for generic cell-library
 - [X] Script: Generator for generic benchmark circuits and VCMs for generic cell-library
 - [X] Script: Synthesis for ISCAS85, ISCAS89, ITC99, IWS05 benchmarks for generic cell-library
 - [X] Script: Synthesis for DarkRISCV and PicoRV32 processors for generic cell-library
@@ -67,7 +67,7 @@ Find the current progress below:
 - [X] Code: Provide core FreiTest framework
 - [X] Code: Provide open-source basic ATPG workflows (Scale4Edge)
 - [ ] Code: Provide open-source SBST ATPG workflows (Scale4Edge)
-- [ ] Code: Provide open-source switching activity ATPG workflows (PoliTO)
+- [X] Code: Provide open-source switching activity ATPG workflows (PoliTO)
 - [ ] Code: Provide open-source untestability ATPG workflows (PoliTO)
 - [X] Code: Provide open-source MACISH safe-fault workflows (PoliTO)
 - [X] Code: Provide fuzzing workflows
@@ -75,7 +75,7 @@ Find the current progress below:
 - [X] Documentation: Provide core FreiTest framework
 - [X] Documentation: Provide open-source basic ATPG workflows (Scale4Edge)
 - [ ] Documentation: Provide open-source SBST ATPG workflows (Scale4Edge)
-- [ ] Documentation: Provide open-source switching activity ATPG workflows (PoliTO)
+- [X] Documentation: Provide open-source switching activity ATPG workflows (PoliTO)
 - [ ] Documentation: Provide open-source untestability ATPG workflows (PoliTO)
 - [X] Documentation: Provide open-source MACISH safe-fault workflows (PoliTO)
 - [X] Documentation: Provide fuzzing workflows
@@ -83,7 +83,7 @@ Find the current progress below:
 - [X] Configuration: Provide core FreiTest framework
 - [X] Configuration: Provide open-source basic ATPG workflows (Scale4Edge)
 - [ ] Configuration: Provide open-source SBST ATPG workflows (Scale4Edge)
-- [ ] Configuration: Provide open-source switching activity ATPG workflows (PoliTO)
+- [X] Configuration: Provide open-source switching activity ATPG workflows (PoliTO)
 - [ ] Configuration: Provide open-source untestability ATPG workflows (PoliTO)
 - [X] Configuration: Provide open-source MACISH safe-fault workflows (PoliTO)
 - [X] Configuration: Provide fuzzing workflows

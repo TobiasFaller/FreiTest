@@ -8,7 +8,9 @@
 
 # Generated Data
 /output
-/public
+/public-freitest
+/public-cellaware
+/public-rsn
 
 # Distribution files
 /tmp

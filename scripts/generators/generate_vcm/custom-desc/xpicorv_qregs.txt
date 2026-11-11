@@ -1,0 +1,5 @@
+b0000000 b00000 b000 qs[1:0] b000 rd[4:0]      b0001011 PICORV32.GETQ    % getq rd, qs
+b0000001 b00000 rs[4:0]      b000 b000 qd[1:0] b0001011 PICORV32.SETQ    % setq qd, rs
+b0000010 b00000 b00000       b000 b00000       b0001011 PICORV32.RETIRQ  % retirq
+b0000011 b00000 rs[4:0]      b000 rd[4:0]      b0001011 PICORV32.MASKIRQ % maskirq rd, rs
+b0000100 b00000 b00000       b000 rd[4:0]      b0001011 PICORV32.WAITIRQ % waitirq rd

@@ -1,0 +1,1 @@
+b0000101 b00000 rs[4:0] b000 rd[4:0] b0001011 PICORV32.TIMER % timer rd, rs

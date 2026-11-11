@@ -39,6 +39,7 @@ SequentialAtpgBase<FaultModel, FaultList>::SequentialAtpgBase(std::string config
 	AtpgBase<FaultModel, FaultList>(configPrefix),
 	settingsCombinationalTestabilityCheck(CombinationalTestabilityCheck::Enabled),
 	settingsMaximumTimeframes(10u),
+	settingsStartingState(StartingState::AllZeroes),
 	configPrefix(configPrefix)
 {
 }
@@ -60,8 +61,66 @@ bool SequentialAtpgBase<FaultModel, FaultList>::SetSetting(std::string key, std:
 	{
 		return Settings::ParseSizet(value, settingsMaximumTimeframes);
 	}
+	if (Settings::IsOption(key, "StartingState", configPrefix))
+	{
+		return Settings::ParseEnum(value, settingsStartingState, {
+			{ "Unconstrained", StartingState::Unconstrained },
+			{ "AllZeroes", StartingState::AllZeroes },
+			{ "AllOnes", StartingState::AllOnes },
+			{ "AllDontCares", StartingState::AllDontCares },
+			{ "AllUnknowns", StartingState::AllUnknowns },
+			{ "Custom", StartingState::Custom },
+		});
+	}
+	if (Settings::IsOption(key, "CustomStartingState", configPrefix))
+	{
+		settingsCustomStartingState = value;
+		return true;
+	}
 
 	return AtpgBase<FaultModel, FaultList>::SetSetting(key, value);
+}
+
+template<typename FaultModel, typename FaultList>
+void SequentialAtpgBase<FaultModel, FaultList>::Init(void)
+{
+	LOG(INFO) << "Loading starting state for circuit";
+	const size_t stateCount { this->circuit->GetMappedCircuit().GetNumberOfSecondaryInputs() };
+	switch (settingsStartingState) {
+		case StartingState::Unconstrained:
+			LOG(INFO) << "Using unconstrained starting state for the circuit";
+			// Set state to known value such that assertions in workflows don't trigger
+			startingState = std::vector(stateCount, Basic::Logic::LOGIC_DONT_CARE);
+			break;
+
+		case StartingState::AllZeroes:
+			LOG(INFO) << "Using zeroes as starting state for the circuit";
+			startingState = std::vector(stateCount, Basic::Logic::LOGIC_ZERO);
+			break;
+
+		case StartingState::AllOnes:
+			LOG(INFO) << "Using ones as starting state for the circuit";
+			startingState = std::vector(stateCount, Basic::Logic::LOGIC_ONE);
+			break;
+
+		case StartingState::AllDontCares:
+			LOG(INFO) << "Using don't cares as starting state for the circuit";
+			startingState = std::vector(stateCount, Basic::Logic::LOGIC_DONT_CARE);
+			break;
+
+		case StartingState::AllUnknowns:
+			LOG(INFO) << "Using unknowns as starting state for the circuit";
+			startingState = std::vector(stateCount, Basic::Logic::LOGIC_UNKNOWN);
+			break;
+
+		case StartingState::Custom:
+			LOG(INFO) << "Using user-provided starting state ("
+				<< settingsCustomStartingState << ") for the circuit";
+			startingState = Basic::GetLogicValuesForString(settingsCustomStartingState);
+			break;
+	}
+	ASSERT (startingState.size() == stateCount)
+		<< "Starting state size doesn't match the number of flip-flops";
 }
 
 template<typename FaultModel, typename FaultList>

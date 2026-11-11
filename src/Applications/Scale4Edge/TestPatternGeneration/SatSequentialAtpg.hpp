@@ -48,29 +48,6 @@ namespace Scale4Edge
  *     - When SAT-result is "UNSAT" (unsatisfiable):
  *       - Extended the timeframe count
  *       - Or set the fault status to aborted (timeout)
- * 6. Extract the propagation patterns from the previously generated test patterns
- * 7. (Generate a test pattern in two steps)
- *    - For each fault in the fault list do the same steps as in step 5
- *      However, the target constraints are set such that the fault is propagated
- *      to any secondary port instead of a primary port.
- *    - If no sensitization pattern could be created set the fault status to untestable
- *    - If a sensitization pattern was generated extract the end state
- *      of the sensitization pattern via simulation
- *    - Search the propagation cache for a valid propagation pattern
- *      - For each propagation pattern in the cache combine the sensitization pattern
- *        and propagation pattern and test the resulting test pattern with a simulation
- *      - If the pattern is a valid test pattern then set the fault to testable
- *    - If no propagation pattern in the cache exists a new one is generated
- *      - Do the same steps as in step 5
- *        However, the initial condition is specified as the end condition of the
- *        sensitization pattern.
- *        The target constraints are set such that the fault effect is propagated to
- *        a primary output port.
- *    - If no propagation pattern could be created then the fault is aborted (timeout).
- *    - If a propagation pattern could be created both patterns (sensitization and propagation)
- *      are combined
- *      - The generated pattern is validated via simulation
- *      - The fault is marked as testable
  * 8. Export statistics
  */
 template<typename FaultModel, typename FaultList>
@@ -87,7 +64,6 @@ public:
 
 protected:
 	void GeneratePatternForFault(size_t faultIndex);
-	void GeneratePatternWithCacheForFault(size_t faultIndex);
 
 };
 

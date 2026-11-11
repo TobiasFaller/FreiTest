@@ -276,8 +276,6 @@ cc_library(
     ],
     linkopts = [
         # Boost libraries
-        "-lboost_filesystem",
-        "-lboost_regex",
         "-lboost_iostreams",
 
         # Add parallel support

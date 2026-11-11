@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 
 #include "Basic/Logic.hpp"
@@ -11,7 +12,7 @@ namespace FreiTest
 namespace Fault
 {
 
-enum class StuckAtFaultType
+enum class StuckAtFaultType: uint8_t
 {
 	STUCK_AT_0,
 	STUCK_AT_1,

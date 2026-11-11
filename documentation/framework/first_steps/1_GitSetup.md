@@ -18,8 +18,7 @@ Copy the URL via the copy button on the right.
 Then clone the repository to your computer via the following command (replace the URL parameter with your URL):
 
 ```bash
-git clone URL freitest
-git --git-dir=freitest/.git remote add upstream https://github.com/TobiasFaller/FreiTest.git
+git clone --recusrive URL freitest
 ```
 
 ## Fetch changes from upstream

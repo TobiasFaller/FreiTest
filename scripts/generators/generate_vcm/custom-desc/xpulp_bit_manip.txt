@@ -1,0 +1,18 @@
+b11 imm1[4:0] imm2[4:0] rs1[4:0] b000 rd[4:0] b0110011 P.EXTRACT   % p.extract rD, rs1, imm1, imm2
+b11 imm1[4:0] imm2[4:0] rs1[4:0] b001 rd[4:0] b0110011 P.EXTRACTU  % p.extractu rD, rs1, imm1, imm2
+b11 imm1[4:0] imm2[4:0] rs1[4:0] b010 rd[4:0] b0110011 P.INSERT    % p.insert rD, rs1, imm1, imm2
+b11 imm1[4:0] imm2[4:0] rs1[4:0] b011 rd[4:0] b0110011 P.BCLR      % p.bclr rD, rs1, imm1, imm2
+b11 imm1[4:0] imm2[4:0] rs1[4:0] b100 rd[4:0] b0110011 P.BSET      % p.bset rD, rs1, imm1, imm2
+
+b1000000 rs2[4:0] rs1[4:0] b000 rd[4:0] b0110011 P.EXTRACTR        % p.extractr rd, rs1, rs2
+b1000000 rs2[4:0] rs1[4:0] b001 rd[4:0] b0110011 P.EXTRACTUR       % p.extractur rd, rs1, rs2
+b1000000 rs2[4:0] rs1[4:0] b010 rd[4:0] b0110011 P.INSERTR         % p.insertr rd, rs1, rs2
+b1000000 rs2[4:0] rs1[4:0] b011 rd[4:0] b0110011 P.BCLRR           % p.bclrr rd, rs1, rs2
+b1000000 rs2[4:0] rs1[4:0] b100 rd[4:0] b0110011 P.BSETR           % p.bsetr rd, rs1, rs2
+
+b0000100 rs2[4:0] rs1[4:0] b101  rd[4:0] b0110011 P.ROR            % p.ror rd, rs1, rs2
+
+b000100000000 rs1[4:0] b000 rd[4:0] b0110011 P.FF1                 % p.ff1 rd, rs1
+b000100000000 rs1[4:0] b001 rd[4:0] b0110011 P.FL1                 % p.fl1 rd, rs1
+b000100000000 rs1[4:0] b010 rd[4:0] b0110011 P.CLB                 % p.clb rd, rs2
+b000100000000 rs1[4:0] b011 rd[4:0] b0110011 P.CNT                 % p.cnt rd, rs1

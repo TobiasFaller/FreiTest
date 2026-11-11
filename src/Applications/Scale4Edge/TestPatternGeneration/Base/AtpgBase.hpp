@@ -10,7 +10,7 @@
 #include "Applications/Mixins/Statistics/SolverStatisticsMixin.hpp"
 #include "Applications/Mixins/Vcd/VcdExportMixin.hpp"
 #include "Applications/Mixins/Vcm/VcmMixin.hpp"
-#include "Applications/Mixins/Udfm/UdfmMixin.hpp"
+#include "Applications/Mixins/CellAware/CellAwareSpecificationMixin.hpp"
 #include "Basic/ApplicationStatistics.hpp"
 #include "Basic/Logic.hpp"
 #include "Basic/Fault/Lists/CellAwareFaultList.hpp"
@@ -23,7 +23,6 @@
 #include "Basic/Pattern/Capture.hpp"
 #include "Basic/Statistic/AverageStatistic.hpp"
 #include "Simulation/CircuitSimulator.hpp"
-#include "Io/UserDefinedFaultModel/UdfmModel.hpp"
 #include "Tpg/LogicGenerator/LogicGenerator.hpp"
 
 namespace FreiTest
@@ -51,9 +50,28 @@ public:
 	void Run(void);
 
 protected:
-	enum class FaultListReduction { Original, RemoveEquivalent };
+	enum class SettingFaultReduction : size_t {
+		Original = 0u,
+		RemoveEquivalent = 1u,
+		RemoveCellInternal = 2u,
+		RemoveSequentialClock = 4u,
+		RemoveSequentialSetReset = 8u,
+		RemoveConnectedToDontCare = 16u,
+		RemoveConnectedToUnknown = 32u,
+		RemoveCircuitPort = 64u,
+	};
 
-	FaultListReduction faultListReduction;
+	friend SettingFaultReduction operator|(const SettingFaultReduction& first, const SettingFaultReduction& second)
+	{
+		return static_cast<SettingFaultReduction>(static_cast<size_t>(first) | static_cast<size_t>(second));
+	}
+
+	friend SettingFaultReduction operator&(const SettingFaultReduction& first, const SettingFaultReduction& second)
+	{
+		return static_cast<SettingFaultReduction>(static_cast<size_t>(first) & static_cast<size_t>(second));
+	}
+
+	SettingFaultReduction faultListReduction;
 
 private:
 	std::string configPrefix;
@@ -71,9 +89,28 @@ public:
 	void Run(void);
 
 protected:
-	enum class FaultListReduction { Original, RemoveEquivalent };
+	enum class SettingFaultReduction : size_t {
+		Original = 0u,
+		RemoveEquivalent = 1u,
+		RemoveCellInternal = 2u,
+		RemoveSequentialClock = 4u,
+		RemoveSequentialSetReset = 8u,
+		RemoveConnectedToDontCare = 16u,
+		RemoveConnectedToUnknown = 32u,
+		RemoveCircuitPort = 64u,
+	};
 
-	FaultListReduction faultListReduction;
+	friend SettingFaultReduction operator|(const SettingFaultReduction& first, const SettingFaultReduction& second)
+	{
+		return static_cast<SettingFaultReduction>(static_cast<size_t>(first) | static_cast<size_t>(second));
+	}
+
+	friend SettingFaultReduction operator&(const SettingFaultReduction& first, const SettingFaultReduction& second)
+	{
+		return static_cast<SettingFaultReduction>(static_cast<size_t>(first) & static_cast<size_t>(second));
+	}
+
+	SettingFaultReduction faultListReduction;
 
 private:
 	std::string configPrefix;
@@ -82,7 +119,7 @@ private:
 
 template<>
 class AtpgData<Fault::CellAwareFaultModel>:
-	public Mixin::UdfmMixin
+	public Mixin::CellAwareSpecificationMixin
 {
 public:
 	AtpgData(std::string configPrefix);
@@ -91,6 +128,27 @@ public:
 	bool SetSetting(std::string key, std::string value);
 	void Init(void);
 	void Run(void);
+
+
+protected:
+	enum class SettingFaultReduction : size_t {
+		Original = 0u
+	};
+
+	friend SettingFaultReduction operator|(const SettingFaultReduction& first, const SettingFaultReduction& second)
+	{
+		return static_cast<SettingFaultReduction>(static_cast<size_t>(first) | static_cast<size_t>(second));
+	}
+
+	friend SettingFaultReduction operator&(const SettingFaultReduction& first, const SettingFaultReduction& second)
+	{
+		return static_cast<SettingFaultReduction>(static_cast<size_t>(first) & static_cast<size_t>(second));
+	}
+
+	SettingFaultReduction faultListReduction;
+
+private:
+	std::string configPrefix;
 
 };
 
@@ -143,7 +201,7 @@ protected:
 
 	void GenerateFaultList(void);
 	template<typename PinData>
-	void ValidateAtpgResult(size_t faultIndex, Pattern::TestPattern& pattern, Pattern::OutputCapture capture, Tpg::LogicGenerator<PinData>& logicGenerator, const Simulation::SimulationConfig& simConfig) const;
+	void ValidateAtpgResult(size_t faultIndex, const Pattern::TestPattern& pattern, Pattern::OutputCapture capture, Tpg::LogicGenerator<PinData>& logicGenerator, const Simulation::SimulationConfig& simConfig) const;
 	void DebugAtpgResult(const Simulation::SimulationResult& result, const Circuit::MappedCircuit& circuit, const std::string& name);
 
 	void RunFaultSimulation(const Tpg::Vcm::VcmContext& context, size_t faultIndex, size_t patternIndex, Pattern::OutputCapture capture, const Simulation::SimulationConfig& simConfig);
@@ -157,7 +215,6 @@ protected:
 	void SnapshotStatisticsForIteration(void);
 	void PrintStatistics(void);
 	void ExportStatistics(void);
-	std::string DebugFaultLocation(const Simulation::SimulationResult& atpgGoodResult, const Simulation::SimulationResult& atpgBadResult, const Simulation::SimulationResult& simGoodResult, const Simulation::SimulationResult& simBadResult, size_t faultIndex) const;
 
 	FaultListSource faultListSource;
 	std::string faultListFile;
@@ -166,6 +223,7 @@ protected:
 	std::vector<std::size_t> faultMapping;
 	std::string faultListFilter;
 	std::string faultListExclude;
+	size_t faultListSamples;
 
 	Pattern::TestPatternList testPatterns;
 

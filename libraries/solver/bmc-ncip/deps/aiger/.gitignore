@@ -17,14 +17,12 @@ aigsim
 aigsplit
 aigstrip
 aigtoaig
-aigtoblif
-aigtobtor
 aigtocnf
+aigtobtor
 aigtodot
 aigtosmv
-aiguncomment
+aigtoblif
 aigunconstraint
-aigunor
 aigunroll
 andtoaig
 bliftoaig

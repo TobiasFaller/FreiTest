@@ -77,8 +77,8 @@ void FaultCoverageExport<FaultModel, FaultList>::Run(void)
 		}
 		else if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
 		{
-			ASSERT(this->GetUdfm()) << "No User-Defined Fault Model (UDFM) was loaded";
-			return Io::ImportFaults<FaultList>(faultFileHandle.GetStream(), *this->circuit, *this->GetUdfm());
+			return Io::ImportFaults<FaultList>(faultFileHandle.GetStream(), *this->circuit,
+				*this->GetCellAwareModelSpecification());
 		}
 		else
 		{
@@ -272,8 +272,8 @@ Io::FaultCoverage::FaultInformation FaultCoverageExport<FaultModel, FaultList>::
 	}
 	else if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
 	{
-		auto location { fault->GetCell()->GetHierarchyName() };
-		auto type { fault->GetUserDefinedFault()->GetFaultName() };
+		auto location { fault->GetCellName() };
+		auto type { fault->GetName() };
 		return { location, type };
 	}
 }

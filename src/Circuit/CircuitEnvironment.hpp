@@ -32,8 +32,7 @@ public:
 	CircuitEnvironment& operator=(CircuitEnvironment&& other) = delete;
 	CircuitEnvironment& operator=(const CircuitEnvironment& other) = delete;
 
-	std::string GetName(void) const;
-
+	const std::string& GetName(void) const;
 	const UnmappedCircuit& GetUnmappedCircuit(void) const;
 	const MappedCircuit& GetMappedCircuit(void) const;
 	const CircuitMetaData& GetMetaData(void) const;
@@ -41,12 +40,12 @@ public:
 	bool HasUnmappedNodeId(size_t mappedNodeId) const;
 	bool HasMappedNodeIds(size_t unmappedNodeId) const;
 	size_t GetUnmappedNodeId(size_t mappedNodeId) const;
-	std::vector<size_t> GetMappedNodeIds(size_t unmappedNodeId) const;
+	const std::vector<size_t>& GetMappedNodeIds(size_t unmappedNodeId) const;
 
 	bool HasUnmappedPinId(size_t mappedPinId) const;
 	bool HasMappedPinIds(size_t unmappedPinId) const;
 	size_t GetUnmappedPinId(size_t mappedPinId) const;
-	std::vector<size_t> GetMappedPinIds(size_t unmappedPinId) const;
+	const std::vector<size_t>& GetMappedPinIds(size_t unmappedPinId) const;
 
 	friend MappedCircuit;
 	friend UnmappedCircuit;

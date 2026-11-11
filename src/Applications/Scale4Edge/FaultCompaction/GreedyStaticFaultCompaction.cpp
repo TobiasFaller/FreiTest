@@ -70,24 +70,24 @@ void GreedyCompactionData<Fault::SingleTransitionDelayFaultModel>::Run(void)
 }
 
 GreedyCompactionData<Fault::CellAwareFaultModel>::GreedyCompactionData(std::string configPrefix):
-	Mixin::UdfmMixin(configPrefix)
+	Mixin::CellAwareSpecificationMixin(configPrefix)
 {
 }
 GreedyCompactionData<Fault::CellAwareFaultModel>::~GreedyCompactionData(void) = default;
 
 bool GreedyCompactionData<Fault::CellAwareFaultModel>::SetSetting(std::string key, std::string value)
 {
-	return UdfmMixin::SetSetting(key, value);
+	return CellAwareSpecificationMixin::SetSetting(key, value);
 }
 
 void GreedyCompactionData<Fault::CellAwareFaultModel>::Init(void)
 {
-	UdfmMixin::Init();
+	CellAwareSpecificationMixin::Init();
 }
 
 void GreedyCompactionData<Fault::CellAwareFaultModel>::Run(void)
 {
-	UdfmMixin::Run();
+	CellAwareSpecificationMixin::Run();
 }
 
 template <typename FaultModel, typename FaultList>
@@ -161,8 +161,8 @@ void GreedyStaticFaultCompaction<FaultModel, FaultList>::Run(void)
 		}
 		else if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
 		{
-			ASSERT(this->GetUdfm()) << "No User-Defined Fault Model (UDFM) was loaded";
-			return Io::ImportFaults<FaultList>(importMetaDataHandle.GetStream(), *this->circuit, *this->GetUdfm());
+			return Io::ImportFaults<FaultList>(importMetaDataHandle.GetStream(), *this->circuit,
+				*this->GetCellAwareModelSpecification());
 		}
 		else
 		{

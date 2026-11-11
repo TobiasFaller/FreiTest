@@ -12,10 +12,18 @@ help::
 	@printf "\tclean: Clean outputs\n"
 	@printf "\tbuild: Build all VCMs\n"
 	@printf "\tmacish: Macish and Multiplier VCM\n"
+	@printf "\trepeatable-constant-switching-ri5cy-rv32im-zicsr-xpulp2: RI5CY in RV32IM_Zicsr_Xpulp2 version\n"
+	@printf "\tmultipoint-switching-ri5cy-rv32im-zicsr-xpulp2: RI5CY in RV32IM_Zicsr_Xpulp2 version\n"
+	@printf "\tmultipoint-switching-ibex-rv32imc-zicsr: ibex in RV32IMC_Zicsr version \n"
 
-build:: misc
+build:: misc repeatable-constant-switching multipoint-switching
 
 misc: macish
+
+repeatable-constant-switching: repeatable-constant-switching-ri5cy-rv32im-zicsr-xpulp2
+
+multipoint-switching: multipoint-switching-ri5cy-rv32im-zicsr-xpulp2 multipoint-switching-ibex-rv32imc-zicsr
+
 
 clean:
 	rm $(VCM_OUTPUT_PATH)/* || true
@@ -41,4 +49,31 @@ macish: $(VCM_OUTPUT_PATH)
 			--output-script-path $(VCM_OUTPUT_PATH)/macish$${bits}-mul-vcm-nangate45.ys \
 			--library-path $(NANGATE_LIBRARY); \
 	done
+
+repeatable-constant-switching-ri5cy-rv32im-zicsr-xpulp2: $(VCM_OUTPUT_PATH)
+	python3 $(SCRIPTS_PATH)/generate_yosys.py \
+		--execute \
+		--top-module ri5cy_vcm \
+		--input-path ./repeatable-constant-switching-vcm-ri5cy.sv \
+		--output-circuit-path $(VCM_OUTPUT_PATH)/repeatable-constant-switching-vcm-ri5cy-rv32im-zicsr-xpulp2-nangate.v \
+		--output-script-path $(VCM_OUTPUT_PATH)/synth-repeatable-constant-switching-vcm-ri5cy-rv32im-zicsr-xpulp2.ys \
+		--library-path $(NANGATE_LIBRARY)
+
+multipoint-switching-ri5cy-rv32im-zicsr-xpulp2: $(VCM_OUTPUT_PATH)
+	python3 $(SCRIPTS_PATH)/generate_yosys.py \
+		--execute \
+		--top-module ri5cy_vcm \
+		--input-path ./multipoint-switching-vcm-ri5cy.sv \
+		--output-circuit-path $(VCM_OUTPUT_PATH)/multipoint-switching-vcm-ri5cy-rv32im-zicsr-xpulp2-nangate.v \
+		--output-script-path $(VCM_OUTPUT_PATH)/synth-multipoint-switching-vcm-ri5cy-rv32im-zicsr-xpulp2.ys \
+		--library-path $(NANGATE_LIBRARY)
+
+multipoint-switching-ibex-rv32imc-zicsr: $(VCM_OUTPUT_PATH)
+	python3 $(SCRIPTS_PATH)/generate_yosys.py \
+		--execute \
+		--top-module ibex_vcm \
+		--input-path ./multipoint-switching-vcm-ibex.sv \
+		--output-circuit-path $(VCM_OUTPUT_PATH)/multipoint-switching-vcm-ibex-rv32imc-zicsr-nangate.v \
+		--output-script-path $(VCM_OUTPUT_PATH)/synth-multipoint-switching-vcm-ibex-rv32imc-zicsr.ys \
+		--library-path $(NANGATE_LIBRARY)
 

@@ -200,15 +200,15 @@ switch(solver->Solve())
     This chain encodes constraints that force the solver to apply a fault difference to at least one of the input ports of a gate if the output port shows a fault difference.
     This requires DiffTag to present, which can be tagged by the `DChainCircuitTagger` that encodes all nodes with  DiffTag that have a GoodTag and BadTag encoding.
     The `DChainBaseEncoder` encodes the difference literals following the tagging by encoding XOR-like gates that show a difference for the good and bad encoding value.
-    The backward D-Chain itself is then built by the `BackwardDChainEncoder` and `BackwardDChainConnectionEncoder` that connect the difference literals in a chain-like structure.
-    The forward D-Chain has shown to have in most cases a negligible impact on performance.
+    The backward D-Chain itself is then built by the `BackwardDChainEncoder`, `ForwardDChainEncoder` and `DChainSequentialConnectionEncoder` that connect the difference literals in a chain-like structure.
+    The forward D-Chain has shown to have in most cases a negligible improvement on performance.
+    The backward D-Chain improves performance for ATPG substantially.
 
     - **DChainCircuitTagger**: Tags all gates with DiffTag if they are encoded with GoodTag and BadTag
     - **DChainBaseEncoder**: Encodes the literals for the D-Chain, which represent a fault different at the gate output
+    - **DChainSequentialConnectionEncoder**: Encodes the D-Chain beyond sequential elements / timeframes
     - **ForwardDChainEncoder**: Encodes a forward D-Chain, that forces the gate output to not have a difference, when no input has a difference
-    - **ForwardDChainConnectionEncoder**: Encodes the forward D-Chain beyond sequential elements / timeframes
     - **BackwardDChainEncoder**: Encodes a backward D-Chain, that forces one gate input to have a difference, when the output has a difference
-    - **BackwardDChainConnectionEncoder**: Encodes the backward D-Chain beyond sequential elements / timeframes
 
 # Fault Model Modules
 

@@ -1,0 +1,42 @@
+[
+    {
+        "name": "adder",
+        "parameters": [
+            {
+                "parameter": "mode_of_operation",
+                "value": "00"
+            }
+        ],
+        "tags": [ "adder" ]
+    },
+    {
+        "name": "compressed_decoder",
+        "parameters": [
+            {
+                "parameter": "mode_of_operation",
+                "value": "01"
+            }
+        ],
+        "tags": [ "compressed_decoder" ]
+    },
+    {
+        "name": "decoder",
+        "parameters": [
+            {
+                "parameter": "mode_of_operation",
+                "value": "10"
+            }
+        ],
+        "tags": [ "decoder" ]
+    },
+    {
+        "name": "lsu",
+        "parameters": [
+            {
+                "parameter": "mode_of_operation",
+                "value": "11"
+            }
+        ],
+        "tags": [ "lsu" ]
+    }
+]

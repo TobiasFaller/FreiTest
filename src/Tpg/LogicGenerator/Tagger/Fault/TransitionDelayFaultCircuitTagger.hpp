@@ -11,7 +11,7 @@ namespace FreiTest
 namespace Tpg
 {
 
-enum class TransitionDelayFaultTaggingMode { FullScan, Functional };
+enum class TransitionDelayFaultTaggingMode { Independent, Functional };
 
 template<typename PinData, typename FaultModel>
 class TransitionDelayFaultCircuitTagger: public ICircuitTagger<PinData>

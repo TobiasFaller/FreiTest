@@ -25,7 +25,11 @@ template<typename PinData, typename FaultModel>
 TransitionDelayFaultEncoder<PinData, FaultModel>::TransitionDelayFaultEncoder(std::shared_ptr<FaultModel> faultModel):
 	_faultModel(faultModel),
 	_badContainerForTimeframe(),
-	_diffContainerForTimeframe()
+	_diffContainerForTimeframe(),
+	_transitionInitialValidForTimeframe(),
+	_transitionInitialValueForTimeframe(),
+	_transitionSettledValidForTimeframe(),
+	_transitionSettledValueForTimeframe()
 {
 }
 
@@ -41,8 +45,12 @@ std::string TransitionDelayFaultEncoder<PinData, FaultModel>::GetName(void) cons
 template<typename PinData, typename FaultModel>
 void TransitionDelayFaultEncoder<PinData, FaultModel>::Reset(void)
 {
-	_badContainerForTimeframe = { };
-	_diffContainerForTimeframe = { };
+	_badContainerForTimeframe.clear();
+	_diffContainerForTimeframe.clear();
+	_transitionInitialValidForTimeframe.clear();
+	_transitionInitialValueForTimeframe.clear();
+	_transitionSettledValidForTimeframe.clear();
+	_transitionSettledValueForTimeframe.clear();
 }
 
 template<typename PinData, typename FaultModel>
@@ -111,59 +119,60 @@ bool TransitionDelayFaultEncoder<PinData, FaultModel>::PostEncodeTimeframe(Gener
 
 	auto& transitionInitialValid = _transitionInitialValidForTimeframe.emplace_back();
 	auto& transitionInitialValue = _transitionInitialValueForTimeframe.emplace_back();
+	auto& transitionSettledValid = _transitionSettledValidForTimeframe.emplace_back();
+	auto& transitionSettledValue = _transitionSettledValueForTimeframe.emplace_back();
 
 	size_t index { 0u };
 	for (auto const& transition : get_slow_transitions())
 	{
 		LogicConstraint initialConstraint;
-		LogicConstraint transitionConstraint;
+		LogicConstraint settledConstraint;
 		switch (transition.GetType())
 		{
 			case Fault::TransitionDelayFaultType::SLOW_TO_RISE:
 				initialConstraint = LogicConstraint::ONLY_LOGIC_ZERO;
-				transitionConstraint = LogicConstraint::ONLY_LOGIC_ONE;
+				settledConstraint = LogicConstraint::ONLY_LOGIC_ONE;
 				break;
 			case Fault::TransitionDelayFaultType::SLOW_TO_FALL:
 				initialConstraint = LogicConstraint::ONLY_LOGIC_ONE;
-				transitionConstraint = LogicConstraint::ONLY_LOGIC_ZERO;
+				settledConstraint = LogicConstraint::ONLY_LOGIC_ZERO;
 				break;
 			case Fault::TransitionDelayFaultType::SLOW_TO_TRANSITION:
 				initialConstraint = LogicConstraint::ONLY_LOGIC_01;
-				transitionConstraint = LogicConstraint::ONLY_LOGIC_01;
+				settledConstraint = LogicConstraint::ONLY_LOGIC_01;
 				break;
 			default: Logging::Panic("Unknown transition delay fault type");
 		}
 
 		const auto& [node, port] = transition.GetNodeAndPort();
-		auto const badContainer { timeframe.template GetContainer<BadTag>(
-			context, node->GetNodeId(), port.portType, port.portNumber, AllowContainerInterceptor::Enable) };
-		const auto initialValueValid { encoder.EncodeLogicValueConstraintDetector(badContainer, initialConstraint) };
-		const auto initialValue { encoder.EncodeLogicValueDetector(badContainer, Logic::LOGIC_ONE) };
-
 		const auto originalContainer { timeframe.template GetContainer<BadTag>(
 			context, node->GetNodeId(), port.portType, port.portNumber, AllowContainerInterceptor::Disable) };
-		const auto transitionValueValid { encoder.EncodeLogicValueConstraintDetector(originalContainer, transitionConstraint) };
-		const auto transitionValue { encoder.EncodeLogicValueDetector(originalContainer, Logic::LOGIC_ONE) };
+		const auto initialValid { encoder.EncodeLogicValueConstraintDetector(originalContainer, initialConstraint) };
+		const auto initialValue { originalContainer };
+		const auto settledValid { encoder.EncodeLogicValueConstraintDetector(originalContainer, settledConstraint) };
+		const auto settledValue { originalContainer };
 
 		LogicContainer01 transitionCondition;
 		if (satSolver)
 		{
 			// Simple logic container (no initial state hacks needed)
-			transitionInitialValid.push_back(initialValueValid);
+			transitionInitialValid.push_back(initialValid);
 			transitionInitialValue.push_back(initialValue);
+			transitionSettledValid.push_back(settledValid);
+			transitionSettledValue.push_back(settledValue);
 
 			transitionCondition = (timeframeId == 0u)
 				? encoder.template NewLogicContainer<LogicContainer01>(Logic::LOGIC_ZERO)
 				: encoder.EncodeAnd(std::vector<LogicContainer01> {
 					_transitionInitialValidForTimeframe[timeframeId - 1u][index],
-					transitionValueValid,
+					_transitionSettledValidForTimeframe[timeframeId][index],
 					// This XOR is required for the slow-to-transition type
 					// where the constraints don't include the inverse relation
 					// of the intial and final value of the transition.
-					encoder.EncodeXor(
+					encoder.EncodeLogicValueDetector(encoder.EncodeXor(
 						_transitionInitialValueForTimeframe[timeframeId - 1u][index],
-						transitionValue
-					)
+						_transitionSettledValueForTimeframe[timeframeId][index]
+					), Logic::LOGIC_ONE)
 				});
 		}
 
@@ -172,37 +181,41 @@ bool TransitionDelayFaultEncoder<PinData, FaultModel>::PostEncodeTimeframe(Gener
 			// Latches with multiplexer for initial state (No undefined initial state is allowed).
 			bmcSolver->SetTargetClauseType(ClauseType::Transition);
 			bmcSolver->SetTargetVariableType(VariableType::Latch);
-			auto activationLatch = encoder.template NewLogicContainer<LogicContainer01>();
-			auto activationValueLatch = encoder.template NewLogicContainer<LogicContainer01>();
+			auto initialValidLatch = encoder.template NewLogicContainer<LogicContainer01>();
+			auto initialValueLatch = encoder.template NewLogicContainer<get_pin_data_container_t<PinData, GoodTag>>();
 
 			bmcSolver->SetTargetClauseType(ClauseType::Initial);
 			bmcSolver->SetTargetVariableType(VariableType::Auxiliary);
-			encoder.EncodeLogicValue(activationLatch, Logic::LOGIC_ZERO);
-			encoder.EncodeLogicValue(activationValueLatch, Logic::LOGIC_ZERO);
+			encoder.EncodeLogicValue(initialValidLatch, Logic::LOGIC_ZERO);
+			encoder.EncodeLogicValue(initialValueLatch, Logic::LOGIC_ZERO);
 
 			bmcSolver->SetTargetClauseType(ClauseType::Transition);
 			bmcSolver->SetTargetVariableType(VariableType::Auxiliary);
-			bmcSolver->CommitTimeframeClause(-initialValueValid.l0, 0u,  activationLatch.l0, 1u);
-			bmcSolver->CommitTimeframeClause( initialValueValid.l0, 0u, -activationLatch.l0, 1u);
-			bmcSolver->CommitTimeframeClause(-initialValue.l0, 0u,  activationValueLatch.l0, 1u);
-			bmcSolver->CommitTimeframeClause( initialValue.l0, 0u, -activationValueLatch.l0, 1u);
+			bmcSolver->CommitTimeframeClause(-initialValid.l0, 0u,  initialValidLatch.l0, 1u);
+			bmcSolver->CommitTimeframeClause( initialValid.l0, 0u, -initialValidLatch.l0, 1u);
+			bmcSolver->CommitTimeframeClause(-initialValue.l0, 0u,  initialValueLatch.l0, 1u);
+			bmcSolver->CommitTimeframeClause( initialValue.l0, 0u, -initialValueLatch.l0, 1u);
 
-			transitionInitialValid.push_back(activationLatch);
-			transitionInitialValue.push_back(activationValueLatch);
+			transitionInitialValid.push_back(initialValidLatch);
+			transitionInitialValue.push_back(initialValueLatch);
+			transitionSettledValid.push_back(settledValid);
+			transitionSettledValue.push_back(settledValue);
 
 			transitionCondition = encoder.EncodeAnd(std::vector<LogicContainer01> {
-				activationLatch,
-				transitionValueValid,
+				_transitionInitialValidForTimeframe[timeframeId][index],
+				_transitionSettledValidForTimeframe[timeframeId][index],
 				// This XOR is required for the slow-to-transition type
 				// where the constraints don't include the inverse relation
 				// of the intial and final value of the transition.
-				encoder.EncodeXor(
-					activationValueLatch,
-					transitionValue
-				)
+				encoder.EncodeLogicValueDetector(encoder.EncodeXor(
+					_transitionInitialValueForTimeframe[timeframeId][index],
+					_transitionSettledValueForTimeframe[timeframeId][index]
+				), Logic::LOGIC_ONE)
 			});
 		}
 
+		auto const badContainer { timeframe.template GetContainer<BadTag>(
+			context, node->GetNodeId(), port.portType, port.portNumber, AllowContainerInterceptor::Enable) };
 		encoder.EncodeImplication( transitionCondition, encoder.EncodeLogicEquivalenceDetector(badContainer, -originalContainer));
 		encoder.EncodeImplication(-transitionCondition, encoder.EncodeLogicEquivalenceDetector(badContainer,  originalContainer));
 		index++;

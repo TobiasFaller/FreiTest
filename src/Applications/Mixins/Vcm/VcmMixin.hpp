@@ -85,6 +85,7 @@ protected:
 	std::unique_ptr<Io::ValuePrinterImporter> vcmPrinterImporter;
 
 	std::string watcherExportPath;
+	std::string printerExportPath;
 
 private:
 	std::string vcmConfigPrefix;

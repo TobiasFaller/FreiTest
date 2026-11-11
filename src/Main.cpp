@@ -227,7 +227,9 @@ void Main::AfterRun(void)
 	LOG(INFO) << "FreiTest by University of Freiburg (Build " << __DATE__  << " " << __TIME__ << ")";
 	LOG(INFO) << "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~";
 
-	statistics.PrintHumanReadableToStream(std::cout);
+	std::stringstream statisticsStream;
+	statistics.PrintHumanReadableToStream(statisticsStream);
+	LOG(INFO) << statisticsStream.str();
 
 	std::string statisticsFileName = Settings::GetInstance()->StatisticsExportFilename;
 	if (statisticsFileName != "")

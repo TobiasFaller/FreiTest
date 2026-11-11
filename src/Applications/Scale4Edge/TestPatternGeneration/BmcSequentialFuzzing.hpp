@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cstdint>
-#include <string>
 
 #include "Applications/Scale4Edge/TestPatternGeneration/Base/FuzzingBase.hpp"
 #include "Applications/Scale4Edge/TestPatternGeneration/Base/SequentialAtpgBase.hpp"

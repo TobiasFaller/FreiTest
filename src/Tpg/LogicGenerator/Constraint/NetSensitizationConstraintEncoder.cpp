@@ -18,7 +18,6 @@
 using namespace FreiTest::Basic;
 using namespace FreiTest::Circuit;
 using namespace FreiTest::Fault;
-using namespace FreiTest::Io::Udfm;
 using namespace SolverProxy::Bmc;
 using namespace SolverProxy::Sat;
 

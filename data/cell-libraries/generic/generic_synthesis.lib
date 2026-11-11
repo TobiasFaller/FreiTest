@@ -12,6 +12,14 @@ library (generic) {
 			direction : output;
 			function : "IN1";
 		}
+		pg_pin (VDD) {
+			voltage_name : VDD;
+			pg_type : primary_power;
+		}
+		pg_pin (VSS) {
+			voltage_name : VSS;
+			pg_type : primary_ground;
+		}
 	}
 
 	cell (INV) {
@@ -22,6 +30,14 @@ library (generic) {
 		pin (OUT) {
 			direction : output;
 			function : "!IN1";
+		}
+		pg_pin (VDD) {
+			voltage_name : VDD;
+			pg_type : primary_power;
+		}
+		pg_pin (VSS) {
+			voltage_name : VSS;
+			pg_type : primary_ground;
 		}
 	}
 
@@ -37,6 +53,14 @@ library (generic) {
 			direction : output;
 			function : "(IN1 & IN2)";
 		}
+		pg_pin (VDD) {
+			voltage_name : VDD;
+			pg_type : primary_power;
+		}
+		pg_pin (VSS) {
+			voltage_name : VSS;
+			pg_type : primary_ground;
+		}
 	}
 
 	cell (NAND) {
@@ -50,6 +74,14 @@ library (generic) {
 		pin (OUT) {
 			direction : output;
 			function : "!(IN1 & IN2)";
+		}
+		pg_pin (VDD) {
+			voltage_name : VDD;
+			pg_type : primary_power;
+		}
+		pg_pin (VSS) {
+			voltage_name : VSS;
+			pg_type : primary_ground;
 		}
 	}
 
@@ -65,6 +97,14 @@ library (generic) {
 			direction : output;
 			function : "(IN1 | IN2)";
 		}
+		pg_pin (VDD) {
+			voltage_name : VDD;
+			pg_type : primary_power;
+		}
+		pg_pin (VSS) {
+			voltage_name : VSS;
+			pg_type : primary_ground;
+		}
 	}
 
 	cell (NOR) {
@@ -78,6 +118,14 @@ library (generic) {
 		pin (OUT) {
 			direction : output;
 			function : "!(IN1 | IN2)";
+		}
+		pg_pin (VDD) {
+			voltage_name : VDD;
+			pg_type : primary_power;
+		}
+		pg_pin (VSS) {
+			voltage_name : VSS;
+			pg_type : primary_ground;
 		}
 	}
 
@@ -93,6 +141,14 @@ library (generic) {
 			direction : output;
 			function : "(IN1 ^ IN2)";
 		}
+		pg_pin (VDD) {
+			voltage_name : VDD;
+			pg_type : primary_power;
+		}
+		pg_pin (VSS) {
+			voltage_name : VSS;
+			pg_type : primary_ground;
+		}
 	}
 
 	cell (XNOR) {
@@ -106,6 +162,14 @@ library (generic) {
 		pin (OUT) {
 			direction : output;
 			function : "!(IN1 ^ IN2)";
+		}
+		pg_pin (VDD) {
+			voltage_name : VDD;
+			pg_type : primary_power;
+		}
+		pg_pin (VSS) {
+			voltage_name : VSS;
+			pg_type : primary_ground;
 		}
 	}
 
@@ -124,11 +188,19 @@ library (generic) {
 			direction : output;
 			function : "((!IN3 & IN1) | (IN3 & IN2))";
 		}
+		pg_pin (VDD) {
+			voltage_name : VDD;
+			pg_type : primary_power;
+		}
+		pg_pin (VSS) {
+			voltage_name : VSS;
+			pg_type : primary_ground;
+		}
 	}
 
 	cell (DL) {
 		area : 6.0;
-		ff (IQ , IQN) {
+		latch (IQ , IQN) {
 			enable : "ENABLE";
 			data_in : "IN1";
 		}
@@ -143,14 +215,22 @@ library (generic) {
 			direction : output;
 			function : "IQ";
 		}
+		pg_pin (VDD) {
+			voltage_name : VDD;
+			pg_type : primary_power;
+		}
+		pg_pin (VSS) {
+			voltage_name : VSS;
+			pg_type : primary_ground;
+		}
 	}
 
 	cell (DLR) {
 		area : 7.0;
-		ff (IQ , IQN) {
-			enable : "ENABLE";
-			clear: "ARESET";
+		latch (IQ , IQN) {
+			enable  : "ENABLE";
 			data_in : "IN1";
+			clear   : "ARESET";
 		}
 		pin (IN1) {
 			direction : input;
@@ -167,6 +247,14 @@ library (generic) {
 			direction : output;
 			function : "IQ";
 		}
+		pg_pin (VDD) {
+			voltage_name : VDD;
+			pg_type : primary_power;
+		}
+		pg_pin (VSS) {
+			voltage_name : VSS;
+			pg_type : primary_ground;
+		}
 	}
 
 	cell (DFF) {
@@ -181,10 +269,19 @@ library (generic) {
 		}
 		pin (CLOCK) {
 			direction : input;
+			clock     : true;
 		}
 		pin (OUT) {
 			direction : output;
 			function : "IQ";
+		}
+		pg_pin (VDD) {
+			voltage_name : VDD;
+			pg_type : primary_power;
+		}
+		pg_pin (VSS) {
+			voltage_name : VSS;
+			pg_type : primary_ground;
 		}
 	}
 
@@ -201,13 +298,23 @@ library (generic) {
 		}
 		pin (CLOCK) {
 			direction : input;
+			clock     : true;
 		}
 		pin (ARESET) {
 			direction : input;
+			nextstate_type : clear;
 		}
 		pin (OUT) {
 			direction : output;
 			function : "IQ";
+		}
+		pg_pin (VDD) {
+			voltage_name : VDD;
+			pg_type : primary_power;
+		}
+		pg_pin (VSS) {
+			voltage_name : VSS;
+			pg_type : primary_ground;
 		}
 	}
 

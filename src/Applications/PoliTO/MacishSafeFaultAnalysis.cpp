@@ -37,7 +37,7 @@
 #include "Tpg/LogicGenerator/Constraint/NetSensitizationConstraintEncoder.hpp"
 #include "Tpg/LogicGenerator/DChain/DChainBaseEncoder.hpp"
 #include "Tpg/LogicGenerator/DChain/BackwardDChainEncoder.hpp"
-#include "Tpg/LogicGenerator/DChain/BackwardDChainConnectionEncoder.hpp"
+#include "Tpg/LogicGenerator/DChain/DChainSequentialConnectionEncoder.hpp"
 #include "Tpg/LogicGenerator/CircuitLogic/DefaultLogicEncoder.hpp"
 #include "Tpg/LogicGenerator/FaultLogic/FaultPropagationConstraintEncoder.hpp"
 #include "Tpg/LogicGenerator/FaultLogic/StuckAtFaultEncoder.hpp"
@@ -197,7 +197,7 @@ template<typename PinData> struct AtpgConfig<Fault::CellAwareFaultModel, PinData
 
 static size_t GetRequiredTimeframeCount(const Fault::SingleStuckAtFaultModel& faultModel) { return 1u; }
 static size_t GetRequiredTimeframeCount(const Fault::SingleTransitionDelayFaultModel& faultModel) { return 2u; }
-static size_t GetRequiredTimeframeCount(const Fault::CellAwareFaultModel& faultModel) { return faultModel.GetFault()->GetTimeframeSpread(); }
+static size_t GetRequiredTimeframeCount(const Fault::CellAwareFaultModel& faultModel) { return faultModel.GetFault()->GetStateMachine().GetTimeframes(); }
 
 template<typename FaultModel, typename FaultList>
 MacishSafeFaultAnalysis<FaultModel, FaultList>::MacishSafeFaultAnalysis():
@@ -508,7 +508,7 @@ solve_again:
 							watcher->name = watcher->name + "_bad";
 						}
 						this->vcmWatcherImporter->ApplyWatchers(vcmWatcher, *this->vcmCircuit, { }, "");
-		
+
 						std::vector<Helper::ValueWatcher::WatcherValues> watches;
 						auto circuitWatchesGood { circuitWatcherGood.GetWatcherValues(circuitSimulationGood) };
 						auto circuitWatchesBad { circuitWatcherBad.GetWatcherValues(circuitSimulationBad) };
@@ -735,6 +735,10 @@ end_loop:
 	// 32 bit, 64 bit result -> 96 bit precision
 	const mpfr_prec_t precision { static_cast<mpfr_prec_t>(+bits) * static_cast<mpfr_prec_t>(3u) };
 	mpfr_t constantOne; mpfr_init2(constantOne, precision);
+#if ((MPFR_VERSION_MAJOR < 4) || ((MPFR_VERSION_MAJOR == 4 && MPFR_VERSION_MINOR < 2)))
+	mpfr_t constantTwo; mpfr_init2(constantTwo, precision);
+	mpfr_set_ui(constantTwo, 2u, MPFR_RNDN);
+#endif
 	mpfr_t numInputBits; mpfr_init2(numInputBits, precision);
 	mpfr_t numOutputBits; mpfr_init2(numOutputBits, precision);
 	mpfr_t minInputValue; mpfr_init2(minInputValue, precision);
@@ -746,8 +750,15 @@ end_loop:
 	mpfr_set_ui(numOutputBits, 2u*+bits, MPFR_RNDN);
 	mpfr_set_ui(constantOne, 1u, MPFR_RNDN);
 	mpfr_set_ui(minInputValue, 0u, MPFR_RNDN);
+#if ((MPFR_VERSION_MAJOR < 4) || ((MPFR_VERSION_MAJOR == 4 && MPFR_VERSION_MINOR < 2)))
+	mpfr_exp2(maxInputValue, numInputBits, MPFR_RNDN);
+	mpfr_sub(maxInputValue, maxInputValue, constantOne, MPFR_RNDN);
+	mpfr_exp2(maxOutputValue, numOutputBits, MPFR_RNDN);
+	mpfr_sub(maxOutputValue, maxOutputValue, constantOne, MPFR_RNDN);
+#else
 	mpfr_exp2m1(maxInputValue, numInputBits, MPFR_RNDN);
 	mpfr_exp2m1(maxOutputValue, numOutputBits, MPFR_RNDN);
+#endif
 	mpfr_mul_d(maxOutputValueLower, maxOutputValue, 0.2, MPFR_RNDN);
 	mpfr_mul_d(maxOutputValueUpper, maxOutputValue, 0.8, MPFR_RNDN);
 
@@ -802,7 +813,11 @@ end_loop:
 			unsigned long computed { 0u };
 			for (size_t index { 0u }; index < port.size(); index++)
 			{
+#if ((MPFR_VERSION_MAJOR < 4) || ((MPFR_VERSION_MAJOR == 4 && MPFR_VERSION_MINOR < 2)))
+				mpfr_fmod(bit, shifter, constantTwo, MPFR_RNDZ);
+#else
 				mpfr_fmod_ui(bit, shifter, 2u, MPFR_RNDZ);
+#endif
 				mpfr_div_ui(shifter, shifter, 2u, MPFR_RNDZ);
 				auto const setBit { mpfr_greaterequal_p(bit, constantOne) };
 				if (setBit) {
@@ -853,7 +868,11 @@ end_loop:
 			Pattern::TestPattern pattern(simulationResult.GetNumberOfTimeframes(), mappedCircuit.GetNumberOfPrimaryInputs(), mappedCircuit.GetNumberOfSecondaryInputs());
 			for (size_t timeframe { 0u }; timeframe < simulationResult.GetNumberOfTimeframes(); timeframe++)
 			{
+#if (MPFR_VERSION_MAJOR < 4)
+				mpfr_grandom(valuesA[timeframe], nullptr, mpfr_random, MPFR_RNDN);
+#else
 				mpfr_nrandom(valuesA[timeframe], mpfr_random, MPFR_RNDN);
+#endif
 				mpfr_mul(valuesA[timeframe], valuesA[timeframe], normal_sigma, MPFR_RNDN);
 				mpfr_add(valuesA[timeframe], valuesA[timeframe], normal_mu, MPFR_RNDN);
 				mpfr_max(valuesA[timeframe], valuesA[timeframe], minInputValue, MPFR_RNDN);
@@ -861,7 +880,11 @@ end_loop:
 				mpfr_trunc(valuesA[timeframe], valuesA[timeframe]);
 				mpfr_set_input(pattern, portA, timeframe, valuesA[timeframe]);
 
+#if (MPFR_VERSION_MAJOR < 4)
+				mpfr_grandom(valuesB[timeframe], nullptr, mpfr_random, MPFR_RNDN);
+#else
 				mpfr_nrandom(valuesB[timeframe], mpfr_random, MPFR_RNDN);
+#endif
 				mpfr_mul(valuesB[timeframe], valuesB[timeframe], normal_sigma, MPFR_RNDN);
 				mpfr_add(valuesB[timeframe], valuesB[timeframe], normal_mu, MPFR_RNDN);
 				mpfr_max(valuesB[timeframe], valuesB[timeframe], minInputValue, MPFR_RNDN);

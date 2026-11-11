@@ -11,7 +11,7 @@ namespace FreiTest
 namespace Tpg
 {
 
-enum class StuckAtFaultTaggingMode { FullScan, Functional };
+enum class StuckAtFaultTaggingMode { Independent, Functional };
 
 template<typename PinData, typename FaultModel>
 class StuckAtFaultCircuitTagger: public ICircuitTagger<PinData>

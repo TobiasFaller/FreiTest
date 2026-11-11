@@ -2,11 +2,9 @@
 
 #include <boost/format.hpp>
 
+#include <atomic>
 #include <algorithm>
-#include <cstdint>
-#include <execution>
 #include <iostream>
-#include <map>
 #include <memory>
 #include <random>
 #include <vector>
@@ -19,21 +17,19 @@
 #include "Basic/Settings.hpp"
 #include "Basic/Fault/Models/FaultFreeModel.hpp"
 #include "Basic/Fault/Models/SingleStuckAtFaultModel.hpp"
-#include "Basic/Fault/Lists/SingleStuckAtFaultList.hpp"
 #include "Basic/Fault/Models/SingleTransitionDelayFaultModel.hpp"
-#include "Basic/Fault/Lists/SingleTransitionDelayFaultList.hpp"
 #include "Basic/Fault/Models/CellAwareFaultModel.hpp"
+#include "Basic/Fault/Lists/SingleStuckAtFaultList.hpp"
+#include "Basic/Fault/Lists/SingleTransitionDelayFaultList.hpp"
 #include "Basic/Fault/Lists/CellAwareFaultList.hpp"
 #include "Basic/Pattern/TestPattern.hpp"
 #include "Basic/Iterator/IntegerIterator.hpp"
 #include "Circuit/CircuitEnvironment.hpp"
-#include "Circuit/CircuitBuilder.hpp"
-#include "Io/CircuitVerilogExporter/CircuitVerilogExporter.hpp"
+#include "Helper/AtpgDebug.hpp"
 #include "SolverProxy/Sat/SatSolverProxy.hpp"
-#include "SolverProxy/MaxSat/MaxSatSolverProxy.hpp"
-#include "SolverProxy/Sat/Glucose421ParallelSolverProxy.hpp"
 #include "Tpg/LogicGenerator/LogicGenerator.hpp"
 #include "Tpg/LogicGenerator/TestPatternExtractor.hpp"
+#include "Tpg/LogicGenerator/SimulationResultExtractor.hpp"
 #include "Tpg/LogicGenerator/Tagger/DChain/DChainCircuitTagger.hpp"
 #include "Tpg/LogicGenerator/Tagger/Fault/StuckAtFaultCircuitTagger.hpp"
 #include "Tpg/LogicGenerator/Tagger/Fault/TransitionDelayFaultCircuitTagger.hpp"
@@ -56,13 +52,13 @@
 #include "Tpg/LogicGenerator/FaultLogic/TransitionSensitizationConstraintEncoder.hpp"
 #include "Tpg/LogicGenerator/FaultLogic/CellAwareFaultEncoder.hpp"
 #include "Tpg/LogicGenerator/FaultLogic/CellAwareSensitizationConstraintEncoder.hpp"
+#include "Tpg/LogicGenerator/Utility/UnaryCounterEncoder.hpp"
 #include "Tpg/LogicGenerator/Vcm/VcmOutputLogicEncoder.hpp"
 #include "Tpg/LogicGenerator/Vcm/VcmInputLogicEncoder.hpp"
 #include "Tpg/Vcm/VcmContext.hpp"
 
 using namespace SolverProxy;
 using namespace FreiTest::Basic;
-using namespace FreiTest::Circuit;
 using namespace FreiTest::Tpg;
 
 namespace FreiTest
@@ -98,7 +94,7 @@ template<typename PinData> struct AtpgConfig<Fault::CellAwareFaultModel, PinData
 	using FaultSensitizationTimeframe = Tpg::CellAwareSensitizationTimeframe;
 	using FaultTagger = Tpg::CellAwareFaultCircuitTagger<PinData>;
 	using FaultTaggerMode = Tpg::CellAwareFaultTaggingMode;
-	static size_t GetRequiredTimeframeCount(const Fault::CellAwareFaultModel& faultModel) { return faultModel.GetFault()->GetTimeframeSpread(); }
+	static size_t GetRequiredTimeframeCount(const Fault::CellAwareFaultModel& faultModel) { return faultModel.GetFault()->GetStateMachine().GetTimeframes(); }
 };
 
 template <typename FaultModel, typename FaultList>
@@ -110,12 +106,30 @@ SatFullScanFuzzing<FaultModel, FaultList>::SatFullScanFuzzing(void):
 	Mixin::VcdExportMixin<FaultList>(SCALE4EDGE_ATPG_CONFIG),
 	Mixin::VcmMixin(SCALE4EDGE_ATPG_CONFIG),
 	AtpgBase<FaultModel, FaultList>(SCALE4EDGE_ATPG_CONFIG),
-	FuzzingBase<FaultModel, FaultList>(SCALE4EDGE_ATPG_CONFIG)
+	FuzzingBase<FaultModel, FaultList>(SCALE4EDGE_ATPG_CONFIG),
+	scanChainType(ScanChainType::LaunchOnShift)
 {
+	// Adjust default settings for fuzzing.
+	// Disable fault simulation to generate a pattern for each fault.
+	this->faultSimulation = AtpgBase<FaultModel, FaultList>::FaultSimulation::Disabled;
+	this->solverTimeout = 60u;
 }
 
 template <typename FaultModel, typename FaultList>
 SatFullScanFuzzing<FaultModel, FaultList>::~SatFullScanFuzzing(void) = default;
+
+template <typename FaultModel, typename FaultList>
+bool SatFullScanFuzzing<FaultModel, FaultList>::SetSetting(std::string key, std::string value)
+{
+	if (Settings::IsOption(key, "ScanChainType", SCALE4EDGE_ATPG_CONFIG))
+	{
+		return Settings::ParseEnum(value, scanChainType, {
+			{ "LaunchOnShift", ScanChainType::LaunchOnShift },
+			{ "EnhancedScan", ScanChainType::EnhancedScan }
+		});
+	}
+	return AtpgBase<FaultModel, FaultList>::SetSetting(key, value);
+}
 
 template <typename FaultModel, typename FaultList>
 void SatFullScanFuzzing<FaultModel, FaultList>::Init(void)
@@ -134,16 +148,25 @@ void SatFullScanFuzzing<FaultModel, FaultList>::Run(void)
 	{
 		auto const seed { random() };
 		FuzzingBase<FaultModel, FaultList>::GenerateCircuit(seed);
-		FuzzingBase<FaultModel, FaultList>::GenerateFaultModel(seed, FuzzingBase<FaultModel, FaultList>::UdfmType::FullScan);
+		FuzzingBase<FaultModel, FaultList>::GenerateFaultModel(seed);
 		FuzzingBase<FaultModel, FaultList>::GenerateFaultList(seed);
 		VLOG(6) << to_debug(this->circuit->GetUnmappedCircuit(), VLOG_VERBOSE(9));
 		VLOG(6) << to_debug(this->circuit->GetMappedCircuit(), VLOG_VERBOSE(9));
 
-		this->testPatterns.clear();
+		Logging::SetFaultLimits(this->faultListBegin, this->faultListEnd);
 		Parallel::ExecuteParallel(this->faultListBegin, this->faultListEnd, Parallel::Arena::PatternGeneration, Parallel::Order::Parallel, [&](size_t index) {
 			GeneratePatternForFault(seed, index);
 		});
 		Logging::ClearCurrentFault();
+
+		auto const faultCount = this->faultListEnd - this->faultListBegin;
+		auto const patternCount = this->testPatterns.size();
+		auto const simulationCount = patternCount + (faultCount - patternCount) * this->configNumSimulations;
+		this->testPatterns.clear();
+
+		LOG(INFO) << boost::format("Checked circuit %s (Inputs: %2d, Ouputs: %2d, Cells: %2d, Faults: %3d, Patterns: %3d, Simulations: %6d) \u2713")
+			% this->GetCircuitName() % this->GetNumberOfInputs() % this->GetNumberOfOutputs() % this->GetNumberOfCells()
+			% faultCount % patternCount % simulationCount;
 	}
 }
 
@@ -170,10 +193,6 @@ void SatFullScanFuzzing<FaultModel, FaultList>::GeneratePatternForFault(size_t s
 	satSolver->SetSolverTimeout(this->solverTimeout);
 
 	auto faultModel = std::make_shared<FaultModel>(fault);
-	if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
-	{
-		DVLOG(6) << "\n" << to_string(faultModel->GetFault()->GetStateMachine());
-	}
 
 	// The logic generator combines all tagging, encoding and constraint modules into one generator.
 	auto logicGenerator = std::make_shared<Tpg::LogicGenerator<PinData>>(satSolver, this->circuit);
@@ -181,7 +200,10 @@ void SatFullScanFuzzing<FaultModel, FaultList>::GeneratePatternForFault(size_t s
 
 	auto faultGenerator = logicGenerator->template EmplaceModule<FaultGenerator>(faultModel);
 	auto faultTagger = logicGenerator->template EmplaceModule<FaultTagger>(faultModel);
-	faultTagger->SetTaggingMode(FaultTaggerMode::FullScan);
+	switch (scanChainType) {
+		case ScanChainType::LaunchOnShift: faultTagger->SetTaggingMode(FaultTaggerMode::Functional); break;
+		case ScanChainType::EnhancedScan: faultTagger->SetTaggingMode(FaultTaggerMode::Independent); break;
+	}
 	if constexpr (has_diff_encoding_v<PinData>) logicGenerator->template EmplaceModule<Tpg::DChainCircuitTagger<PinData>>();
 
 	// Basic circuit encoding for exactly one timeframe.
@@ -193,6 +215,11 @@ void SatFullScanFuzzing<FaultModel, FaultList>::GeneratePatternForFault(size_t s
 	logicGenerator->template EmplaceModule<Tpg::SequentialInputLogicEncoder<PinData, BadTag>>(LogicConstraint::ONLY_LOGIC_01X);
 	logicGenerator->template EmplaceModule<Tpg::SequentialOutputLogicEncoder<PinData, GoodTag>>(Basic::MakeUnclockedSetResetFlipFlopModel());
 	logicGenerator->template EmplaceModule<Tpg::SequentialOutputLogicEncoder<PinData, BadTag>>(Basic::MakeUnclockedSetResetFlipFlopModel());
+	if (scanChainType == ScanChainType::LaunchOnShift)
+	{
+		logicGenerator->template EmplaceModule<Tpg::SequentialConnectionEncoder<PinData, GoodTag>>();
+		logicGenerator->template EmplaceModule<Tpg::SequentialConnectionEncoder<PinData, BadTag>>();
+	}
 	logicGenerator->template EmplaceModule<Tpg::OutputLogicEncoder<PinData, GoodTag>>();
 	logicGenerator->template EmplaceModule<Tpg::OutputLogicEncoder<PinData, BadTag>>();
 	if constexpr (has_diff_encoding_v<PinData>) logicGenerator->template EmplaceModule<Tpg::DChainBaseEncoder<PinData>>();
@@ -201,8 +228,11 @@ void SatFullScanFuzzing<FaultModel, FaultList>::GeneratePatternForFault(size_t s
 	// Test constraint encoding which requires the fault to be activated (a difference at the fault location)
 	// and the fault effect propagation (a difference at a circuit output port).
 	logicGenerator->template EmplaceModule<Tpg::PortConstraintEncoder<PinData, LDiffTag>>(Tpg::MakeConstantPortConstraint(Logic::LOGIC_ZERO), Tpg::ConstrainedPorts::Inputs);
-	logicGenerator->template EmplaceModule<Tpg::SequentialConstraintEncoder<PinData, LDiffTag>>(Tpg::MakeConstantSequentialInitializer(Logic::LOGIC_ZERO), Tpg::ConstrainedSequentials::Inputs);
-	auto sensitizationEncoder = logicGenerator->template EmplaceModule<FaultSensitization>(faultModel, FaultSensitizationTimeframe::Any);
+	switch (scanChainType) {
+		case ScanChainType::LaunchOnShift: logicGenerator->template EmplaceModule<Tpg::SequentialConstraintEncoder<PinData, LDiffTag>>(Tpg::MakeConstantSequentialInitializer(Logic::LOGIC_ZERO), Tpg::ConstrainedSequentials::Inputs); break;
+		case ScanChainType::EnhancedScan: logicGenerator->template EmplaceModule<Tpg::SequentialConstraintEncoder<PinData, LDiffTag>>(Tpg::MakeConstantSequentialConstraint(Logic::LOGIC_ZERO), Tpg::ConstrainedSequentials::Inputs); break;
+	}
+	logicGenerator->template EmplaceModule<FaultSensitization>(faultModel, FaultSensitizationTimeframe::Any);
 	// For the cell-aware model the propagation constraint "Any" is required due to different lengths of the patterns.
 	logicGenerator->template EmplaceModule<Tpg::FaultPropagationConstraintEncoder<PinData>>(Tpg::FaultPropagationTarget::PrimaryAndSecondaryOutputs, Tpg::FaultPropagationTimeframe::Any);
 
@@ -233,46 +263,24 @@ void SatFullScanFuzzing<FaultModel, FaultList>::GeneratePatternForFault(size_t s
 	{
 	case Sat::SatResult::SAT:
 	{
-		Pattern::TestPattern pattern = Tpg::Extractor::ExtractTestPattern<PinData, GoodTag>(logicGenerator->GetContext(), Pattern::InputCapture::PrimaryAndSecondaryInputs);
-		DVLOG(3) << "Generated test pattern: " << to_string(pattern);
-
-		if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
-		{
-			auto& states = faultGenerator->GetStates();
-			auto& nextStates = faultGenerator->GetNextStates();
-			auto& transitions = faultGenerator->GetTransitions();
-			auto& noTransitions = faultGenerator->GetNoTransitions();
-			auto& sensitizations = sensitizationEncoder->GetSensitizations();
-			for (size_t timeframeId { 0u }; timeframeId < states.size(); timeframeId++) {
-				DVLOG(6) << "TF" << timeframeId << ":";
-				for (size_t state { 0u }; state < states[timeframeId].size(); state++) {
-					auto stateValue { satSolver->GetLiteralValue(states[timeframeId][state].l0) };
-					auto nextValue { satSolver->GetLiteralValue(nextStates[timeframeId][state].l0) };
-					std::string trans;
-					for (auto& lit : transitions[timeframeId][state]) {
-						auto value { satSolver->GetLiteralValue(lit.l0) };
-						trans += to_string(value);
-					}
-					DVLOG(6) << "  S" << state << " " << to_string(stateValue)
-						<< " -> " << to_string(nextValue) << " " << trans;
-				}
-				auto none { satSolver->GetLiteralValue(noTransitions[timeframeId].l0) };
-				auto sensitized { satSolver->GetLiteralValue(sensitizations[timeframeId].l0) };
-				DVLOG(6) << "  N " << to_string(none);
-				DVLOG(6) << "  S " << to_string(sensitized);
-			}
-		}
+		auto const pattern = Tpg::Extractor::ExtractTestPattern<PinData, GoodTag>(logicGenerator->GetContext(), Pattern::InputCapture::PrimaryAndSecondaryInputs);
+		auto const resultGood = Tpg::Extractor::ExtractSimulationResult<PinData, GoodTag>(logicGenerator->GetContext());
+		auto const resultBad = Tpg::Extractor::ExtractSimulationResult<PinData, GoodTag>(logicGenerator->GetContext());
+		DVLOG(3) << "Generated test pattern: " << to_string(pattern) << std::endl << std::endl
+			<< Helper::DebugFaultLocation<Helper::DebugSimulationGoodBad, FaultModel>(
+				{ fault }, *this->circuit, resultGood, resultBad, resultGood, resultBad);
 
 		Simulation::SimulationConfig simConfig { Simulation::MakeSimulationConfig(Basic::MakeUnclockedSetResetFlipFlopModel()) };
-		simConfig.sequentialMode = Simulation::SequentialMode::FullScan;
+		switch (scanChainType) {
+			case ScanChainType::LaunchOnShift: simConfig.sequentialMode = Simulation::SequentialMode::Functional; break;
+			case ScanChainType::EnhancedScan: simConfig.sequentialMode = Simulation::SequentialMode::Independent; break;
+		}
 		AtpgBase<FaultModel, FaultList>::ValidateAtpgResult(faultIndex, pattern, Pattern::OutputCapture::PrimaryAndSecondaryOutputs, *logicGenerator, simConfig);
 
 		size_t testPatternIndex = this->testPatterns.emplace_back(pattern);
+
 		AtpgBase<FaultModel, FaultList>::RunFaultSimulation(vcmContext, faultIndex, testPatternIndex, Pattern::OutputCapture::PrimaryAndSecondaryOutputs, simConfig);
-		if (metadata->faultStatus != Fault::FaultStatus::FAULT_STATUS_DETECTED)
-		{
-			LOG(FATAL) << "Invalid test pattern was generated";
-		}
+		ASSERT (metadata->faultStatus == Fault::FaultStatus::FAULT_STATUS_DETECTED);
 		return;
 	}
 
@@ -304,26 +312,138 @@ void SatFullScanFuzzing<FaultModel, FaultList>::GeneratePatternForFault(size_t s
 validate_untestable:
 	DVLOG(3) << "Checking if there is a pattern that finds " << to_string(*fault);
 	{
+		using PinData = PinDataGB<LogicContainer>;
+		using FaultGenerator = typename AtpgConfig<FaultModel, PinData>::FaultGenerator;
+		using FaultSensitization = typename AtpgConfig<FaultModel, PinData>::FaultSensitization;
+		using FaultSensitizationTimeframe = typename AtpgConfig<FaultModel, PinData>::FaultSensitizationTimeframe;
+		using FaultTagger = typename AtpgConfig<FaultModel, PinData>::FaultTagger;
+		using FaultTaggerMode = typename AtpgConfig<FaultModel, PinData>::FaultTaggerMode;
+
+		// Try without D-Chain
+		auto logicGenerator = std::make_shared<Tpg::LogicGenerator<PinData>>(satSolver, this->circuit);
+		logicGenerator->GetContext().SetIncremental(false);
+		auto faultGenerator = logicGenerator->template EmplaceModule<FaultGenerator>(faultModel);
+		auto faultTagger = logicGenerator->template EmplaceModule<FaultTagger>(faultModel);
+		switch (scanChainType) {
+			case ScanChainType::LaunchOnShift: faultTagger->SetTaggingMode(FaultTaggerMode::Functional); break;
+			case ScanChainType::EnhancedScan: faultTagger->SetTaggingMode(FaultTaggerMode::Independent); break;
+		}
+		logicGenerator->template EmplaceModule<Tpg::InputLogicEncoder<PinData, GoodTag>>(LogicConstraint::ONLY_LOGIC_01X);
+		logicGenerator->template EmplaceModule<Tpg::InputLogicEncoder<PinData, BadTag>>(LogicConstraint::ONLY_LOGIC_01X);
+		logicGenerator->template EmplaceModule<Tpg::DefaultLogicEncoder<PinData, GoodTag>>(LogicConstraint::ONLY_LOGIC_01X);
+		logicGenerator->template EmplaceModule<Tpg::DefaultLogicEncoder<PinData, BadTag>>(LogicConstraint::ONLY_LOGIC_01X);
+		logicGenerator->template EmplaceModule<Tpg::SequentialInputLogicEncoder<PinData, GoodTag>>(LogicConstraint::ONLY_LOGIC_01X);
+		logicGenerator->template EmplaceModule<Tpg::SequentialInputLogicEncoder<PinData, BadTag>>(LogicConstraint::ONLY_LOGIC_01X);
+		logicGenerator->template EmplaceModule<Tpg::SequentialOutputLogicEncoder<PinData, GoodTag>>(Basic::MakeUnclockedSetResetFlipFlopModel());
+		logicGenerator->template EmplaceModule<Tpg::SequentialOutputLogicEncoder<PinData, BadTag>>(Basic::MakeUnclockedSetResetFlipFlopModel());
+		if (scanChainType == ScanChainType::LaunchOnShift)
+		{
+			logicGenerator->template EmplaceModule<Tpg::SequentialConnectionEncoder<PinData, GoodTag>>();
+			logicGenerator->template EmplaceModule<Tpg::SequentialConnectionEncoder<PinData, BadTag>>();
+		}
+		logicGenerator->template EmplaceModule<Tpg::OutputLogicEncoder<PinData, GoodTag>>();
+		logicGenerator->template EmplaceModule<Tpg::OutputLogicEncoder<PinData, BadTag>>();
+
+		logicGenerator->template EmplaceModule<Tpg::PortConstraintEncoder<PinData, LDiffTag>>(Tpg::MakeConstantPortConstraint(Logic::LOGIC_ZERO), Tpg::ConstrainedPorts::Inputs);
+		switch (scanChainType) {
+			case ScanChainType::LaunchOnShift: logicGenerator->template EmplaceModule<Tpg::SequentialConstraintEncoder<PinData, LDiffTag>>(Tpg::MakeConstantSequentialInitializer(Logic::LOGIC_ZERO), Tpg::ConstrainedSequentials::Inputs); break;
+			case ScanChainType::EnhancedScan: logicGenerator->template EmplaceModule<Tpg::SequentialConstraintEncoder<PinData, LDiffTag>>(Tpg::MakeConstantSequentialConstraint(Logic::LOGIC_ZERO), Tpg::ConstrainedSequentials::Inputs); break;
+		}
+		logicGenerator->template EmplaceModule<FaultSensitization>(faultModel, FaultSensitizationTimeframe::Any);
+		logicGenerator->template EmplaceModule<Tpg::FaultPropagationConstraintEncoder<PinData>>(Tpg::FaultPropagationTarget::PrimaryAndSecondaryOutputs, Tpg::FaultPropagationTimeframe::Any);
+
+		logicGenerator->GetContext().SetNumberOfTimeframes(timeframes);
+		if (logicGenerator->GenerateCircuitLogic() && satSolver->Solve() == Sat::SatResult::SAT)
+		{
+			const auto resultGood = Tpg::Extractor::ExtractSimulationResult<PinData, GoodTag>(logicGenerator->GetContext());
+			const auto resultBad = Tpg::Extractor::ExtractSimulationResult<PinData, BadTag>(logicGenerator->GetContext());
+			Helper::DebugExportSimulation("atpg-good", *this->circuit, resultGood);
+			Helper::DebugExportSimulation("atpg-bad", *this->circuit, resultBad);
+
+			LOG(FATAL) << "Untestable fault " << faultIndex << " " << to_string(*fault)
+				<< " was found by full-scan ATPG without D-chains:" << std::endl
+				<< Helper::DebugFaultLocation<Helper::DebugSimulationGoodBad, FaultModel>(
+					{ fault }, *this->circuit, resultGood, resultBad, resultGood, resultBad) << std::endl
+				<< Helper::DebugSimulation<Helper::DebugSimulationGoodBad>(
+					*this->circuit, resultGood, resultBad, resultGood, resultBad) << std::endl
+				<< to_debug(this->circuit->GetMappedCircuit());
+		}
+	}
+	{
+		using PinData = PinDataGB<LogicContainer>;
+		using FaultGenerator = typename AtpgConfig<FaultModel, PinData>::FaultGenerator;
+		using FaultSensitization = typename AtpgConfig<FaultModel, PinData>::FaultSensitization;
+		using FaultSensitizationTimeframe = typename AtpgConfig<FaultModel, PinData>::FaultSensitizationTimeframe;
+
+		// Try using a BMC Solver without D-Chain
+		std::shared_ptr<Bmc::BmcSolverProxy> bmcSolver = Bmc::BmcSolverProxy::CreateBmcSolver(Settings::GetInstance()->BmcSolver);
+		bmcSolver->SetSolverTimeout(this->solverTimeout);
+
+		auto logicGenerator = std::make_shared<Tpg::LogicGenerator<PinData>>(bmcSolver, this->circuit);
+		logicGenerator->template EmplaceModule<FaultGenerator>(faultModel);
+		logicGenerator->template EmplaceModule<Tpg::WholeCircuitTagger<PinData, GoodTag>>();
+		logicGenerator->template EmplaceModule<Tpg::WholeCircuitTagger<PinData, BadTag>>();
+		if constexpr (has_diff_encoding_v<PinData>) logicGenerator->template EmplaceModule<Tpg::DChainCircuitTagger<PinData>>();
+		logicGenerator->template EmplaceModule<Tpg::InputLogicEncoder<PinData, GoodTag>>(LogicConstraint::ONLY_LOGIC_01X);
+		logicGenerator->template EmplaceModule<Tpg::InputLogicEncoder<PinData, BadTag>>(LogicConstraint::ONLY_LOGIC_01X);
+		logicGenerator->template EmplaceModule<Tpg::DefaultLogicEncoder<PinData, GoodTag>>(LogicConstraint::ONLY_LOGIC_01X);
+		logicGenerator->template EmplaceModule<Tpg::DefaultLogicEncoder<PinData, BadTag>>(LogicConstraint::ONLY_LOGIC_01X);
+		logicGenerator->template EmplaceModule<Tpg::SequentialInputLogicEncoder<PinData, GoodTag>>(LogicConstraint::ONLY_LOGIC_01X);
+		logicGenerator->template EmplaceModule<Tpg::SequentialInputLogicEncoder<PinData, BadTag>>(LogicConstraint::ONLY_LOGIC_01X);
+		logicGenerator->template EmplaceModule<Tpg::SequentialOutputLogicEncoder<PinData, GoodTag>>(Basic::MakeUnclockedSetResetFlipFlopModel());
+		logicGenerator->template EmplaceModule<Tpg::SequentialOutputLogicEncoder<PinData, BadTag>>(Basic::MakeUnclockedSetResetFlipFlopModel());
+		logicGenerator->template EmplaceModule<Tpg::SequentialConnectionEncoder<PinData, GoodTag>>();
+		logicGenerator->template EmplaceModule<Tpg::SequentialConnectionEncoder<PinData, BadTag>>();
+		logicGenerator->template EmplaceModule<Tpg::OutputLogicEncoder<PinData, GoodTag>>();
+		logicGenerator->template EmplaceModule<Tpg::OutputLogicEncoder<PinData, BadTag>>();
+		if constexpr (has_diff_encoding_v<PinData>) logicGenerator->template EmplaceModule<Tpg::DChainBaseEncoder<PinData>>();
+		if constexpr (has_diff_encoding_v<PinData>) logicGenerator->template EmplaceModule<Tpg::BackwardDChainEncoder<PinData>>();
+
+		logicGenerator->template EmplaceModule<Tpg::UnaryCounterEncoder<PinData>>();
+		logicGenerator->template EmplaceModule<Tpg::PortConstraintEncoder<PinData, LDiffTag>>(Tpg::MakeConstantPortConstraint(Logic::LOGIC_ZERO), Tpg::ConstrainedPorts::Inputs);
+		logicGenerator->template EmplaceModule<Tpg::SequentialConstraintEncoder<PinData, LDiffTag>>(Tpg::MakeConstantSequentialInitializer(Logic::LOGIC_ZERO), Tpg::ConstrainedSequentials::Inputs);
+		logicGenerator->template EmplaceModule<FaultSensitization>(faultModel, FaultSensitizationTimeframe::Any);
+		logicGenerator->template EmplaceModule<Tpg::FaultPropagationConstraintEncoder<PinData>>(Tpg::FaultPropagationTarget::PrimaryAndSecondaryOutputs, Tpg::FaultPropagationTimeframe::Any);
+
+		logicGenerator->GetContext().SetNumberOfTimeframes(timeframes + 1u);
+		if (logicGenerator->GenerateCircuitLogic() && bmcSolver->Solve() == Bmc::BmcResult::Reachable)
+		{
+			const auto resultGood = Tpg::Extractor::ExtractSimulationResult<PinData, GoodTag>(logicGenerator->GetContext());
+			const auto resultBad = Tpg::Extractor::ExtractSimulationResult<PinData, BadTag>(logicGenerator->GetContext());
+			Helper::DebugExportSimulation("atpg-good", *this->circuit, resultGood);
+			Helper::DebugExportSimulation("atpg-bad", *this->circuit, resultBad);
+
+			LOG(FATAL) << "Untestable fault " << faultIndex << " " << to_string(*fault)
+				<< " was found by sequential ATPG:" << std::endl
+				<< Helper::DebugFaultLocation<Helper::DebugSimulationGoodBad, FaultModel>(
+					{ fault }, *this->circuit, resultGood, resultBad, resultGood, resultBad) << std::endl
+				<< Helper::DebugSimulation<Helper::DebugSimulationGoodBad>(
+					*this->circuit, resultGood, resultBad, resultGood, resultBad) << std::endl
+				<< to_debug(this->circuit->GetMappedCircuit());
+		}
+	}
+	{
+		// Try using random simulation
 		std::mt19937_64 random { seed };
 		std::uniform_int_distribution<size_t> randomLogic { 0u, 1u };
 
 		const auto& mappedCircuit { this->circuit->GetMappedCircuit() };
 		Simulation::SimulationConfig simConfig { Simulation::MakeSimulationConfig(Basic::MakeUnclockedSetResetFlipFlopModel()) };
-		simConfig.sequentialMode = Simulation::SequentialMode::FullScan;
-		const auto [testPrimaryOutputs, testSecondaryOutputs] = Pattern::GetCaptureOutputs(Pattern::OutputCapture::PrimaryAndSecondaryOutputs);
+		switch (scanChainType) {
+			case ScanChainType::LaunchOnShift: simConfig.sequentialMode = Simulation::SequentialMode::Functional; break;
+			case ScanChainType::EnhancedScan: simConfig.sequentialMode = Simulation::SequentialMode::Independent; break;
+		}
 		for (size_t index { 0u }; index < this->configNumSimulations; index++) {
 			// Generate random test pattern
 			Pattern::TestPattern testPattern { timeframes, mappedCircuit.GetNumberOfPrimaryInputs(), mappedCircuit.GetNumberOfSecondaryInputs() };
 			for (size_t timeframe { 0u }; timeframe < timeframes; timeframe++) {
-				for (size_t input { 0u }; input < mappedCircuit.GetNumberOfPrimaryInputs(); input++) {
+				for (size_t primaryInput { 0u }; primaryInput < mappedCircuit.GetNumberOfPrimaryInputs(); primaryInput++) {
 					auto const logicValue { (randomLogic(random) == 1u) ? Basic::Logic::LOGIC_ONE : Basic::Logic::LOGIC_ZERO };
-					testPattern.SetPrimaryInput(timeframe, input, logicValue);
+					testPattern.SetPrimaryInput(timeframe, primaryInput, logicValue);
 				}
-			}
-			for (size_t timeframe { 0u }; timeframe < timeframes; timeframe++) {
-				for (size_t input { 0u }; input < mappedCircuit.GetNumberOfSecondaryInputs(); input++) {
+				for (size_t secondaryInput { 0u }; secondaryInput < mappedCircuit.GetNumberOfSecondaryInputs(); secondaryInput++) {
 					auto const logicValue { (randomLogic(random) == 1u) ? Basic::Logic::LOGIC_ONE : Basic::Logic::LOGIC_ZERO };
-					testPattern.SetSecondaryInput(timeframe, input, logicValue);
+					testPattern.SetSecondaryInput(timeframe, secondaryInput, logicValue);
 				}
 			}
 
@@ -339,37 +459,63 @@ validate_untestable:
 
 			Simulation::SimulationResult badResult(testPattern.GetNumberOfTimeframes(), mappedCircuit.GetNumberOfNodes(), Logic::LOGIC_DONT_CARE);
 			Simulation::SimulateTestPatternNaive<FaultModel>(mappedCircuit, testPattern, { fault }, badResult, simConfig);
-			//LOG(INFO) << to_string(testPattern) << " => " << to_string(goodResult) << " vs " << to_string(badResult);
 
 			for (size_t timeframe = 0u; timeframe < testPattern.GetNumberOfTimeframes(); ++timeframe)
 			{
-				for (size_t index = 0u; testPrimaryOutputs && index < mappedCircuit.GetNumberOfPrimaryOutputs(); ++index)
+				for (size_t primaryIndex = 0u; primaryIndex < mappedCircuit.GetNumberOfPrimaryOutputs(); ++primaryIndex)
 				{
-					const auto* primaryOutput = mappedCircuit.GetPrimaryOutput(index);
-					const Basic::Logic good = goodResult.GetOutputLogic(primaryOutput, timeframe);
-					const Basic::Logic bad = badResult.GetOutputLogic(primaryOutput, timeframe);
-					const bool difference = IsValidLogic01(good) && IsValidLogic01(bad) && (bad != good);
+					auto *const primaryOutput = mappedCircuit.GetPrimaryOutput(primaryIndex);
+					auto const good = goodResult.GetOutputLogic(primaryOutput, timeframe);
+					auto const bad = badResult.GetOutputLogic(primaryOutput, timeframe);
+					auto const difference = IsValidLogic01(good) && IsValidLogic01(bad) && (bad != good);
 					if (__builtin_expect(difference, false))
 					{
+						Simulation::SimulationResult verifyGood(testPattern.GetNumberOfTimeframes(), mappedCircuit.GetNumberOfNodes(), Logic::LOGIC_DONT_CARE);
+						Simulation::SimulationResult verifyBad(testPattern.GetNumberOfTimeframes(), mappedCircuit.GetNumberOfNodes(), Logic::LOGIC_DONT_CARE);
+						Simulation::SimulateTestPatternNaive<Fault::FaultFreeModel>(mappedCircuit, testPattern, {}, verifyGood, simConfig);
+						Simulation::SimulateTestPatternNaive<FaultModel>(mappedCircuit, testPattern, { fault }, verifyBad, simConfig);
+
+						Helper::DebugExportSimulation("sim-good", *this->circuit, goodResult);
+						Helper::DebugExportSimulation("sim-bad", *this->circuit, badResult);
+						Helper::DebugExportSimulation("check-good", *this->circuit, verifyGood);
+						Helper::DebugExportSimulation("check-bad", *this->circuit, verifyBad);
+
 						LOG(FATAL) << "Undetectable fault " << faultIndex << " " << to_string(*fault)
-							<< " was found by test pattern: " << to_string(testPattern) << "\n"
-							<< "Good sim result: " << to_string(goodResult) << "\n"
-							<< "Bad sim result:  " << to_string(badResult);
+							<< " was found by test pattern at primary output:" << std::endl
+							<< Helper::DebugFaultLocation<Helper::DebugSimulationVsCheck, FaultModel>(
+								{ fault }, *this->circuit, goodResult, badResult, verifyGood, verifyBad) << std::endl
+							<< Helper::DebugSimulation<Helper::DebugSimulationVsCheck>(
+								*this->circuit, goodResult, badResult, verifyGood, verifyBad) << std::endl
+							<< to_debug(this->circuit->GetMappedCircuit());
 					}
 				}
 
-				for (size_t index = 0; testSecondaryOutputs && index < mappedCircuit.GetNumberOfSecondaryOutputs(); ++index)
+				for (size_t secondaryIndex = 0; secondaryIndex < mappedCircuit.GetNumberOfSecondaryOutputs(); ++secondaryIndex)
 				{
-					auto *const secondaryOutput = mappedCircuit.GetSecondaryOutput(index);
+					auto *const secondaryOutput = mappedCircuit.GetSecondaryOutput(secondaryIndex);
 					auto const good = goodResult.GetOutputLogic(secondaryOutput, timeframe);
 					auto const bad = badResult.GetOutputLogic(secondaryOutput, timeframe);
 					auto const difference = IsValidLogic01(good) && IsValidLogic01(bad) && bad != good;
 					if (__builtin_expect(difference, false))
 					{
+						Simulation::SimulationResult verifyGood(testPattern.GetNumberOfTimeframes(), mappedCircuit.GetNumberOfNodes(), Logic::LOGIC_DONT_CARE);
+						Simulation::SimulationResult verifyBad(testPattern.GetNumberOfTimeframes(), mappedCircuit.GetNumberOfNodes(), Logic::LOGIC_DONT_CARE);
+						Simulation::SimulateTestPatternNaive<Fault::FaultFreeModel>(mappedCircuit, testPattern, {}, verifyGood, simConfig);
+						Simulation::SimulateTestPatternNaive<FaultModel>(mappedCircuit, testPattern, { fault }, verifyBad, simConfig);
+
+						Helper::DebugExportSimulation("sim-good", *this->circuit, goodResult);
+						Helper::DebugExportSimulation("sim-bad", *this->circuit, badResult);
+						Helper::DebugExportSimulation("check-good", *this->circuit, verifyGood);
+						Helper::DebugExportSimulation("check-bad", *this->circuit, verifyBad);
+
 						LOG(FATAL) << "Undetectable fault " << faultIndex << " " << to_string(*fault)
-							<< " was found by test pattern: " << to_string(testPattern) << "\n"
-							<< "Good sim result: " << to_string(goodResult) << "\n"
-							<< "Bad sim result:  " << to_string(badResult);
+							<< " was found by test pattern at secondary output:" << std::endl
+							<< secondaryOutput->GetName() << ": " << to_string(badResult) << std::endl
+							<< Helper::DebugFaultLocation<Helper::DebugSimulationVsCheck, FaultModel>(
+								{ fault }, *this->circuit, goodResult, badResult, verifyGood, verifyBad) << std::endl
+							<< Helper::DebugSimulation<Helper::DebugSimulationVsCheck>(
+								*this->circuit, goodResult, badResult, verifyGood, verifyBad) << std::endl
+							<< to_debug(this->circuit->GetMappedCircuit());
 					}
 				}
 			}

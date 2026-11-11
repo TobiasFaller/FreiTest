@@ -1,0 +1,23 @@
+[
+	{"include": "./repeatable-constant-switching-activity-maximization-ri5cy.jsonc"},
+
+	// REMARK: Pacose seems to outperform Inc BMO solver for this problem with this configuration.
+	{"setting": "SatSolver", "value": "PROD_MAX_SAT_PACOSE"},
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/MaxSATSolverSetting", "value": "BAILLEUX"},
+
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/StressTargetCells", "value": "ExcludeCellNets"},
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/StressTargetSubmodules", "value": "IncludeSubmodules"},
+
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/Timeframes", "value": "7"},
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/FirstTimeframeOfStateA", "value": "4"},
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/FirstTimeframeOfStateB", "value": "5"},
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/FirstTimeframeOfStateC", "value": "6"},
+
+	{"setting": "Scale4Edge/TestPatternGeneration/VcmTag", "value": "decoder"},
+	{"setting": "Scale4Edge/TestPatternGeneration/VcmParameter", "value" : "mode_of_operation=01"},
+	{"setting": "Scale4Edge/TestPatternGeneration/VcmParameter", "value" : "hard_reset=1"},
+
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/StressTargetHierarchyName", "value":"riscv_top/id_stage_i/decoder_i"},
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/LiteralDChainOptimization", "value" : "Yes"}
+]
+

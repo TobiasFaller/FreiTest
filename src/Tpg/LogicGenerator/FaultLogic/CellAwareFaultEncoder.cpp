@@ -13,7 +13,6 @@
 using namespace FreiTest::Basic;
 using namespace FreiTest::Circuit;
 using namespace FreiTest::Fault;
-using namespace FreiTest::Io::Udfm;
 using namespace SolverProxy::Sat;
 using namespace SolverProxy::Bmc;
 
@@ -25,7 +24,7 @@ namespace Tpg
 template<typename PinData>
 CellAwareFaultEncoder<PinData>::CellAwareFaultEncoder(std::shared_ptr<CellAwareFaultModel> faultModel):
 	_faultModel(faultModel),
-	_noAlternativeEffect(CellAwareNoAlternativeEffect::FaultFree),
+	_noTransitionOutput(CellAwareNoTransitionOutput::FaultFree),
 	_badContainerForTimeframe(),
 	_diffContainerForTimeframe(),
 	_states()
@@ -36,15 +35,15 @@ template<typename PinData>
 CellAwareFaultEncoder<PinData>::~CellAwareFaultEncoder(void) = default;
 
 template<typename PinData>
-void CellAwareFaultEncoder<PinData>::SetEffectWhenNoAlternativeFound(CellAwareNoAlternativeEffect effect)
+void CellAwareFaultEncoder<PinData>::SetOutputWhenNoTransitionFound(CellAwareNoTransitionOutput output)
 {
-	_noAlternativeEffect = effect;
+	_noTransitionOutput = output;
 }
 
 template<typename PinData>
-const CellAwareNoAlternativeEffect& CellAwareFaultEncoder<PinData>::GetEffectWhenNoAlternativeFound(void) const
+const CellAwareNoTransitionOutput& CellAwareFaultEncoder<PinData>::GetOutputWhenNoTransitionFound(void) const
 {
-	return _noAlternativeEffect;
+	return _noTransitionOutput;
 }
 
 template<typename PinData>
@@ -78,7 +77,7 @@ bool CellAwareFaultEncoder<PinData>::PreEncodeTimeframe(GeneratorContext<PinData
 	{
 		auto& badMap = _badContainerForTimeframe.emplace_back();
 		auto& diffMap = _diffContainerForTimeframe.emplace_back();
-		for (auto& nodeAndPort : fault->GetEffectNodesAndPorts())
+		for (auto& nodeAndPort : fault->GetStateMachine().GetOutputs())
 		{
 			badMap[nodeAndPort] = encoder.template NewLogicContainer<BadContainer>();
 			diffMap[nodeAndPort] = DiffContainer();
@@ -96,6 +95,7 @@ bool CellAwareFaultEncoder<PinData>::PostEncodeTimeframe(GeneratorContext<PinDat
 
 	const auto& fault { _faultModel->GetFault() };
 	const auto& stateMachine { fault->GetStateMachine() };
+	const auto& states { stateMachine.GetStates() };
 	const auto& timeframe { context.GetTimeframe(timeframeId) };
 	auto& encoder { context.GetEncoder() };
 
@@ -104,10 +104,10 @@ bool CellAwareFaultEncoder<PinData>::PostEncodeTimeframe(GeneratorContext<PinDat
 		_states.resize(timeframeId + 1);
 		_nextStates.resize(timeframeId + 1);
 		_transitions.resize(timeframeId + 1);
-		_transitions[timeframeId].resize(stateMachine.size());
+		_transitions[timeframeId].resize(states.size());
 		_noTransitions.resize(timeframeId + 1);
 	}
-	for (size_t stateIndex { 0u }; stateIndex < stateMachine.size(); stateIndex++)
+	for (size_t stateIndex { 0u }; stateIndex < states.size(); stateIndex++)
 	{
 		if (bmcSolver)
 		{
@@ -130,51 +130,49 @@ bool CellAwareFaultEncoder<PinData>::PostEncodeTimeframe(GeneratorContext<PinDat
 	}
 
 	std::vector<LogicContainer01> transitionsTaken { encoder.template NewLogicContainer<LogicContainer01>(Logic::LOGIC_ZERO) };
-	for (auto transitionType : std::vector<CellAwareTransition::TransitionType> {
+	for (auto transitionType : std::vector<CellAwareFaultStateMachine::TransitionType> {
 			// First encode primary, then secondary transitions which have a lower priority.
-			CellAwareTransition::TransitionType::Primary,
-			CellAwareTransition::TransitionType::Secondary
+			CellAwareFaultStateMachine::TransitionType::Primary,
+			CellAwareFaultStateMachine::TransitionType::Secondary
 		})
 	{
 		// This will result in LOGIC_ONE for primary transitions.
 		// For secondary transitions, this will only be LOGIC_ONE
 		// if no primary transitions were taken.
 		auto transitionAllowed = -encoder.EncodeOr(transitionsTaken);
-		for (size_t stateIndex { 0u }; stateIndex < stateMachine.size(); stateIndex++)
+		for (size_t stateIndex { 0u }; stateIndex < states.size(); stateIndex++)
 		{
-			for (auto const& transition : stateMachine[stateIndex].transitions)
+			for (auto const& transition : states[stateIndex].transitions)
 			{
 				if (transition.type != transitionType)
 				{
 					continue;
 				}
 
-				std::vector<LogicContainer01> conditions;
-				std::vector<LogicContainer01> effects;
-				for (auto const& condition : transition.conditions)
+				std::vector<LogicContainer01> inputs;
+				std::vector<LogicContainer01> outputs;
+				for (auto const& input : transition.inputs)
 				{
-					const auto& [node, port] = condition.nodeAndPort;
-					const auto& logicConstraint { condition.logicConstraints[0u] };
+					const auto& [node, port] = input.nodeAndPort;
 					const auto container { timeframe.template GetContainer<BadTag>(
 						context, node->GetNodeId(), port.portType, port.portNumber, AllowContainerInterceptor::Enable) };
-					conditions.push_back(encoder.EncodeLogicValueConstraintDetector(container, logicConstraint));
+					inputs.push_back(encoder.EncodeLogicValueConstraintDetector(container, input.constraint));
 				}
-				for (auto const& effect : transition.effects)
+				for (auto const& output : transition.outputs)
 				{
-					const auto& [node, port] = effect.nodeAndPort;
-					const auto& logicConstraint { effect.logicConstraints[0u] };
+					const auto& [node, port] = output.nodeAndPort;
 					const auto container { timeframe.template GetContainer<BadTag>(
 						context, node->GetNodeId(), port.portType, port.portNumber, AllowContainerInterceptor::Enable) };
-					effects.push_back(encoder.EncodeLogicValueConstraintDetector(container, logicConstraint));
+					outputs.push_back(encoder.EncodeLogicValueConstraintDetector(container, output.constraint));
 				}
 
 				auto transitionTaken {
 					encoder.EncodeAnd(
 						encoder.EncodeAnd(transitionAllowed, _states[timeframeId][stateIndex]),
-						encoder.EncodeAnd(conditions))
+						encoder.EncodeAnd(inputs))
 				};
-				encoder.EncodeImplication(transitionTaken, encoder.EncodeAnd(effects));
-				for (size_t index { 0u }; index < stateMachine.size(); index++)
+				encoder.EncodeImplication(transitionTaken, encoder.EncodeAnd(outputs));
+				for (size_t index { 0u }; index < states.size(); index++)
 				{
 					encoder.EncodeImplication(transitionTaken, encoder.EncodeLogicValueDetector(_nextStates[timeframeId][index],
 						(index == transition.toState) ? Logic::LOGIC_ONE : Logic::LOGIC_ZERO));
@@ -185,40 +183,40 @@ bool CellAwareFaultEncoder<PinData>::PostEncodeTimeframe(GeneratorContext<PinDat
 		}
 	}
 
-	std::vector<LogicContainer01> noAlternativeEffects;
-	for (const auto& [node, port] : fault->GetEffectNodesAndPorts())
+	std::vector<LogicContainer01> noTransitionOutputs;
+	for (const auto& [node, port] : stateMachine.GetOutputs())
 	{
 		LogicConstraint constraint = LogicConstraint::NO_CONSTRAINT;
-		switch (_noAlternativeEffect)
+		switch (_noTransitionOutput)
 		{
-			case CellAwareNoAlternativeEffect::FaultFree:
+			case CellAwareNoTransitionOutput::FaultFree:
 			{
 				const auto badContainer { timeframe.template GetContainer<BadTag>(
 					context, node->GetNodeId(), port.portType, port.portNumber, AllowContainerInterceptor::Enable) };
 				const auto originalContainer { timeframe.template GetContainer<BadTag>(
 					context, node->GetNodeId(), port.portType, port.portNumber, AllowContainerInterceptor::Disable) };
-				noAlternativeEffects.push_back(encoder.EncodeLogicEquivalenceDetector(badContainer, originalContainer));
+				noTransitionOutputs.push_back(encoder.EncodeLogicEquivalenceDetector(badContainer, originalContainer));
 				continue;
 			}
 
-			case CellAwareNoAlternativeEffect::FixedOne: constraint = LogicConstraint::ONLY_LOGIC_ONE; break;
-			case CellAwareNoAlternativeEffect::FixedZero: constraint = LogicConstraint::ONLY_LOGIC_ZERO; break;
-			case CellAwareNoAlternativeEffect::FixedDontCare: constraint = LogicConstraint::ONLY_LOGIC_DONT_CARE; break;
-			case CellAwareNoAlternativeEffect::FixedUnknown: constraint = LogicConstraint::ONLY_LOGIC_UNKNOWN; break;
-			case CellAwareNoAlternativeEffect::Unconstrained: constraint = LogicConstraint::NO_CONSTRAINT; break;
+			case CellAwareNoTransitionOutput::FixedOne: constraint = LogicConstraint::ONLY_LOGIC_ONE; break;
+			case CellAwareNoTransitionOutput::FixedZero: constraint = LogicConstraint::ONLY_LOGIC_ZERO; break;
+			case CellAwareNoTransitionOutput::FixedDontCare: constraint = LogicConstraint::ONLY_LOGIC_DONT_CARE; break;
+			case CellAwareNoTransitionOutput::FixedUnknown: constraint = LogicConstraint::ONLY_LOGIC_UNKNOWN; break;
+			case CellAwareNoTransitionOutput::Unconstrained: constraint = LogicConstraint::NO_CONSTRAINT; break;
 
-			default: Logging::Panic("Unknown effect when no alternative is active");
+			default: Logging::Panic("Unknown output when no transition is taken");
 		}
 
 		// The logic value can be constrained by using a constraint detector.
 		const auto container { timeframe.template GetContainer<BadTag>(
 			context, node->GetNodeId(), port.portType, port.portNumber, AllowContainerInterceptor::Enable) };
-		noAlternativeEffects.push_back(encoder.EncodeLogicValueConstraintDetector(container, constraint));
+		noTransitionOutputs.push_back(encoder.EncodeLogicValueConstraintDetector(container, constraint));
 	}
 
 	auto noTransition { -encoder.EncodeOr(transitionsTaken) };
-	encoder.EncodeImplication(noTransition, encoder.EncodeAnd(noAlternativeEffects));
-	for (size_t nextIndex { 0u }; nextIndex < stateMachine.size(); nextIndex++)
+	encoder.EncodeImplication(noTransition, encoder.EncodeAnd(noTransitionOutputs));
+	for (size_t nextIndex { 0u }; nextIndex < states.size(); nextIndex++)
 	{
 		encoder.EncodeImplication(noTransition, encoder.EncodeLogicValueDetector(_nextStates[timeframeId][nextIndex],
 			(nextIndex == 0) ? Logic::LOGIC_ONE : Logic::LOGIC_ZERO));

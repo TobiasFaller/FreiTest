@@ -40,7 +40,7 @@
 #include "Tpg/LogicGenerator/Constraint/SequentialConstraintEncoder.hpp"
 #include "Tpg/LogicGenerator/Constraint/PatternExclusionConstraintEncoder.hpp"
 #include "Tpg/LogicGenerator/CircuitLogic/DefaultLogicEncoder.hpp"
-#include "Tpg/LogicGenerator/DChain/BackwardDChainConnectionEncoder.hpp"
+#include "Tpg/LogicGenerator/DChain/DChainSequentialConnectionEncoder.hpp"
 #include "Tpg/LogicGenerator/DChain/BackwardDChainEncoder.hpp"
 #include "Tpg/LogicGenerator/DChain/DChainBaseEncoder.hpp"
 #include "Tpg/LogicGenerator/FaultLogic/FaultPropagationConstraintEncoder.hpp"
@@ -154,8 +154,8 @@ void SatSequentialAtpg<FaultModel, FaultList>::Run(void)
 	});
 	Logging::ClearCurrentFault();
 
-	this->statistics.Add("Encoding.PatternGeneration.LogicContainer", std::string("LogicContainer") + get_logic_container_name<LogicContainer>, "Type", "LogicContainer used");
-	this->statistics.Add("Encoding.PatternGeneration.PinData", std::string("PinData") + get_pin_data_name_v<PinData>, "Type", "PinData used");
+	this->statistics.Add("Atpg.Encoding.PatternGeneration.LogicContainer", std::string("LogicContainer") + get_logic_container_name<LogicContainer>, "Type", "LogicContainer used");
+	this->statistics.Add("Atpg.Encoding.PatternGeneration.PinData", std::string("PinData") + get_pin_data_name_v<PinData>, "Type", "PinData used");
 	AtpgBase<FaultModel, FaultList>::ExportStatistics();
 	AtpgBase<FaultModel, FaultList>::ExportTestPatterns(Pattern::InputCapture::PrimaryAndInitialSecondaryInputs);
 	AtpgBase<FaultModel, FaultList>::ExportFaultList();
@@ -224,13 +224,19 @@ void SatSequentialAtpg<FaultModel, FaultList>::GeneratePatternForFault(size_t fa
 	logicGenerator->template EmplaceModule<Tpg::OutputLogicEncoder<PinData, BadTag>>();
 	if constexpr (has_diff_encoding_v<PinData>) logicGenerator->template EmplaceModule<Tpg::DChainBaseEncoder<PinData>>();
 	if constexpr (has_diff_encoding_v<PinData>) logicGenerator->template EmplaceModule<Tpg::BackwardDChainEncoder<PinData>>();
-	if constexpr (has_diff_encoding_v<PinData>) logicGenerator->template EmplaceModule<Tpg::BackwardDChainConnectionEncoder<PinData>>();
+	if constexpr (has_diff_encoding_v<PinData>) logicGenerator->template EmplaceModule<Tpg::DChainSequentialConnectionEncoder<PinData>>();
 
-	// Pattern generation constraints consist of the initial state (could be replaced with end state of synchronization sequence at some point)
-	// and the fault propagation and fault sensitization.
+	// Pattern generation constraints consist of the initial state and the fault propagation and fault sensitization.
 	logicGenerator->template EmplaceModule<Tpg::PortConstraintEncoder<PinData, LDiffTag>>(Tpg::MakeConstantPortConstraint(Logic::LOGIC_ZERO), Tpg::ConstrainedPorts::Inputs);
-	logicGenerator->template EmplaceModule<Tpg::SequentialConstraintEncoder<PinData, GoodTag>>(Tpg::MakeConstantSequentialInitializer(Logic::LOGIC_ZERO), Tpg::ConstrainedSequentials::Inputs);
-	logicGenerator->template EmplaceModule<Tpg::SequentialConstraintEncoder<PinData, BadTag>>(Tpg::MakeConstantSequentialInitializer(Logic::LOGIC_ZERO), Tpg::ConstrainedSequentials::Inputs);
+	if (this->settingsStartingState == SequentialAtpgBase<FaultModel, FaultList>::StartingState::Unconstrained)
+	{
+		logicGenerator->template EmplaceModule<Tpg::SequentialConstraintEncoder<PinData, LDiffTag>>(Tpg::MakeConstantSequentialInitializer(Logic::LOGIC_ZERO), Tpg::ConstrainedSequentials::Inputs);
+	}
+	else
+	{
+		logicGenerator->template EmplaceModule<Tpg::SequentialConstraintEncoder<PinData, GoodTag>>(Tpg::MakeConstantSequentialInitializer(this->startingState), Tpg::ConstrainedSequentials::Inputs);
+		logicGenerator->template EmplaceModule<Tpg::SequentialConstraintEncoder<PinData, BadTag>>(Tpg::MakeConstantSequentialInitializer(this->startingState), Tpg::ConstrainedSequentials::Inputs);
+	}
 	logicGenerator->template EmplaceModule<FaultSensitization>(faultModel, FaultSensitizationTimeframe::Any);
 	logicGenerator->template EmplaceModule<Tpg::FaultPropagationConstraintEncoder<PinData>>(Tpg::FaultPropagationTarget::PrimaryOutputsOnly, Tpg::FaultPropagationTimeframe::Last);
 
@@ -291,6 +297,7 @@ void SatSequentialAtpg<FaultModel, FaultList>::GeneratePatternForFault(size_t fa
 			if (timeframes == this->settingsMaximumTimeframes)
 			{
 				cnfGenerationTimer.Stop();
+				// Can happen if the fault sensitization module concludes that there is no faul propagation possible
 				LOG(INFO) << "Fault is untestable with " << timeframes << " timeframes and no test pattern has been generated";
 
 				std::scoped_lock lock { this->parallelMutex };
@@ -356,6 +363,7 @@ void SatSequentialAtpg<FaultModel, FaultList>::GeneratePatternForFault(size_t fa
 				printer.AddDivider(Helper::ValuePrinter::DivideType::BoldSolid);
 				this->vcmPrinterImporter->ApplyPrinters(printer, vcmContext.GetTags(), vcmContext.GetTarget());
 			}
+			printer.SetTimeframes(timeframes);
 			LOG(INFO) << std::endl << printer.ToPrintable(watchedValues);
 
 			size_t testPatternIndex = this->testPatterns.emplace_back(pattern);
@@ -364,12 +372,14 @@ void SatSequentialAtpg<FaultModel, FaultList>::GeneratePatternForFault(size_t fa
 				FileHandle watchersHandle(boost::str(boost::format("%s/pattern-%d.json") % this->watcherExportPath % testPatternIndex), false);
 				Io::ExportWatchers(watchersHandle.GetOutStream(), watchedValues);
 			}
-			AtpgBase<FaultModel, FaultList>::RunFaultSimulation(vcmContext, faultIndex, testPatternIndex, Pattern::OutputCapture::PrimaryOutputsOnly, simConfig);
-
-			if (metadata->faultStatus != Fault::FaultStatus::FAULT_STATUS_DETECTED)
+			if (!this->printerExportPath.empty())
 			{
-				LOG(FATAL) << "Invalid test pattern was generated";
+				FileHandle printersHandle(boost::str(boost::format("%s/pattern-%d.txt") % this->printerExportPath % testPatternIndex), false);
+				printersHandle.GetOutStream() << printer.ToPrintable(watchedValues);
 			}
+
+			AtpgBase<FaultModel, FaultList>::RunFaultSimulation(vcmContext, faultIndex, testPatternIndex, Pattern::OutputCapture::PrimaryOutputsOnly, simConfig);
+			ASSERT (metadata->faultStatus == Fault::FaultStatus::FAULT_STATUS_DETECTED);
 			goto nextFault;
 		}
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 
 #include "Basic/Logic.hpp"
@@ -11,7 +12,7 @@ namespace FreiTest
 namespace Fault
 {
 
-enum class TransitionDelayFaultType
+enum class TransitionDelayFaultType: uint8_t
 {
 	SLOW_TO_RISE,
 	SLOW_TO_FALL,

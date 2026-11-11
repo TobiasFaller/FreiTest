@@ -1,0 +1,6 @@
+[
+	{"include": "./multi-point-stress-stimuli-ibex.jsonc"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/VcmConfiguration", "value": "decoder"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/NetSampleSource", "value": "File"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/NetSamplesPath", "value": "./settings/workflows/polito/nets/ibex-rv32imc-zicsr-decoder-stress-pairs.nets.txt"},
+]

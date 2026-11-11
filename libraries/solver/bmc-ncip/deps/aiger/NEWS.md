@@ -1,23 +1,5 @@
-## Version 1.9.24
-
-  - Support empty comments.
-
-## Version 1.9.23
-
-  - Reset functions.
-
-## Version 1.9.22
-
-  - Added option fuzzing and delta debugging.
-
-## Version 1.9.21
-
-  - Aigsim bugfix.
-
 ## Version 1.9.20
 
-  - Added 'aignunor' utility to split ORs.
-  - Added 'aignmiter -n' for keeping XORs as outputs.
   - Added 'aiguncomment' utility to just strip comments.
   - Added 'aiger_strip_comments', 'aiger_strip_symbols'.
   - Allowed 'aigstrip' utility to work on multiple files.

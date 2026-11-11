@@ -279,13 +279,12 @@ cc_library(
         "-Wno-parentheses",
         "-Wno-sign-compare",
         "-Wno-misleading-indentation",
+        "-Wno-class-memaccess",
 
         "-DNBUILD",
+        "-DNCLOSEFROM",
 
         "-iquote", "libraries/solver/sat-cadical/src/"
-    ],
-    cxxopts = [
-        "-Wno-class-memaccess",
     ]
 )
 

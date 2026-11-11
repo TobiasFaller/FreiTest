@@ -14,15 +14,6 @@ namespace Io
 class ValueWatcherImporter
 {
 public:
-	ValueWatcherImporter(void);
-	virtual ~ValueWatcherImporter(void);
-
-	bool LoadWatchers(std::istream& stream, std::string watcherPrefix = "", std::string signalPrefix = "");
-	void ClearWatchers(void);
-
-	std::vector<std::shared_ptr<Helper::ValueWatcher::Watcher>> ApplyWatchers(Helper::ValueWatcher& watcher, const Circuit::CircuitEnvironment& circuit, const std::vector<std::string>& tags, const std::string& target) const;
-
-private:
 	enum class Endianess { Little, Big };
 
 	struct WatcherEntry
@@ -38,6 +29,17 @@ private:
 		std::vector<std::string> targets;
 	};
 
+	ValueWatcherImporter(void);
+	virtual ~ValueWatcherImporter(void);
+
+	bool LoadWatchers(std::istream& stream, std::string watcherPrefix = "", std::string signalPrefix = "");
+	void AddWatcher(WatcherEntry watcher, std::string watcherPrefix = "", std::string signalPrefix = "");
+	void ClearWatchers(void);
+	const std::vector<WatcherEntry>& GetWatchers(void) const;
+
+	std::vector<std::shared_ptr<Helper::ValueWatcher::Watcher>> ApplyWatchers(Helper::ValueWatcher& watcher, const Circuit::CircuitEnvironment& circuit, const std::vector<std::string>& tags, const std::string& target) const;
+
+private:
 	std::vector<WatcherEntry> watcherEntries;
 
 };

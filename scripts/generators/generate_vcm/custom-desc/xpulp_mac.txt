@@ -1,0 +1,22 @@
+b0100001 rs2[4:0] rs1[4:0] b000 rd[4:0] b0110011 P.MAC            % p.mac rd, rs1, rs2
+b10 b00000 rs2[4:0] rs1[4:0] b000 rd[4:0] b1011011 P.MULS         % p.muls rd, rs1, rs2
+b0100001 rs2[4:0] rs1[4:0] b001 rd[4:0] b0110011 P.MSU            % p.msu rd, rs1, rs2
+b11 b00000 rs2[4:0] rs1[4:0] b000 rd[4:0] b1011011 P.MULHHS       % p.mulhhs rd, rs1, rs2
+b10 imm[4:0] rs2[4:0] rs1[4:0] b000 rd[4:0] b1011011 P.MULSN      % p.mulsN rd, rs1, rs2 imm
+b11 imm[4:0] rs2[4:0] rs1[4:0] b000 rd[4:0] b1011011 P.MULHHSN    % p.mulhhsN rd, rs1, rs2 imm
+b10 imm[4:0] rs2[4:0] rs1[4:0] b100 rd[4:0] b1011011 P.MULSRN     % p.mulsRN rd, rs1, rs2, imm
+b11 imm[4:0] rs2[4:0] rs1[4:0] b100 rd[4:0] b1011011 P.MULHHSRN   % p.mulhhsRN rd, rs1, rs2, imm
+b0000000      rs2[4:0] rs1[4:0] b000 rd[4:0] b1011011 P.MULU      % p.mulu rd, rs1, rs2
+b0100000      rs2[4:0] rs1[4:0] b000 rd[4:0] b1011011 P.MULHHU    % p.mulhhu rd, rs1, rs2
+b00 imm[4:0] rs2[4:0] rs1[4:0] b000 rd[4:0] b1011011 P.MULUN      % p.muluN rd, rs1, rs2, imm
+b01 imm[4:0] rs2[4:0] rs1[4:0] b000 rd[4:0] b1011011 P.MULHHUN    % p.mulhhuN rd, rs1, rs2, imm
+b00 imm[4:0] rs2[4:0] rs1[4:0] b100 rd[4:0] b1011011 P.MULURN     % p.muluRN rd, rs1, rs2, imm
+b01 imm[4:0] rs2[4:0] rs1[4:0] b100 rd[4:0] b1011011 P.MULHHURN   % p.mulhhuRN rd, rs1, rs2, imm
+b10 imm[4:0] rs2[4:0] rs1[4:0] b001 rd[4:0] b1011011 P.MACSN      % p.macsN rd, rs1, rs2, imm
+b11 imm[4:0] rs2[4:0] rs1[4:0] b001 rd[4:0] b1011011 P.MACHHSN    % p.machhsN rd, rs1, rs2, imm
+b10 imm[4:0] rs2[4:0] rs1[4:0] b101 rd[4:0] b1011011 P.MACSRN     % p.macsRN rd, rs1, rs2, imm
+b11 imm[4:0] rs2[4:0] rs1[4:0] b101 rd[4:0] b1011011 P.MACHHSRN   % p.machhsRN rd, rs1, rs2, imm
+b00 imm[4:0] rs2[4:0] rs1[4:0] b001 rd[4:0] b1011011 P.MACUN      % p.macuN rd, rs1, rs2 imm
+b01 imm[4:0] rs2[4:0] rs1[4:0] b001 rd[4:0] b1011011 P.MACHHUN    % p.machhuN rd, rs1, rs2 imm
+b00 imm[4:0] rs2[4:0] rs1[4:0] b101 rd[4:0] b1011011 P.MACURN     % p.macuRN rd, rs1, rs2, imm
+b01 imm[4:0] rs2[4:0] rs1[4:0] b101 rd[4:0] b1011011 P.MACHHURN   % p.machhuRN rd, rs1, rs2, imm

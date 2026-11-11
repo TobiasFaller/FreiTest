@@ -1,0 +1,17 @@
+imm[11:0] rs1[4:0] b000 rd[4:0] b0001011 P.LB_I_Inc          % p.lb rd, imm(rs1!)
+imm[11:0] rs1[4:0] b100 rd[4:0] b0001011 P.LBU_I_Inc         % p.lbu rd, imm(rs1!)
+imm[11:0] rs1[4:0] b001 rd[4:0] b0001011 P.LH_I_Inc          % p.lh rd, imm(rs1!)
+imm[11:0] rs1[4:0] b101 rd[4:0] b0001011 P.LHU_I_Inc         % p.lhu rd, imm(rs1!)
+imm[11:0] rs1[4:0] b010 rd[4:0] b0001011 P.LW_I_Inc          % p.lw rd, imm(rs1!)
+
+b0000000 rs2[4:0] rs1[4:0] b111 rd[4:0] b0001011 P.LB_R_Inc  % p.lb rd, rs2(rs1!)
+b0100000 rs2[4:0] rs1[4:0] b111 rd[4:0] b0001011 P.LBU_R_Inc % p.lbu rd, rs2(rs1!)
+b0001000 rs2[4:0] rs1[4:0] b111 rd[4:0] b0001011 P.LH_R_Inc  % p.lh rd, rs2(rs1!)
+b0101000 rs2[4:0] rs1[4:0] b111 rd[4:0] b0001011 P.LHU_R_Inc % p.lhu rd, rs2(rs1!)
+b0010000 rs2[4:0] rs1[4:0] b111 rd[4:0] b0001011 P.LW_R_Inc  % p.lw rd, rs2(rs1!)
+
+b0000000 rs2[4:0] rs1[4:0] b111 rd[4:0] b0000011 P.LB_R      % p.lb rd, rs2(rs1)
+b0100000 rs2[4:0] rs1[4:0] b111 rd[4:0] b0000011 P.LBU_R     % p.lbu rd, rs2(rs1)
+b0001000 rs2[4:0] rs1[4:0] b111 rd[4:0] b0000011 P.LH_R      % p.lh rd, rs2(rs1)
+b0101000 rs2[4:0] rs1[4:0] b111 rd[4:0] b0000011 P.LHU_R     % p.lhu rd, rs2(rs1)
+b0010000 rs2[4:0] rs1[4:0] b111 rd[4:0] b0000011 P.LW_R      % p.lw rd, rs2(rs1)

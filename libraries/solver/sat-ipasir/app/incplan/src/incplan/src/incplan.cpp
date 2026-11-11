@@ -259,7 +259,7 @@ class Solver : public TimePointBasedSolver {
 		}
 
 		void printSolution() {
-			if (this->BmcResult == ipasir::BmcResult::SAT) {
+			if (this->solveResult == ipasir::SolveResult::SAT) {
 				std::cout << "solution " << this->problem->numberLiteralsPerTime << " " << this->finalMakeSpan + 1 << std::endl;
 				TimePoint t = timePointManager->getFirst();
 				int time = 0;
@@ -303,7 +303,7 @@ class Solver : public TimePointBasedSolver {
 
 		int finalMakeSpan;
 		int makeSpan;
-		ipasir::BmcResult BmcResult;
+		ipasir::SolveResult solveResult;
 		std::unique_ptr<TimePointManager> timePointManager;
 
 		TimePoint initialize() {
@@ -373,8 +373,8 @@ class Solver : public TimePointBasedSolver {
 			int step = 0;
 			TimePoint elementInsertedLast = initialize();
 
-			ipasir::BmcResult result = ipasir::BmcResult::UNSAT;
-			for (;result != ipasir::BmcResult::SAT;step++) {
+			ipasir::SolveResult result = ipasir::SolveResult::UNSAT;
+			for (;result != ipasir::SolveResult::SAT;step++) {
 				if(options.nonIncrementalSolving) {
 					elementInsertedLast = initialize();
 				}
@@ -423,8 +423,8 @@ class Solver : public TimePointBasedSolver {
 
 			carj::getCarj().data["/incplan/result/solves"_json_pointer] =
 				solves;
-			this->BmcResult = result;
-			return result == ipasir::BmcResult::SAT;
+			this->solveResult = result;
+			return result == ipasir::SolveResult::SAT;
 		}
 
 		void addInitialClauses(TimePoint t) {

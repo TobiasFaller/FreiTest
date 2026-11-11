@@ -32,8 +32,11 @@
 #include "Applications/Scale4Edge/FaultCompaction/GreedyStaticFaultCompaction.hpp"
 #include "Applications/Scale4Edge/FaultCompaction/SatStaticFaultCompaction.hpp"
 #include "Applications/Scale4Edge/FaultCoverageExport/FaultCoverageExport.hpp"
+#include "Applications/Scale4Edge/FaultListExport/FaultListExport.hpp"
 #include "Applications/PoliTO/MacishMultiplierFaultStatistics.hpp"
 #include "Applications/PoliTO/MacishSafeFaultAnalysis.hpp"
+#include "Applications/PoliTO/RepeatableConstantSwitchingStimuliGeneration.hpp"
+#include "Applications/PoliTO/MultiPointStressStimuliGeneration.hpp"
 #include "Basic/Fault/Lists/SingleStuckAtFaultList.hpp"
 #include "Basic/Fault/Models/SingleStuckAtFaultModel.hpp"
 #include "Basic/Fault/Lists/SingleTransitionDelayFaultList.hpp"
@@ -120,7 +123,7 @@ unique_ptr<BaseApplication> BaseApplication::Create(std::string application)
 		return std::make_unique<FreiTest::Application::Fuzzing::StimSimFuzzing>();
 	if (application == "FUZZING_SIMULATION_STUCK_AT")
 		return std::make_unique<FreiTest::Application::Fuzzing::FaultSimulationFuzzing<Fault::SingleStuckAtFaultModel, Fault::SingleStuckAtFaultList>>();
-	if (application == "FUZZING_SIMULATION_TRANSITION_FAULT")
+	if (application == "FUZZING_SIMULATION_TRANSITION_DELAY")
 		return std::make_unique<FreiTest::Application::Fuzzing::FaultSimulationFuzzing<Fault::SingleTransitionDelayFaultModel, Fault::SingleTransitionDelayFaultList>>();
 	if (application == "FUZZING_SIMULATION_CELL_AWARE")
 		return std::make_unique<FreiTest::Application::Fuzzing::FaultSimulationFuzzing<Fault::CellAwareFaultModel, Fault::CellAwareFaultList>>();
@@ -149,31 +152,35 @@ unique_ptr<BaseApplication> BaseApplication::Create(std::string application)
 		return std::make_unique<FreiTest::Application::Scale4Edge::SatStaticFaultCompaction<Fault::SingleStuckAtFaultModel, Fault::SingleStuckAtFaultList>>();
 	if (application == "SCALE4EDGE_FAULT_COVERAGE_EXPORT_STUCK_AT")
 		return std::make_unique<FreiTest::Application::Scale4Edge::FaultCoverageExport<Fault::SingleStuckAtFaultModel, Fault::SingleStuckAtFaultList>>();
+	if (application == "SCALE4EDGE_FAULT_LIST_EXPORT_STUCK_AT")
+		return std::make_unique<FreiTest::Application::Scale4Edge::FaultListExport<Fault::SingleStuckAtFaultModel, Fault::SingleStuckAtFaultList>>();
 
-	if (application == "SCALE4EDGE_SAT_FULLSCAN_TRANSITION_ATPG")
+	if (application == "SCALE4EDGE_SAT_FULLSCAN_TRANSITION_DELAY_ATPG")
 		return std::make_unique<FreiTest::Application::Scale4Edge::SatFullScanAtpg<Fault::SingleTransitionDelayFaultModel, Fault::SingleTransitionDelayFaultList>>();
-	if (application == "SCALE4EDGE_SAT_SEQUENTIAL_TRANSITION_ATPG")
+	if (application == "SCALE4EDGE_SAT_SEQUENTIAL_TRANSITION_DELAY_ATPG")
 		return std::make_unique<FreiTest::Application::Scale4Edge::SatSequentialAtpg<Fault::SingleTransitionDelayFaultModel, Fault::SingleTransitionDelayFaultList>>();
-	if (application == "SCALE4EDGE_BMC_SEQUENTIAL_TRANSITION_ATPG")
+	if (application == "SCALE4EDGE_BMC_SEQUENTIAL_TRANSITION_DELAY_ATPG")
 		return std::make_unique<FreiTest::Application::Scale4Edge::BmcSequentialAtpg<Fault::SingleTransitionDelayFaultModel, Fault::SingleTransitionDelayFaultList>>();
-	if (application == "SCALE4EDGE_RANDOM_TRANSITION_ATPG")
+	if (application == "SCALE4EDGE_RANDOM_TRANSITION_DELAY_ATPG")
 		return std::make_unique<FreiTest::Application::Scale4Edge::RandomAtpg<Fault::SingleTransitionDelayFaultModel, Fault::SingleTransitionDelayFaultList>>();
-	if (application == "SCALE4EDGE_LFSR_TRANSITION_ATPG")
+	if (application == "SCALE4EDGE_LFSR_TRANSITION_DELAY_ATPG")
 		return std::make_unique<FreiTest::Application::Scale4Edge::LfsrAtpg<Fault::SingleTransitionDelayFaultModel, Fault::SingleTransitionDelayFaultList>>();
-	if (application == "SCALE4EDGE_PATTERNS_TO_VCD_TRANSITION")
+	if (application == "SCALE4EDGE_PATTERNS_TO_VCD_TRANSITION_DELAY")
 		return std::make_unique<FreiTest::Application::Scale4Edge::TestPatternsToVcd<Fault::SingleTransitionDelayFaultModel, Fault::SingleTransitionDelayFaultList>>();
-	if (application == "SCALE4EDGE_PATTERNS_TO_STATISTICS_TRANSITION")
+	if (application == "SCALE4EDGE_PATTERNS_TO_STATISTICS_TRANSITION_DELAY")
 		return std::make_unique<FreiTest::Application::Scale4Edge::TestPatternsToStatistics<Fault::SingleTransitionDelayFaultModel, Fault::SingleTransitionDelayFaultList>>();
-	if (application == "SCALE4EDGE_SAT_FULLSCAN_TRANSITION_FUZZ")
+	if (application == "SCALE4EDGE_SAT_FULLSCAN_TRANSITION_DELAY_FUZZ")
 		return std::make_unique<FreiTest::Application::Scale4Edge::SatFullScanFuzzing<Fault::SingleTransitionDelayFaultModel, Fault::SingleTransitionDelayFaultList>>();
-	if (application == "SCALE4EDGE_BMC_SEQUENTIAL_TRANSITION_FUZZ")
+	if (application == "SCALE4EDGE_BMC_SEQUENTIAL_TRANSITION_DELAY_FUZZ")
 		return std::make_unique<FreiTest::Application::Scale4Edge::BmcSequentialFuzzing<Fault::SingleTransitionDelayFaultModel, Fault::SingleTransitionDelayFaultList>>();
-	if (application == "SCALE4EDGE_GREEDY_STATIC_FAULT_COMPACTION_TRANSITION")
+	if (application == "SCALE4EDGE_GREEDY_STATIC_FAULT_COMPACTION_TRANSITION_DELAY")
 		return std::make_unique<FreiTest::Application::Scale4Edge::GreedyStaticFaultCompaction<Fault::SingleTransitionDelayFaultModel, Fault::SingleTransitionDelayFaultList>>();
-	if (application == "SCALE4EDGE_SAT_STATIC_FAULT_COMPACTION_TRANSITION")
+	if (application == "SCALE4EDGE_SAT_STATIC_FAULT_COMPACTION_TRANSITION_DELAY")
 		return std::make_unique<FreiTest::Application::Scale4Edge::SatStaticFaultCompaction<Fault::SingleTransitionDelayFaultModel, Fault::SingleTransitionDelayFaultList>>();
-	if (application == "SCALE4EDGE_FAULT_COVERAGE_EXPORT_TRANSITION")
+	if (application == "SCALE4EDGE_FAULT_COVERAGE_EXPORT_TRANSITION_DELAY")
 		return std::make_unique<FreiTest::Application::Scale4Edge::FaultCoverageExport<Fault::SingleTransitionDelayFaultModel, Fault::SingleTransitionDelayFaultList>>();
+	if (application == "SCALE4EDGE_FAULT_LIST_EXPORT_TRANSITION_DELAY")
+		return std::make_unique<FreiTest::Application::Scale4Edge::FaultListExport<Fault::SingleTransitionDelayFaultModel, Fault::SingleTransitionDelayFaultList>>();
 
 	if (application == "SCALE4EDGE_SAT_FULLSCAN_CELL_AWARE_ATPG")
 		return std::make_unique<FreiTest::Application::Scale4Edge::SatFullScanAtpg<Fault::CellAwareFaultModel, Fault::CellAwareFaultList>>();
@@ -199,6 +206,8 @@ unique_ptr<BaseApplication> BaseApplication::Create(std::string application)
 		return std::make_unique<FreiTest::Application::Scale4Edge::SatStaticFaultCompaction<Fault::CellAwareFaultModel, Fault::CellAwareFaultList>>();
 	if (application == "SCALE4EDGE_FAULT_COVERAGE_EXPORT_CELL_AWARE")
 		return std::make_unique<FreiTest::Application::Scale4Edge::FaultCoverageExport<Fault::CellAwareFaultModel, Fault::CellAwareFaultList>>();
+	if (application == "SCALE4EDGE_FAULT_LIST_EXPORT_CELL_AWARE")
+		return std::make_unique<FreiTest::Application::Scale4Edge::FaultListExport<Fault::CellAwareFaultModel, Fault::CellAwareFaultList>>();
 
 	if (application == "POLITO_MACISH_MULTIPLIER_FAULT_STATISTICS")
 		return std::make_unique<FreiTest::Application::PoliTO::MacishMultiplierFaultStatistics>();
@@ -208,6 +217,11 @@ unique_ptr<BaseApplication> BaseApplication::Create(std::string application)
 		return std::make_unique<FreiTest::Application::PoliTO::MacishSafeFaultAnalysis<Fault::SingleTransitionDelayFaultModel, Fault::SingleTransitionDelayFaultList>>();
 	if (application == "POLITO_MACISH_SAFE_FAULT_ANALYSIS_CELL_AWARE")
 		return std::make_unique<FreiTest::Application::PoliTO::MacishSafeFaultAnalysis<Fault::CellAwareFaultModel, Fault::CellAwareFaultList>>();
+
+	if (application == "POLITO_CPU_REPEATABLE_CONSTANT_SWITCHING_MAXIMIZATION")
+		return std::make_unique<FreiTest::Application::PoliTO::RepeatableConstantSwitchingStimuliGeneration>();
+	if (application == "POLITO_MULTI_POINT_STIMULI_GENERATION")
+		return std::make_unique<FreiTest::Application::PoliTO::MultiPointStressStimuliGeneration>();
 
 
 	LOG(FATAL) << "The application " << application << " was not found!";

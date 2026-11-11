@@ -17,6 +17,7 @@ namespace Circuit
 class CircuitEnvironment;
 class MappedCircuit;
 class UnmappedCircuit;
+class CircuitMetaData;
 
 };
 
@@ -45,6 +46,7 @@ public:
 	const std::shared_ptr<Circuit::CircuitEnvironment> GetCircuitEnvironment(void) const;
 	const Circuit::MappedCircuit& GetMappedCircuit(void) const;
 	const Circuit::UnmappedCircuit& GetUnmappedCircuit(void) const;
+	const Circuit::CircuitMetaData& GetCircuitMetaData(void) const;
 
 	std::shared_ptr<SolverProxy::ISolverProxy> GetSolver(void);
 	const std::shared_ptr<SolverProxy::ISolverProxy> GetSolver(void) const;

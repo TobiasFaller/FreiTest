@@ -6,11 +6,6 @@ build --copt -fdiagnostics-color=always
 build --copt -Wfatal-errors
 build --cxxopt -std=c++17
 build --conlyopt -std=c17
-build --linkopt -rdynamic
-
-# Debug information
-build --copt -ggdb3
-build --linkopt -ggdb3
 build --copt -fno-omit-frame-pointer
 build --linkopt -fno-omit-frame-pointer
 
@@ -18,6 +13,8 @@ build:debug --compilation_mode=dbg
 build:debug --copt -O1
 build:debug --copt -DDEBUG
 build:debug --linkopt -O1
+build:debug --copt -ggdb3
+build:debug --linkopt -ggdb3
 
 build:release --compilation_mode=opt
 build:release --copt -O3
@@ -31,6 +28,7 @@ build:release --linkopt -flto=jobserver
 build:release --linkopt -fno-fat-lto-objects
 build:release --linkopt -fuse-ld=gold
 build:release --linkopt -fuse-linker-plugin
+build:release --linkopt -rdynamic
 
 build:debug_keepall --copt -fno-eliminate-unused-debug-types
 build:debug_keepall --copt -fno-eliminate-unused-debug-symbols

@@ -6,13 +6,14 @@
 #include <vector>
 #include <memory>
 
+#include <boost/format.hpp>
+
 #include "Basic/Logging.hpp"
 #include "Basic/Logic.hpp"
 #include "Circuit/CircuitMetaData.hpp"
 
 using namespace FreiTest::Basic;
 using namespace FreiTest::Circuit;
-using namespace FreiTest::Io::Udfm;
 
 using NodeAndPort = FreiTest::Circuit::MappedCircuit::NodeAndPort;
 
@@ -21,225 +22,208 @@ namespace FreiTest
 namespace Fault
 {
 
-std::string to_string(const std::vector<CellAwarePort>& pinAttributes);
+static std::string to_string(const CellAwareFaultStateMachine::TransitionType& type);
+static std::string to_string(const std::vector<CellAwareFaultStateMachine::Port>& ports);
 
-CellAwareFault::CellAwareFault(
-		const std::shared_ptr<UdfmFault> userDefinedFault,
-		const Circuit::GroupMetaData* cell,
-		std::vector<CellAwareAlternative> alternatives
-):
-	_userDefinedFault(userDefinedFault),
-	_cell(cell),
-	_alternatives(alternatives),
-	_states(),
-	_conditionNodesAndPorts(),
-	_effectNodesAndPorts(),
-	_timeframeSpread(0u),
-	_minConditionNodeId(std::numeric_limits<size_t>::max()),
-	_maxConditionNodeId(0u),
-	_minEffectNodeId(std::numeric_limits<size_t>::max()),
-	_maxEffectNodeId(0u),
-	_sequential(false)
+CellAwareFaultStateMachine::CellAwareFaultStateMachine(std::vector<State> states):
+	states(states),
+	inputNodes(),
+	outputNodes(),
+	timeframes(0u),
+	minInputNode(std::numeric_limits<size_t>::max()),
+	maxInputNode(0u),
+	minOutputNode(std::numeric_limits<size_t>::max()),
+	maxOutputNode(0u)
 {
-	for (const auto& alternative : alternatives)
+	for (const auto& state : this->states)
 	{
-		for (const auto& condition : alternative.conditions)
+		for (const auto& transition : state.transitions)
 		{
-			_conditionNodesAndPorts.push_back(condition.nodeAndPort);
-			_timeframeSpread = std::max(_timeframeSpread, condition.logicConstraints.size());
-			_minConditionNodeId = std::min(_minConditionNodeId, condition.nodeAndPort.node->GetNodeId());
-			_maxConditionNodeId = std::max(_maxConditionNodeId, condition.nodeAndPort.node->GetNodeId());
+			for (const auto& input : transition.inputs)
+			{
+				inputNodes.push_back(input.nodeAndPort);
+				minInputNode = std::min(minInputNode, input.nodeAndPort.node->GetNodeId());
+				maxInputNode = std::max(maxInputNode, input.nodeAndPort.node->GetNodeId());
+			}
+			for (const auto& output : transition.outputs)
+			{
+				outputNodes.push_back(output.nodeAndPort);
+				minOutputNode = std::min(minOutputNode, output.nodeAndPort.node->GetNodeId());
+				maxOutputNode = std::max(maxOutputNode, output.nodeAndPort.node->GetNodeId());
+			}
 		}
-		for (const auto& effect : alternative.effects)
+
+		timeframes = std::max(timeframes, state.depth + 1u);
+	}
+
+	std::sort(inputNodes.begin(), inputNodes.end());
+	std::sort(outputNodes.begin(), outputNodes.end());
+	inputNodes.erase(std::unique(inputNodes.begin(), inputNodes.end()), inputNodes.end());
+	outputNodes.erase(std::unique(outputNodes.begin(), outputNodes.end()), outputNodes.end());
+}
+CellAwareFaultStateMachine::~CellAwareFaultStateMachine(void) = default;
+
+CellAwareFault::CellAwareFault(std::string name, Circuit::GroupMetaData const* cell, CellAwareFaultStateMachine stateMachine):
+	name(name),
+	cell(cell),
+	stateMachine(stateMachine),
+	sequential(false)
+{
+	// A cell-aware fault is sequential if there are sequential elements inside.
+	// These kind of cells require special treatment during fault simulation
+	// as the cell output node ids will be smaller the cell input node ids
+	// and no simple linear circuit simulation is possible.
+	//
+	// This is independent of the cell aware fault having multiple timeframes.
+	// Example: Combinational cells can have transition tests (two timeframe inputs).
+	for (const auto* gate : cell->GetSubGroups())
+	{
+		for (const auto* node : gate->GetMappedNodes())
 		{
-			_effectNodesAndPorts.push_back(effect.nodeAndPort);
-			_timeframeSpread = std::max(_timeframeSpread, effect.logicConstraints.size());
-			_minEffectNodeId = std::min(_minEffectNodeId, effect.nodeAndPort.node->GetNodeId());
-			_maxEffectNodeId = std::max(_maxEffectNodeId, effect.nodeAndPort.node->GetNodeId());
+			const auto type { node->GetCellType() };
+			sequential |= (type == CellType::S_IN || type == CellType::S_OUT
+			|| type == CellType::S_OUT_CLK || type == CellType::S_OUT_EN);
+		}
+	}
+}
+CellAwareFault::~CellAwareFault(void) = default;
+
+std::string CellAwareFault::GetCellName(void) const
+{
+	return this->cell->GetHierarchyName();
+}
+
+std::string CellAwareFault::GetCellType(void) const
+{
+	return this->cell->GetSourceInfo().GetProperty<std::string>("cell-type").value_or("UNKNOWN");
+}
+
+std::optional<CellAwareFault> CreateCellAwareFaultForCell(const CellAwareFaultSpecification& specification, const Circuit::GroupMetaData* cell)
+{
+	const auto sourceInfo = cell->GetSourceInfo();
+	ASSERT(sourceInfo.GetProperty<bool>("module-is-cell").value_or(false))
+		<< "The provided group has to be a cell.";
+
+	const auto name = sourceInfo.GetProperty<std::string>("module-name").value_or("");
+	const auto type = sourceInfo.GetProperty<std::string>("module-type").value_or("");
+	const auto portMap = CreateCellPortMapForCell(cell);
+
+	const auto ports_to_string = [&](auto& ports) -> std::string {
+		std::string result;
+		for (const auto& [portName, nodeAndPort] : ports)
+		{
+			if (!result.empty()) result += ", ";
+			result += portName + ": ";
+			result += nodeAndPort.node->GetName() + " (" + to_string(nodeAndPort.node->GetCellType()) + ") ";
+			result += (nodeAndPort.port.portType == Circuit::PortType::Input) ? "Input " : "Output ";
+			result += std::to_string(nodeAndPort.port.portNumber);
+		}
+		return result;
+	};
+	DVLOG(6) << "Cell " << name << " with type " << type << " (" << ports_to_string(portMap) << ")";
+
+	bool portsMapped = true;
+	for (const auto& state : specification.GetStates())
+	{
+		for (const auto& transition : state.transitions)
+		{
+			for (const auto& input : transition.inputs)
+			{
+				auto found { portMap.find(input.name) != portMap.end() };
+				if (!found)
+				{
+					LOG(WARNING) << "Was not able to find port \"" << input.name << "\" in cell \"" << name << "\"!";
+				}
+				portsMapped &= found;
+			}
+			for (const auto& output : transition.outputs)
+			{
+				auto found { portMap.find(output.name) != portMap.end() };
+				if (!found)
+				{
+					LOG(WARNING) << "Was not able to find port \"" << output.name << "\" in cell \"" << name << "\"!";
+				}
+				portsMapped &= found;
+			}
+		}
+	}
+	if (!portsMapped)
+	{
+		LOG(WARNING) << "Port mapping did not work for fault \"" << specification.GetName()
+			<< "\" for cell \"" << name << "\" of type \"" << type << "\"";
+		return { };
+	}
+
+	// Check if all node / ports are unique on the cell outputs.
+	// If not then constraints can not be applied correctly / checked.
+	std::unordered_map<size_t, std::string> driverMap;
+	for (auto const& [portName, nodeAndPort] : portMap)
+	{
+		auto const connectionId { nodeAndPort.node->GetPortConnectionId(nodeAndPort.port) };
+		if (auto const [it, inserted] = driverMap.emplace(connectionId, portName); !inserted)
+		{
+			LOG(WARNING) << "Port mapping did not work for fault \"" << specification.GetName()
+				<< "\" for cell \"" << name << "\" of type \"" << type << "\" as port \""
+				<< portName << "\" and port \"" << it->second << "\" share the same connection "
+				<< connectionId << "."
+				<< " Connections need to be unique to correctly identify ports.";
+			return { };
 		}
 	}
 
-	auto const is_sequential = [&](auto const& self, const Circuit::GroupMetaData* group) -> bool {
-		for (auto const* node : group->GetMappedNodes())
+	using State = CellAwareFaultStateMachine::State;
+	using Transition = CellAwareFaultStateMachine::Transition;
+	using TransitionType = CellAwareFaultStateMachine::TransitionType;
+	using Port = CellAwareFaultStateMachine::Port;
+
+	const auto map_ports = [&](const auto& ports) -> auto {
+		std::vector<Port> result;
+		for (auto& port : ports)
 		{
-			auto const type { node->GetCellType() };
-			if (type == CellType::S_IN || type == CellType::S_OUT
-				|| type == CellType::S_OUT_CLK || type == CellType::S_OUT_EN)
-			{
-				return true;
-			}
-		}
-
-		for (auto const* subgroup : group->GetSubGroups())
-		{
-			if (self(self, subgroup))
-			{
-				return true;
-			}
-		}
-
-		return false;
-	};
-	_sequential = is_sequential(is_sequential, cell);
-
-	std::sort(_conditionNodesAndPorts.begin(), _conditionNodesAndPorts.end());
-	std::sort(_effectNodesAndPorts.begin(), _effectNodesAndPorts.end());
-	_conditionNodesAndPorts.erase(std::unique(_conditionNodesAndPorts.begin(), _conditionNodesAndPorts.end()), _conditionNodesAndPorts.end());
-	_effectNodesAndPorts.erase(std::unique(_effectNodesAndPorts.begin(), _effectNodesAndPorts.end()), _effectNodesAndPorts.end());
-
-	// First state (epsilon).
-	auto const STATE_EPSILON { 0u };
-	_states.push_back(CellAwareState {
-		.depth = 0u,
-		.accepting = false,
-		.transitions = { },
-		.alternatives = { },
-	});
-
-	auto const NEW_TARGET { std::numeric_limits<size_t>::max() };
-	auto const get_or_create_transition = [&](auto transitionType, ssize_t alternative, size_t state, size_t targetState, auto conditions, auto effects) -> CellAwareTransition& {
-#ifndef NDEBUG
-		for (auto& condition : conditions) {
-			assert(condition.logicConstraints[0] == LogicConstraint::NO_CONSTRAINT
-				|| condition.logicConstraints[0] == LogicConstraint::ONLY_LOGIC_ZERO
-				|| condition.logicConstraints[0] == LogicConstraint::ONLY_LOGIC_ONE);
-		}
-		for (auto& effect : effects) {
-			assert(effect.logicConstraints[0] == LogicConstraint::NO_CONSTRAINT
-				|| effect.logicConstraints[0] == LogicConstraint::ONLY_LOGIC_ZERO
-				|| effect.logicConstraints[0] == LogicConstraint::ONLY_LOGIC_ONE
-				|| effect.logicConstraints[0] == LogicConstraint::ONLY_LOGIC_DONT_CARE);
-		}
-#endif
-
-		for (auto& transition : _states[state].transitions)
-		{
-			const auto state_equal = [](auto& port1, auto& port2) -> bool {
-				if (port1.size() != port2.size())
-				{
-					return false;
-				}
-				for (size_t index1 { 0u }; index1 < port1.size(); index1++)
-				{
-					bool found = false;
-					for (size_t index2 { 0u }; index2 < port2.size(); index2++)
-					{
-						if (port1[index1].portName == port2[index2].portName)
-						{
-							if (port1[index1].logicConstraints != port2[index2].logicConstraints)
-							{
-								return false;
-							}
-							found = true;
-						}
-					}
-					if (!found)
-					{
-						return false;
-					}
-				}
-				return true;
-			};
-			if (transition.type == transitionType
-				&& state_equal(transition.conditions, conditions))
-			{
-				std::string otherAlternatives;
-				for (auto& alternativeIndex : transition.alternatives)
-				{
-					otherAlternatives += ", ";
-					otherAlternatives += std::to_string(alternativeIndex);
-				}
-				LOG_IF(!state_equal(transition.effects, effects), FATAL)
-					<< "The UDFM contains fault " << userDefinedFault->GetFaultName()
-					<< " for cell " << userDefinedFault->GetCellName()
-					<< " who two or more test alternatives ("
-					<< std::to_string(alternative) << otherAlternatives
-					<< ") with same prefix at depth " << std::to_string(_states[state].depth) << " but differing effects: "
-					<< to_string(conditions) << " -> " << to_string(effects)
-					<< " vs " << to_string(transition.conditions) << " -> " << to_string(transition.effects);
-				return transition;
-			}
-		}
-
-		if (targetState == NEW_TARGET) {
-			_states.push_back(CellAwareState {
-				.depth = _states[state].depth + 1u,
-				.accepting = false,
-				.transitions = { },
-				.alternatives = { },
-			});
-			targetState = _states.size() - 1u;
-		}
-
-		return _states[state].transitions.emplace_back(CellAwareTransition {
-			.type = transitionType,
-			.toState = targetState,
-			.conditions = conditions,
-			.effects = effects,
-			.alternatives = { }
-		});
-	};
-	auto const extract_vector = [&](auto const& ports, size_t index) -> std::vector<CellAwarePort> {
-		std::vector<CellAwarePort> result;
-		for (auto const& port : ports)
-		{
-			result.push_back({
-				.nodeAndPort = port.nodeAndPort,
-				.portName = port.portName,
-				.logicConstraints = { port.logicConstraints[index] }
+			result.push_back(Port {
+				.nodeAndPort = portMap.find(port.name)->second,
+				.constraint = port.constraint
 			});
 		}
 		return result;
 	};
 
-	// Encode states for each alternative, building a prefix-code.
-	for (size_t alternativeIndex { 0u }; alternativeIndex < this->_alternatives.size(); alternativeIndex++)
-	{
-		auto const& alternative { this->_alternatives[alternativeIndex] };
-		assert (alternative.conditions.size() > 0);
-		size_t currentState { STATE_EPSILON };
-		for (size_t index { 0u }; index < alternative.conditions[0].logicConstraints.size(); index++)
-		{
-			const auto last { (index + 1u) == alternative.conditions[0].logicConstraints.size() };
-			const auto conditions { extract_vector(alternative.conditions, index) };
-			const auto effects { extract_vector(alternative.effects, index) };
-			auto difference = false;
-			for (auto& effect : effects) {
-				difference |= (effect.logicConstraints[0u] == LogicConstraint::ONLY_LOGIC_ZERO);
-				difference |= (effect.logicConstraints[0u] == LogicConstraint::ONLY_LOGIC_ONE);
-			}
+	constexpr size_t STATE_EPSILON = 0u;
+	constexpr size_t DEPTH_UNKNOWN = std::numeric_limits<size_t>::max();
 
-			auto& transition = get_or_create_transition(
-				CellAwareTransition::TransitionType::Primary,
-				alternativeIndex, currentState, NEW_TARGET, conditions, effects);
-			transition.alternatives.push_back(alternativeIndex);
-			_states[currentState].alternatives.push_back(alternativeIndex);
-			_states[transition.toState].accepting |= (last && difference);
-			currentState = transition.toState;
+	std::vector<State> states;
+	for (const auto& state : specification.GetStates())
+	{
+		std::vector<Transition> transitions;
+		for (const auto& transition : state.transitions) {
+			transitions.push_back(Transition {
+				.inputs = map_ports(transition.inputs),
+				.outputs = map_ports(transition.outputs),
+				.toState = transition.toState,
+				.type = TransitionType::Primary,
+				.accepting = transition.accepting,
+			});
 		}
-		_states[currentState].alternatives.push_back(alternativeIndex);
+		states.push_back(State {
+			.transitions = transitions,
+			.depth = DEPTH_UNKNOWN,
+		});
 	}
+	ASSERT(states.size() > 0)
+		<< "There has to be at least one state in the cell-aware model (epsilon)";
 
-	// Excluding first (epsilon) state.
-	for (size_t stateIndex { 1u }; stateIndex < _states.size(); stateIndex++)
+	// Create transitions from the states to the start of new sequences.
+	for (size_t stateIndex { 1u }; stateIndex < states.size(); stateIndex++)
 	{
-		for (auto& epsTrans : _states[STATE_EPSILON].transitions)
+		for (auto const& epsTrans : states[STATE_EPSILON].transitions)
 		{
-			// Note 1:
 			// Create a transition from each state such that it is the start state for the state machine.
-			// Since we are not encoding alternatives here, the transitions might already exist.
-			// Existing transitions have priority and are not considered a conflict as the test alternative's
-			// behavior is expected to be different than starting without a state.
+			// Existing transitions have priority and this is not considered a conflict.
 			//
-			// Example:
-			//  1) A=0,  B=0  -> C=X
-			//  2) A=1,  B=0  -> C=X
-			//  3) A=01, B=00 -> C=X1
-			//
-			// Transition system without continuing transitions on the states:
-			//   eps -+--> 1
-			//        +--> 2
-			//        +--> 3 ---> 4
+			// Example: Transition system without continuing transitions on the states.
+			//   eps -+--> (A=0, B=0 -> C=X) 1
+			//        +--> (A=1, B=0 -> C=X) 2
+			//        +--> (A=0, B=0 -> C=X) 3 ---> 4 (A=1, B=0, C=1)
 			//
 			// Transitioning into any of these states would result in the system to get stuck.
 			// Therefore, transitions equivalent to the ones from eps are inserted into each state.
@@ -247,151 +231,138 @@ CellAwareFault::CellAwareFault(
 			// However, only the transition test creates a fault difference and has a differing fault effect.
 			// The transition from 3 to 2 should not be generated and 3 to 4 is relevant instead.
 			// => Therefore, transition type Secondary is used here to give it a secondary priority.
-			get_or_create_transition(
-				CellAwareTransition::TransitionType::Secondary,
-				-1, stateIndex, epsTrans.toState, epsTrans.conditions, epsTrans.effects);
+			states[stateIndex].transitions.push_back(Transition {
+				.inputs = epsTrans.inputs,
+				.outputs = epsTrans.outputs,
+				.toState = epsTrans.toState,
+				.type = TransitionType::Secondary,
+				.accepting = epsTrans.accepting,
+			});
 		}
 	}
+
+	// Compute the depth of states such that the maximum path length
+	// can be calculated via the maximum depth.
+	std::vector<size_t> statesToVisit { 0u };
+	for (size_t depth { 0u }; !statesToVisit.empty(); depth++)
+	{
+		std::vector<size_t> nextStates;
+		for (size_t stateIndex : statesToVisit)
+		{
+			auto& state = states[stateIndex];
+			if (state.depth == DEPTH_UNKNOWN)
+			{
+				state.depth = depth;
+				for (auto& transition : state.transitions)
+				{
+					if (transition.toState != 0)
+					{
+						nextStates.push_back(transition.toState);
+					}
+				}
+			}
+		}
+		statesToVisit = std::move(nextStates);
+		nextStates.clear();
+	}
+
+	return { CellAwareFault(specification.GetName(), cell, { states }) };
 }
 
-CellAwareFault::~CellAwareFault(void) = default;
-
-const std::shared_ptr<UdfmFault>& CellAwareFault::GetUserDefinedFault(void) const
+std::unordered_map<std::string, Circuit::MappedCircuit::NodeAndPort> CreateCellPortMapForCell(const Circuit::GroupMetaData* cell)
 {
-	return _userDefinedFault;
+	std::vector<const Circuit::MappedNode*> gates { };
+	for (const auto* gate : cell->GetSubGroups())
+	{
+		gates.insert(gates.end(), gate->GetMappedNodes().begin(), gate->GetMappedNodes().end());
+	}
+	std::sort(gates.begin(), gates.end());
+	gates.erase(std::unique(gates.begin(), gates.end()), gates.end());
+
+	std::unordered_map<std::string, Circuit::MappedCircuit::NodeAndPort> portMap;
+	for (auto port: cell->GetPorts())
+	{
+		const auto& portName = port.GetName();
+		ASSERT(port.GetConnections().size() == 1)
+			<< "Port \"" << portName << "\" in cell \"" << cell->GetHierarchyName()
+			<< "\" has a bus with a size not equal to 1 as input / output port.";
+
+		const auto portType = port.GetSourceInfo().GetProperty<std::string>("port-type").value_or("");
+		ASSERT(portType == "input" || portType == "output")
+			<< "Port \"" << portName << "\" in cell \"" << cell->GetHierarchyName()
+			<< "\" has invalid type " << portType << ".";
+
+		if (port.GetConnections()[0u] == nullptr)
+		{
+			continue;
+		}
+
+		const auto& ports = (portType == "input")
+			? port.GetConnections()[0]->GetMappedSinks()
+			: port.GetConnections()[0]->GetMappedSources();
+		for (const auto& port : ports)
+		{
+			if (std::find(gates.begin(), gates.end(), port.node) != gates.end())
+			{
+				portMap.insert_or_assign(portName, port);
+			}
+		}
+	}
+
+	return portMap;
 }
 
-const Circuit::GroupMetaData* CellAwareFault::GetCell(void) const
+std::string to_string(const CellAwareFaultStateMachine& stateMachine)
 {
-	return _cell;
-}
+	std::string result;
+	for (size_t stateIndex { 0u }; stateIndex < stateMachine.GetStates().size(); stateIndex++)
+	{
+		const auto& state = stateMachine.GetState(stateIndex);
+		result += boost::str(boost::format("\nState %d depth=%d") % stateIndex % state.depth);
 
-const std::vector<CellAwareAlternative>& CellAwareFault::GetAlternatives(void) const
-{
-	return _alternatives;
-}
-
-const std::vector<CellAwareState>& CellAwareFault::GetStateMachine(void) const
-{
-	return _states;
-}
-
-const std::vector<NodeAndPort>& CellAwareFault::GetConditionNodesAndPorts(void) const
-{
-	return _conditionNodesAndPorts;
-}
-
-const std::vector<NodeAndPort>& CellAwareFault::GetEffectNodesAndPorts(void) const
-{
-	return _effectNodesAndPorts;
-}
-
-size_t CellAwareFault::GetTimeframeSpread(void) const
-{
-	return _timeframeSpread;
-}
-
-size_t CellAwareFault::GetMinConditionNodeId(void) const
-{
-	return _minConditionNodeId;
-}
-
-size_t CellAwareFault::GetMaxConditionNodeId(void) const
-{
-	return _maxConditionNodeId;
-}
-
-size_t CellAwareFault::GetMinEffectNodeId(void) const
-{
-	return _minEffectNodeId;
-}
-
-size_t CellAwareFault::GetMaxEffectNodeId(void) const
-{
-	return _maxEffectNodeId;
-}
-
-bool CellAwareFault::IsSequential(void) const
-{
-	return _sequential;
+		for (size_t transIndex { 0u }; transIndex < state.transitions.size(); transIndex++)
+		{
+			const auto& transition = state.transitions[transIndex];
+			result += "\n    " + to_string(transition.type) + " to " + std::to_string(transition.toState);
+			result += " (" + to_string(transition.inputs) + " -> " + to_string(transition.outputs) + ")";
+			result += ", " + std::string(transition.accepting ? "accepting" : "not accepting");
+		}
+	}
+	return result;
 }
 
 std::string to_string(const CellAwareFault& fault)
 {
-	std::string result = "CA fault " + fault.GetUserDefinedFault()->GetFaultName() + " @ "
-		+ fault.GetCell()->GetHierarchyName() + " (" + fault.GetUserDefinedFault()->GetCellName() + "): ";
-
-	size_t index { 0u };
-	for (const auto& alternative : fault.GetAlternatives())
-	{
-		if (index++ != 0u) result += " or ";
-		result += to_string(alternative);
-	}
-
-	return result;
+	return boost::str(boost::format("CA fault %s @ %s (%s)")
+		% fault.GetName() % fault.GetCellName() % fault.GetCellType());
 }
 
-std::string to_string(const CellAwareAlternative& alternative)
-{
-	return to_string(alternative.conditions) + " -> " + to_string(alternative.effects);
-}
-
-std::string to_string(const std::vector<CellAwarePort>& pinAttributes)
-{
-	std::string result;
-	size_t index { 0u };
-	for (const auto& attribute : pinAttributes)
-	{
-		if (index++ != 0u) result += ", ";
-		result += to_string(attribute);
-	}
-	return result;
-}
-
-std::string to_string(const CellAwarePort& attribute)
-{
-	return attribute.portName + "=" + to_string(attribute.logicConstraints);
-}
-
-std::string to_string(const std::vector<CellAwareState>& states)
-{
-	std::string result;
-	for (size_t stateIndex { 0u }; stateIndex < states.size(); stateIndex++)
-	{
-		auto& state = states[stateIndex];
-		if (stateIndex != 0u) result += "\n";
-
-		result += "State " + std::to_string(stateIndex) + " depth=" + std::to_string(state.depth) + " (";
-		for (size_t altIndex { 0u }; altIndex < state.alternatives.size(); altIndex++)
-		{
-			auto& alternative = state.alternatives[altIndex];
-			if (altIndex != 0u) result += ", ";
-			result += "alt " + std::to_string(alternative);
-		}
-		result += ")";
-
-		for (size_t transIndex { 0u }; transIndex < state.transitions.size(); transIndex++)
-		{
-			auto& transition = state.transitions[transIndex];
-			result += "\n";
-			result += "    " + to_string(transition.type) + " to ";
-			result += std::to_string(transition.toState);
-			result += " (" + to_string(transition.conditions) + " -> " + to_string(transition.effects) + ")";
-			result += ", " + std::string(states[transition.toState].accepting ? "accepting" : "not accepting");
-		}
-	}
-
-	return result;
-}
-
-std::string to_string(const CellAwareTransition::TransitionType& type)
+static std::string to_string(const CellAwareFaultStateMachine::TransitionType& type)
 {
 	switch (type)
 	{
-		case CellAwareTransition::TransitionType::Primary: return "primary";
-		case CellAwareTransition::TransitionType::Secondary: return "secondary";
+		case CellAwareFaultStateMachine::TransitionType::Primary: return "primary";
+		case CellAwareFaultStateMachine::TransitionType::Secondary: return "secondary";
 		default: __builtin_unreachable();
 	}
+}
+
+static std::string to_string(const std::vector<CellAwareFaultStateMachine::Port>& ports)
+{
+	std::string result;
+	for (const auto& port : ports)
+	{
+		if (result.size() != 0) result += ", ";
+		result += std::to_string(port.nodeAndPort.node->GetNodeId());
+		switch (port.nodeAndPort.port.portType)
+		{
+			case Circuit::PortType::Input: result += "/I"; break;
+			case Circuit::PortType::Output: result += "/O"; break;
+		}
+		result += std::to_string(port.nodeAndPort.port.portNumber);
+		result += "=" + to_string(port.constraint);
+	}
+	return result;
 }
 
 };

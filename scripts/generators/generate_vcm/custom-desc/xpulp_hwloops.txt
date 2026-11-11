@@ -1,0 +1,8 @@
+uimmL[11:0] b00000 b000 b0000 L[0:0] b1111011 LP.STARTI     % lp.starti L, imm
+uimmL[11:0] b00000 b001 b0000 L[0:0] b1111011 LP.ENDI       % lp.endi L, imm
+uimmL[11:0] b00000 b011 b0000 L[0:0] b1111011 LP.COUNTI     % lp.counti L, imm
+
+b000000000000 rs1[4:0] b010 b0000 L[0:0] b1111011 LP.COUNT  % lp.count L, rs1
+
+uimmL[11:0]   rs1[4:0] b100 b0000 L[0:0] b1111011 LP.SETUP  % lp.setup L, rs1, imm
+uimmL[11:0] uimmS[4:0] b101 b0000 b0     b1111011 LP.SETUPI % lp.setupi L, imm1, imm2

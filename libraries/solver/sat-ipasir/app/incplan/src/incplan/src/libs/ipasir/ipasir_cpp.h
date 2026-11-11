@@ -9,7 +9,7 @@ extern "C" {
 #include <vector>
 
 namespace ipasir {
-enum class BmcResult {SAT = 10, UNSAT = 20, TIMEOUT = 0};
+enum class SolveResult {SAT = 10, UNSAT = 20, TIMEOUT = 0};
 
 class Ipasir {
 public:
@@ -62,7 +62,7 @@ public:
 	 * Required state: INPUT or SAT or UNSAT
 	 * State after: INPUT or SAT or UNSAT
 	 */
-	virtual BmcResult solve () = 0;
+	virtual SolveResult solve () = 0;
 
 	/**
 	 * Get the truth value of the given literal in the found satisfying
@@ -138,7 +138,7 @@ public:
 
 	virtual void assume(int lit);
 
-	virtual BmcResult solve();
+	virtual SolveResult solve();
 
 	virtual int val(int lit);
 

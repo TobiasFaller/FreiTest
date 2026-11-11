@@ -11,6 +11,7 @@
 #include <memory>
 #include <random>
 #include <vector>
+#include <unordered_set>
 
 #include "Basic/ApplicationStatistics.hpp"
 #include "Basic/Logic.hpp"
@@ -29,6 +30,7 @@
 #include "Circuit/CircuitEnvironment.hpp"
 #include "Circuit/CircuitBuilder.hpp"
 #include "Io/CircuitVerilogExporter/CircuitVerilogExporter.hpp"
+#include "Basic/Fault/Specification/CellAwareSpecification.hpp"
 #include "SolverProxy/Sat/SatSolverProxy.hpp"
 #include "SolverProxy/MaxSat/MaxSatSolverProxy.hpp"
 #include "SolverProxy/Sat/Glucose421ParallelSolverProxy.hpp"
@@ -88,6 +90,11 @@ FuzzingBase<FaultModel, FaultList>::~FuzzingBase(void) = default;
 template <typename FaultModel, typename FaultList>
 void FuzzingBase<FaultModel, FaultList>::Init(void)
 {
+	if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
+	{
+		this->cellAwareFaultModelSource
+			= AtpgBase<FaultModel, FaultList>::CellAwareFaultModelSource::Custom;
+	}
 }
 
 template <typename FaultModel, typename FaultList>
@@ -98,31 +105,30 @@ void FuzzingBase<FaultModel, FaultList>::Run(void)
 template <typename FaultModel, typename FaultList>
 void FuzzingBase<FaultModel, FaultList>::GenerateCircuit(size_t seed)
 {
+	this->cells.clear();
+	this->inputs.clear();
+	this->outputs.clear();
+
+	using GenRand = std::uniform_int_distribution<size_t>;
+	using RangeIt = IntegerIterator<size_t>;
+
+	std::mt19937_64 random { seed };
+	auto const circuitName { boost::str(boost::format("C%016x") % seed) };
+	auto const inputCount { (GenRand { configNumInputsMin, configNumInputsMax })(random) };
+	auto const outputCount { (GenRand { configNumOutputsMin, configNumOutputsMax })(random) };
+	auto const cellCount { (GenRand { configNumCellsMin, configNumCellsMax })(random) };
+
+	Builder::CircuitBuilder builder;
+	builder.SetName(circuitName);
+	auto const circuitGroupId { builder.EmplaceGroup(circuitName) };
+
 	struct Output {
 		Builder::MappedNodeId nodeId;
 		Builder::ConnectionId connId;
 	};
-
-	auto const get_hex_string = [](size_t value) {
-		std::stringstream stream;
-		stream << std::setfill ('0') << std::setw(sizeof(size_t)*2) << std::hex << value;
-		return stream.str();
-	};
-
-	Builder::CircuitBuilder builder;
-	builder.SetName("circuit_" + get_hex_string(seed));
-	auto const circuitGroupId { builder.EmplaceGroup("circuit_" + get_hex_string(seed)) };
-
-	std::mt19937_64 random { seed };
-	size_t inputCount { (std::uniform_int_distribution<size_t> { configNumInputsMin, configNumInputsMax })(random) };
-	size_t outputCount { (std::uniform_int_distribution<size_t> { configNumOutputsMin, configNumOutputsMax })(random) };
-	size_t cellCount { (std::uniform_int_distribution<size_t> { configNumCellsMin, configNumCellsMax })(random) };
 	std::vector<Output> inputs { };
 	std::vector<Output> cells { };
 	std::vector<Output> outputs { };
-
-	LOG(INFO) << "Generating circuit " << get_hex_string(seed)
-		<< " (I: " << inputCount << " / O: " << outputCount << " / C: " << cellCount << ")";
 
 	// Inputs
 	for (size_t index { 0u }; index < inputCount; index++) {
@@ -148,34 +154,41 @@ void FuzzingBase<FaultModel, FaultList>::GenerateCircuit(size_t seed)
 		builder.GetSourceInfo(circuitPortSourceId).AddProperty<std::string>("port-type", "input");
 		builder.GetSourceInfo(sourceId).sourceType = "port";
 		inputs.push_back({ gateId, connId });
+		this->inputs.push_back("I" +std::to_string(index + 1u));
 	}
 
 	// Cells
-	this->cells.clear();
 	for (size_t index { 0u }; index < cellCount; index++) {
-		auto const get_random_connections = [&](size_t count) {
-			auto const available { inputs.size() + cells.size() - 1u };
-			std::vector<size_t> indices;
-			for (size_t connection { 0u }; (connection <= available) && (connection < count); connection++) {
-				auto chosen { (std::uniform_int_distribution<size_t> { 0u, (available - connection) })(random) };
-				// Skip gaps of taken values (assumes connections are sorted)
-				for (auto& index : indices) {
-					if (chosen >= index) chosen++;
-				}
-				indices.push_back(chosen);
-				std::sort(indices.begin(), indices.end());
-			}
-			// Only allow duplicates if necessary
-			while (indices.size() < count) {
-				auto chosen { (std::uniform_int_distribution<size_t> { 0u, available })(random) };
-				indices.push_back(chosen);
-			}
-			std::vector<Output> connections;
-			for (auto& index : indices) {
-				connections.push_back((index >= inputs.size())
-					? cells[index - inputs.size()] : inputs[index]);
-			}
-			return connections;
+		auto uniquify_connection = [&, uniqueIndex=0u] (const Output& connection) mutable -> Output {
+			auto const name { "uniquify_" + std::to_string(index) + "_" + std::to_string(uniqueIndex) };
+			auto const gateId { builder.EmplaceMappedNode(name, CellCategory::MAIN_BUF, CellType::BUF, 1u) };
+			auto const groupId { builder.EmplaceGroup(name) };
+			auto const connId { builder.EmplaceConnection() };
+			auto const sourceInfoId { builder.AddSourceInfo({}) };
+			auto const portInputId { builder.GetGroup(groupId).EmplacePort("GI", Builder::PortType::Input) };
+			builder.GetMappedNode(gateId).SetInputNode(0u, connection.nodeId);
+			builder.GetMappedNode(gateId).SetInputConnectionId(0u, connection.connId);
+			builder.GetMappedNode(gateId).SetInputConnectionName(0u, "conn_" + std::to_string(connection.connId));
+			builder.GetMappedNode(gateId).SetInputPortName(0u, "GI" );
+			builder.GetMappedNode(connection.nodeId).AddSuccessorNode(gateId);
+			builder.GetGroup(groupId).GetPort(portInputId).SetConnections({ connection.connId });
+			auto const portOutputId { builder.GetGroup(groupId).EmplacePort("GO", Builder::PortType::Output) };
+			builder.GetMappedNode(gateId).SetOutputConnectionId(connId);
+			builder.GetMappedNode(gateId).SetOutputConnectionName("conn_" + std::to_string(connId));
+			builder.GetMappedNode(gateId).SetOutputPortName("GO");
+			builder.GetGroup(groupId).GetPort(portOutputId).SetConnections({ connId });
+			builder.GetGroup(circuitGroupId).AddGroup(groupId);
+			builder.GetGroup(groupId).SetParent(circuitGroupId);
+			builder.GetGroup(groupId).AddMappedNode(gateId);
+			builder.GetGroup(groupId).SetSourceInfo(sourceInfoId);
+			builder.GetSourceInfo(sourceInfoId).sourceType = "unique";
+			builder.GetSourceInfo(sourceInfoId).AddProperty<bool>("module-is-virtual", true);
+			builder.GetSourceInfo(sourceInfoId).AddProperty<std::string>("module-name", name);
+			builder.GetSourceInfo(sourceInfoId).AddProperty<std::string>("module-type", "BUF");
+			builder.GetSourceInfo(sourceInfoId).AddProperty<std::string>("virtual-name", name);
+			builder.GetSourceInfo(sourceInfoId).AddProperty<std::string>("virtual-type", "BUF");
+			builder.GetSourceInfo(sourceInfoId).AddProperty<std::string>("virtual-category", "unique");
+			return  { gateId, connId };
 		};
 
 		auto const name { "cell_" + std::to_string(index) };
@@ -188,27 +201,37 @@ void FuzzingBase<FaultModel, FaultList>::GenerateCircuit(size_t seed)
 		builder.GetSourceInfo(sourceInfoId).AddProperty<bool>("module-is-cell", true);
 		builder.GetSourceInfo(sourceInfoId).AddProperty<std::string>("module-name", name);
 		builder.GetSourceInfo(sourceInfoId).AddProperty<std::string>("module-type", name);
+		builder.GetSourceInfo(sourceInfoId).AddProperty<std::string>("cell-name", name);
+		builder.GetSourceInfo(sourceInfoId).AddProperty<std::string>("cell-type", name);
 
-		// Generate inputs for cell
+		// Generate inputs for cell and add duplicate inputs if required.
+		std::vector<size_t> cellInputIndices;
+		auto const cellInputCount { (GenRand { configNumCellInputsMin, configNumCellInputsMax })(random) };
+		while (cellInputIndices.size() < cellInputCount) {
+			std::sample(RangeIt { 0u }, RangeIt { inputs.size() + cells.size() },
+				std::back_inserter(cellInputIndices), cellInputCount - cellInputIndices.size(), random);
+		}
 		std::vector<Output> cellInputs;
-		size_t cellInputCount { (std::uniform_int_distribution<size_t> { configNumCellInputsMin, configNumCellInputsMax })(random) };
-		auto cellInputConnections { get_random_connections(cellInputCount) };
-		for (size_t i { 0u }; i < cellInputCount; i++) {
-			auto const [gateId, connId] = cellInputConnections[i];
-			auto const portId { builder.GetGroup(cellGroupId).EmplacePort(
-				"I" + std::to_string(i + 1u), Builder::PortType::Input) };
-			auto const portInfoId { builder.AddSourceInfo({}) };
-			builder.GetGroup(cellGroupId).GetPort(portId).SetConnections({ connId });
-			builder.GetGroup(cellGroupId).GetPort(portId).SetSourceInfo(portInfoId);
-			builder.GetSourceInfo(portInfoId).AddProperty<std::string>("port-type", "input");
-			cellInputs.push_back(Output { gateId, connId });
+		std::transform(cellInputIndices.begin(), cellInputIndices.end(), std::back_inserter(cellInputs),
+			[&](auto index) {
+				return (index >= inputs.size()) ? cells[index - inputs.size()] : inputs[index];
+			});
+
+		std::unordered_set<size_t> connectionSet;
+		for (auto& cellInput : cellInputs) {
+			if (auto [it, inserted] = connectionSet.emplace(cellInput.connId); !inserted) {
+				cellInput = uniquify_connection(cellInput);
+			}
 		}
 
+		const size_t GATES_WITH_ONE_INPUT = 4; // Keep in sync with the gate list below.
 		const std::vector<std::tuple<std::string, CellCategory, CellType, size_t>> gateTypes {
+			// One-input gates (need to be first in list)
 			{ "SKIP", CellCategory::MAIN_UNKNOWN, CellType::UNDEFTYPE, 1u },
 			{ "DFF",  CellCategory::MAIN_UNKNOWN, CellType::UNDEFTYPE, 1u },
 			{ "BUF",  CellCategory::MAIN_BUF,     CellType::BUF,       1u },
 			{ "INV",  CellCategory::MAIN_INV,     CellType::INV,       1u },
+			// Two-input gates
 			{ "AND",  CellCategory::MAIN_AND,     CellType::AND,       2u },
 			{ "NAND", CellCategory::MAIN_NAND,    CellType::NAND,      2u },
 			{ "OR",   CellCategory::MAIN_OR,      CellType::OR,        2u },
@@ -216,25 +239,27 @@ void FuzzingBase<FaultModel, FaultList>::GenerateCircuit(size_t seed)
 			{ "XOR",  CellCategory::MAIN_XOR,     CellType::XOR,       2u },
 			{ "XNOR", CellCategory::MAIN_XNOR,    CellType::XNOR,      2u },
 		};
-		size_t cellIndex { 0u };
+
+		// Reduce the output to single connection and make sure the output has a unique connectionId.
+		size_t gateIndex { 0u };
 		size_t flipFlopCount { 0u };
 		std::vector<std::string> logic;
 		std::vector<Output> cellOutputs;
 		std::copy(cellInputs.begin(), cellInputs.end(), std::back_inserter(cellOutputs));
-		while (cellOutputs.size() > 1u) {
+		while (cellOutputs.size() > 1u || connectionSet.find(cellOutputs[0].connId) != connectionSet.end()) {
 			std::vector<Output> newOutputs;
 			for (size_t i { 0u }; i < cellOutputs.size(); ) {
-				auto const gateTypeMax { (i + 1 < cellOutputs.size()) ? (gateTypes.size() - 1u) : 3u };
-				auto const gateTypeIndex { (std::uniform_int_distribution<size_t> { 0, gateTypeMax })(random) };
+				auto const gateTypeMax { (i + 1 < cellOutputs.size()) ? (gateTypes.size() - 1u) : GATES_WITH_ONE_INPUT - 1u };
+				auto const gateTypeIndex { (GenRand { 0, gateTypeMax })(random) };
 				auto const [gateName, gateCategory, gateType, gateSize] = gateTypes[gateTypeIndex];
 				logic.push_back(gateName);
 
 				if (gateName == "SKIP") {
 					newOutputs.push_back(cellOutputs[i]);
 				} else if (gateName == "DFF") {
-					auto const nameSi { "gate_" + std::to_string(index) + "_" + std::to_string(cellIndex + 0u) };
-					auto const nameSo { "gate_" + std::to_string(index) + "_" + std::to_string(cellIndex + 1u) };
-					auto const nameC0 { "gate_" + std::to_string(index) + "_" + std::to_string(cellIndex + 2u) };
+					auto const nameSi { "gate_" + std::to_string(index) + "_" + std::to_string(gateIndex + 0u) };
+					auto const nameSo { "gate_" + std::to_string(index) + "_" + std::to_string(gateIndex + 1u) };
+					auto const nameC0 { "gate_" + std::to_string(index) + "_" + std::to_string(gateIndex + 2u) };
 					auto const gateSiId { builder.EmplaceMappedNode(nameSi, CellCategory::MAIN_IN,       CellType::S_IN,     0u) };
 					auto const gateSoId { builder.EmplaceMappedNode(nameSo, CellCategory::MAIN_OUT,      CellType::S_OUT,    4u) };
 					auto const gateC0Id { builder.EmplaceMappedNode(nameC0, CellCategory::MAIN_CONSTANT, CellType::PRESET_0, 0u) };
@@ -314,10 +339,10 @@ void FuzzingBase<FaultModel, FaultList>::GenerateCircuit(size_t seed)
 					builder.AddSecondaryOutput(gateSoId);
 					builder.LinkSecondaryPorts(gateSiId, gateSoId);
 					newOutputs.push_back(Output { gateSiId, connSiId });
-					cellIndex += 3;
+					gateIndex += 3;
 					flipFlopCount++;
 				} else {
-					auto const name { "gate_" + std::to_string(index) + "_" + std::to_string(cellIndex) };
+					auto const name { "gate_" + std::to_string(index) + "_" + std::to_string(gateIndex) };
 					auto const gateId { builder.EmplaceMappedNode(name, gateCategory, gateType, gateSize) };
 					auto const groupId { builder.EmplaceGroup(name) };
 					auto const connId { builder.EmplaceConnection() };
@@ -346,27 +371,38 @@ void FuzzingBase<FaultModel, FaultList>::GenerateCircuit(size_t seed)
 					builder.GetSourceInfo(sourceInfoId).AddProperty<std::string>("module-name", name);
 					builder.GetSourceInfo(sourceInfoId).AddProperty<std::string>("module-type", gateName);
 					newOutputs.push_back(Output { gateId, connId });
-					cellIndex++;
+					gateIndex++;
 				}
 				i += gateSize;
 			}
 			cellOutputs = std::move(newOutputs);
 		}
-		auto const portId { builder.GetGroup(cellGroupId).EmplacePort("O", Builder::PortType::Output) };
-		auto const portInfoId { builder.AddSourceInfo({}) };
-		builder.GetGroup(cellGroupId).GetPort(portId).SetConnections({ cellOutputs[0u].connId });
-		builder.GetGroup(cellGroupId).GetPort(portId).SetSourceInfo(portInfoId);
-		builder.GetSourceInfo(portInfoId).AddProperty<std::string>("port-type", "output");
 		cells.push_back({ cellOutputs[0u].nodeId, cellOutputs[0u].connId });
 
-		std::vector<std::string> inputs;
-		for (size_t index { 0u }; index < cellInputCount; index++) {
-			inputs.push_back("I" + std::to_string(index + 1u));
+		std::vector<std::string> inputNames;
+		for (size_t i { 0u }; i < cellInputs.size(); i++) {
+			auto const [gateId, connId] = cellInputs[i];
+			auto const portId { builder.GetGroup(cellGroupId).EmplacePort(
+				"I" + std::to_string(i + 1u), Builder::PortType::Input) };
+			auto const portInfoId { builder.AddSourceInfo({}) };
+			builder.GetGroup(cellGroupId).GetPort(portId).SetConnections({ connId });
+			builder.GetGroup(cellGroupId).GetPort(portId).SetSourceInfo(portInfoId);
+			builder.GetSourceInfo(portInfoId).AddProperty<std::string>("port-type", "input");
+			inputNames.push_back("I" + std::to_string(i + 1u));
 		}
+
+		std::vector<std::string> outputNames;
+		auto const outputPortId { builder.GetGroup(cellGroupId).EmplacePort("O", Builder::PortType::Output) };
+		auto const outputPortInfoId { builder.AddSourceInfo({}) };
+		builder.GetGroup(cellGroupId).GetPort(outputPortId).SetConnections({ cellOutputs[0u].connId });
+		builder.GetGroup(cellGroupId).GetPort(outputPortId).SetSourceInfo(outputPortInfoId);
+		builder.GetSourceInfo(outputPortInfoId).AddProperty<std::string>("port-type", "output");
+		outputNames.push_back("O");
+
 		this->cells.push_back(Cell {
 			.name = name,
-			.inputs = inputs,
-			.outputs = { "O" },
+			.inputs = inputNames,
+			.outputs = outputNames,
 			.logic = logic,
 			.flipFlopCount = flipFlopCount,
 		});
@@ -374,11 +410,6 @@ void FuzzingBase<FaultModel, FaultList>::GenerateCircuit(size_t seed)
 
 	// Outputs
 	for (size_t index { 0u }; index < outputCount; index++) {
-		auto const get_random_connection = [&]() {
-			std::uniform_int_distribution<size_t> randomInput { 0u, cells.size() - 1u };
-			return cells[randomInput(random)];
-		};
-
 		auto const name { "output_" + std::to_string(index) };
 		auto const gateId { builder.EmplaceMappedNode(name, CellCategory::MAIN_OUT, CellType::P_OUT, 1u) };
 		auto const groupId { builder.EmplaceGroup(name) };
@@ -388,7 +419,7 @@ void FuzzingBase<FaultModel, FaultList>::GenerateCircuit(size_t seed)
 		auto const outputPortId { builder.GetGroup(groupId).EmplacePort("O", Builder::PortType::Output) };
 		auto const circuitPortId { builder.GetGroup(circuitGroupId).EmplacePort("O" + std::to_string(index + 1), Builder::PortType::Output) };
 		auto const circuitPortSourceId { builder.AddSourceInfo({}) };
-		auto const [inputGateId, inputConnId] = get_random_connection();
+		auto const [inputGateId, inputConnId] = cells[(GenRand { 0u, cells.size() - 1u })(random)];
 		builder.GetMappedNode(gateId).SetInputNode(0u, inputGateId);
 		builder.GetMappedNode(gateId).SetInputConnectionId(0u, inputConnId);
 		builder.GetMappedNode(gateId).SetInputConnectionName(0u, "conn_" + std::to_string(inputConnId));
@@ -409,6 +440,7 @@ void FuzzingBase<FaultModel, FaultList>::GenerateCircuit(size_t seed)
 		builder.GetSourceInfo(circuitPortSourceId).AddProperty<std::string>("port-type", "output");
 		builder.GetSourceInfo(sourceId).sourceType = "port";
 		outputs.push_back(Output { gateId, connId });
+		this->outputs.push_back("O" +std::to_string(index + 1u));
 	}
 
 	Builder::BuildConfiguration buildConfig { };
@@ -419,8 +451,11 @@ void FuzzingBase<FaultModel, FaultList>::GenerateCircuit(size_t seed)
 }
 
 template <typename FaultModel, typename FaultList>
-void FuzzingBase<FaultModel, FaultList>::GenerateFaultModel(size_t seed, UdfmType udfmType)
+void FuzzingBase<FaultModel, FaultList>::GenerateFaultModel(size_t seed)
 {
+	using GenRand = std::uniform_int_distribution<size_t>;
+	using RangeIt = IntegerIterator<size_t>;
+
 	if constexpr (std::is_same_v<FaultModel, Fault::SingleStuckAtFaultModel>)
 	{
 		// Nothing to do
@@ -431,7 +466,6 @@ void FuzzingBase<FaultModel, FaultList>::GenerateFaultModel(size_t seed, UdfmTyp
 	}
 	else if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
 	{
-		std::mt19937_64 random { seed };
 		auto const simulate_cell = [](auto const& cell, auto const& input, auto const& state) -> auto {
 			auto const get_index = [](auto const& value) -> size_t {
 				return (value == 'X') ? 2u : (value - '0');
@@ -475,142 +509,123 @@ void FuzzingBase<FaultModel, FaultList>::GenerateFaultModel(size_t seed, UdfmTyp
 			}
 			return std::make_tuple(output, newState);
 		};
-		auto const build_tree = [&random](auto const leaves, auto const maxBranches) -> auto {
+
+		std::mt19937_64 random { seed };
+		auto const build_tree = [&random](auto const branches, auto const maxBranchesPerNode) -> auto {
+			// Initial state (epsilon) always exists.
 			std::vector<std::vector<size_t>> tree { {} };
+			std::vector<size_t> virtualToTree { 0u };
 			std::vector<size_t> incomplete { 0u };
-			for (size_t index { 0u }; index < leaves; index++) {
-				auto const incompleteIndex { (std::uniform_int_distribution<size_t> { 0u, incomplete.size() - 1u })(random) };
+
+			// Build a tree by adding branches randomly.
+			for (size_t branch { 0u }; branch < branches; branch++) {
+				auto const incompleteIndex { (GenRand { 0u, incomplete.size() - 1u })(random) };
 				auto const toExtend { incomplete[incompleteIndex] };
-				// If there is no branch (it is a leaf) insert first one
-				if (tree[toExtend].size() == 0u && toExtend != 0u) {
+
+				// We want to add a transition to the toExtend node.
+				// If the node is virtual (doesn't exist yet), create it now
+				// and update the node id in the id map for correct mapping.
+				if (toExtend != 0 && virtualToTree[toExtend] == 0u) {
+					auto const createNode = tree.size();
+					virtualToTree[toExtend] = createNode;
 					tree.push_back({ });
-					tree[toExtend].push_back(tree.size() - 1u);
-					incomplete.push_back(tree.size() - 1u);
 				}
-				// Insert new branch
-				tree.push_back({ });
-				tree[toExtend].push_back(tree.size() - 1u);
-				incomplete.push_back(tree.size() - 1u);
+
+				// Create a new virtual node for the branch destination.
+				auto const branchDestination = virtualToTree.size();
+				virtualToTree.push_back(0);
+				incomplete.push_back(branchDestination);
+				tree[virtualToTree[toExtend]].push_back(branchDestination);
+
 				// If the number of branches have been exhausted delist the tree node
-				if (tree[toExtend].size() >= maxBranches) {
-					incomplete.erase(std::find(incomplete.begin(), incomplete.end(), toExtend));
+				if (tree[virtualToTree[toExtend]].size() >= maxBranchesPerNode) {
+					incomplete.erase(incomplete.begin() + incompleteIndex);
+				}
+			}
+			// Replace virtual ids with tree ids.
+			// Nodes that are virtual will lead back to epsilon.
+			for (auto& node : tree) {
+				for (auto& branch : node) {
+					branch = virtualToTree[branch];
 				}
 			}
 			return tree;
 		};
-		auto const get_parents = [](auto const& tree) -> auto {
-			std::vector<size_t> parents(tree.size(), std::numeric_limits<size_t>::max());
-			for (size_t index { 0u }; index < tree.size(); index++) {
-				for (auto const& child : tree[index]) {
-					parents[child] = index;
-				}
-			}
-			return parents;
-		};
-		auto const to_binary_string = [](auto value, auto const& bits) {
-			std::string result;
-			for (size_t bit { 0u }; bit < bits; bit++) {
-				result += ((value & 1) ? "1" : "0");
-				value >>= 1;
-			}
-			return result;
-		};
 
-		auto udfm = std::make_shared<Io::Udfm::UdfmModel>();
+		std::vector<Fault::CellAwareCellSpecification> cellSpecifications;
 		for (auto& cell : this->cells) {
-			// We can not test cells that are themselves part of the scan chain.
-			if (udfmType == UdfmType::FullScan && cell.flipFlopCount > 0) {
-				continue;
-			}
-			auto udfmCell { udfm->AddCell(cell.name) };
-			size_t faultCount { (std::uniform_int_distribution<size_t> { configNumUdfmFaultsMin, configNumUdfmFaultsMax })(random) };
-			for (size_t fault { 0u }; fault < faultCount; fault++) {
-				auto const alternativeCount { (std::uniform_int_distribution<size_t> { configNumUdfmAltsMin, configNumUdfmAltsMax })(random) };
-				auto const maxBranches { 1u << cell.inputs.size() };
-				auto const tree { build_tree(alternativeCount, maxBranches) };
-				auto const parents { get_parents(tree) };
+			std::vector<Fault::CellAwareFaultSpecification> faultSpecifications;
+			auto const faultCount { (GenRand { configNumFaultsMin, configNumFaultsMax })(random) };
+			for (size_t faultIndex { 0u }; faultIndex < faultCount; faultIndex++) {
+				auto const branchCount { (GenRand { configNumBranchesMin, configNumBranchesMax })(random) };
+				auto const maxBranchesPerNode { 1u << cell.inputs.size() };
+				auto const tree { build_tree(branchCount, maxBranchesPerNode) };
 
-				std::vector<std::vector<std::string>> allConditions(tree.size(), std::vector<std::string> { });
-				std::vector<std::vector<std::string>> allEffects(tree.size(), std::vector<std::string> { });
-				std::vector<std::string> allStates(tree.size(), std::string { }); // For D-Flip-Flops in cells
-
-				for (size_t flipFlop { 0u }; flipFlop < cell.flipFlopCount; flipFlop++) {
-					// For full-scan we require specific flip-flop value
-					if (udfmType == UdfmType::FullScan) {
-						auto value { (std::uniform_int_distribution<size_t> { 0u, 1u })(random) };
-						allStates[0u] += '0' + value;
-					} else {
-						allStates[0u] += 'X';
-					}
-				}
-
+				std::vector<std::string> dffStates(tree.size(), std::string(cell.flipFlopCount, 'X'));
+				std::vector<Fault::CellAwareFaultSpecification::State> faultStates(tree.size());
 				for (size_t index { 0u }; index < tree.size(); index++) {
-					std::vector<size_t> transitionConditions;
-					for (size_t child { 0u }; child < tree[index].size(); child++) {
-						auto condition { (std::uniform_int_distribution<size_t> { 0u, maxBranches - 1u - child })(random) };
-						// Skip gaps of taken values (assumes conditions are sorted)
-						for (auto& transitionCondition : transitionConditions) {
-							if (condition >= transitionCondition) condition++;
+					// Sample number-of-children values out of all possible input assignments.
+					std::vector<size_t> childInputs;
+					std::sample(RangeIt { 0u }, RangeIt { maxBranchesPerNode },
+						std::back_inserter(childInputs), tree[index].size(), random);
+
+					auto const to_binary_string = [](auto value, auto const& bits) {
+						std::string result;
+						for (size_t bit { 0u }; bit < bits; bit++) {
+							result += ((value & 1) ? "1" : "0");
+							value >>= 1;
 						}
-						transitionConditions.push_back(condition);
-						std::sort(transitionConditions.begin(), transitionConditions.end());
-					}
-					// Convert binary value to input string
+						return result;
+					};
+
 					for (size_t child { 0u }; child < tree[index].size(); child++) {
-						auto const condition { to_binary_string(transitionConditions[child], cell.inputs.size()) };
-						auto const effectTransformation { (std::uniform_int_distribution<size_t> { 0u, configNumUdfmDontCare })(random) };
-						auto const isLeafTransition { tree[tree[index][child]].size() == 0u };
-						auto [effect, state] = simulate_cell(cell, condition, allStates[index]);
-						if (isLeafTransition) effect = (effect == "X") ? "X" : ((effect == "0") ? "1" : "0"); // Invert effect
-						if (effectTransformation == configNumUdfmDontCare) effect = "X"; // No effect
-						allConditions[index].push_back(condition);
-						allEffects[index].push_back(effect);
-						allStates[tree[index][child]] = state;
-					}
-				}
+						auto const inputValues { to_binary_string(childInputs[child], cell.inputs.size()) };
+						auto [outputValues, nextDffStates] = simulate_cell(cell, inputValues, dffStates[index]);
 
-				auto udfmFault { udfmCell->AddFault("fault_" + std::to_string(fault), "pseudo-fault") };
-				for (size_t index { 0u }; index < tree.size(); index++) {
-					// Only include leaves
-					if (tree[index].size() != 0u) {
-						continue;
-					}
+						auto const transitionTo { tree[index][child] };
+						auto const isLeafTransition { transitionTo == 0u };
 
-					// Trace back the leaf to the root ("record" conditions and effects in reverse order)
-					std::vector<std::string> conditions(cell.inputs.size(), std::string { });
-					std::vector<std::string> effects(cell.outputs.size(), std::string { });
-					size_t current = index;
-					do {
-						auto const parent { parents[current] };
-						auto const offset { std::find(tree[parent].begin(), tree[parent].end(), current) };
-						ASSERT(offset != tree[parent].end());
-						auto const index { offset - tree[parent].begin() };
+						if (isLeafTransition) {
+							for (auto& value : outputValues) {
+								// Invert output for fault propagation
+								value = (value == 'X') ? 'X' : ((value == '0') ? '1' : '0');
+							}
+						} else {
+							// Propagate internal state for child
+							dffStates[tree[index][child]] = nextDffStates;
+						}
+
+						bool accepting = false;
+						for (auto& value : outputValues) {
+							auto const makeDontCare { (GenRand { 0u, configNumDontCare })(random) };
+							if (makeDontCare == configNumDontCare) value = 'X'; // Undefined output
+							accepting |= (value == '0' || value == '1');
+						}
+
+						std::vector<Fault::CellAwareFaultSpecification::Port> inputs;
+						std::vector<Fault::CellAwareFaultSpecification::Port> outputs;
 						for (size_t i { 0u }; i < cell.inputs.size(); i++) {
-							conditions[i] += allConditions[parent][index][i];
+							inputs.push_back({ cell.inputs[i], Basic::GetLogicConstraintForCharacter(inputValues[i]) });
 						}
 						for (size_t i { 0u }; i < cell.outputs.size(); i++) {
-							effects[i] += allEffects[parent][index][i];
+							outputs.push_back({ cell.outputs[i], Basic::GetLogicConstraintForCharacter(outputValues[i]) });
 						}
-						current = parents[current];
-					} while (current != 0u);
-
-					// Convert to UDFM format
-					Io::Udfm::UdfmPortMap mappedConditions { };
-					Io::Udfm::UdfmPortMap mappedEffects { };
-					for (size_t i { 0u }; i < cell.inputs.size(); i++) {
-						std::reverse(conditions[i].begin(), conditions[i].end()); // Transform to forward direction
-						mappedConditions[cell.inputs[i]] = Basic::GetLogicConstraintsForString(conditions[i]);
+						faultStates[index].transitions.push_back({
+							.inputs = inputs,
+							.outputs = outputs,
+							.toState = transitionTo,
+							.accepting = accepting
+						});
 					}
-					for (size_t i { 0u }; i < cell.outputs.size(); i++) {
-						std::reverse(effects[i].begin(), effects[i].end()); // Transform to forward direction
-						mappedEffects[cell.outputs[i]] = Basic::GetLogicConstraintsForString(effects[i]);
-					}
-					udfmFault->AddAlternative("dynamic-test", mappedConditions, mappedEffects);
 				}
+				faultSpecifications.emplace_back("fault_" + std::to_string(faultIndex), faultStates);
 			}
+			cellSpecifications.emplace_back(cell.name, faultSpecifications);
 		}
-		DVLOG(3) << *udfm;
-		Mixin::UdfmMixin::SetUdfm(udfm);
+
+		auto specification { std::make_shared<Fault::CellAwareModelSpecification>(cellSpecifications) };
+		Mixin::CellAwareSpecificationMixin::SetCellAwareModelSpecification(specification);
+		DVLOG(3) << to_string(*specification);
 	}
 	else
 	{
@@ -632,7 +647,8 @@ void FuzzingBase<FaultModel, FaultList>::GenerateFaultList(size_t seed)
 	}
 	else if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
 	{
-		this->faultList = FaultList(Fault::GenerateCellAwareFaultList(*this->circuit, *this->GetUdfm()));
+		this->faultList = FaultList(Fault::GenerateCellAwareFaultList(*this->circuit,
+			*this->GetCellAwareModelSpecification()));
 	}
 	else
 	{

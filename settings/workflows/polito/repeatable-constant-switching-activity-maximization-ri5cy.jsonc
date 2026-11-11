@@ -1,0 +1,17 @@
+[
+	{"application": "POLITO_CPU_REPEATABLE_CONSTANT_SWITCHING_MAXIMIZATION"},
+
+	{"include": "../circuits/processors/ri5cy-rv32im-zicsr-xpulp2.freitest.jsonc"},
+	{"define" : "OutputDir", "value": "./output/polito"},
+	{"setting": "DataExportDirectory", "value": "[OutputDir]/[CircuitName]_RepeatableConstantStress"},
+
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/VcmBaseDirectory", "value": "[VcmDir]"},
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/VcmImportFilename", "value": "output/repeatable-constant-switching-vcm-ri5cy-rv32im-zicsr-xpulp2-nangate.v"},
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/VcmTopLevelModuleName", "value": "ri5cy_vcm"},
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/VcmLibraryFilename", "value": "[LibraryDir]/nangate45_freitest.v"},
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/VcmExportPreprocessedFilename", "value": "[DataExportDirectory]/[Circuit]-vcm.preprocessed.v"},
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/VcmExportProcessedFilename", "value": "[DataExportDirectory]/[Circuit]-vcm.processed.v"},
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/ModuleWatcher", "value": "[CircuitDir]/ri5cy-watchers.jsonc"},
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/ModulePrinter", "value": "[CircuitDir]/ri5cy-table.jsonc"},
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/RiscvCore", "value" : "Yes"},
+]

@@ -21,6 +21,7 @@ auto circuit_set_flipflops(std::unique_ptr<V{{name}}>& top, const std::string& f
 auto circuit_set_inputs(std::unique_ptr<V{{name}}>& top, const std::string& inputs) -> void;
 auto circuit_set_outputs(std::unique_ptr<V{{name}}>& top, const std::string& outputs) -> void;
 auto circuit_set_clocks(std::unique_ptr<V{{name}}>& top, uint8_t value) -> void;
+auto circuit_set_resets(std::unique_ptr<V{{name}}>& top, uint8_t value) -> void;
 auto circuit_get_flipflops(std::unique_ptr<V{{name}}>& top) -> std::string;
 auto circuit_get_inputs(std::unique_ptr<V{{name}}>& top) -> std::string;
 auto circuit_get_outputs(std::unique_ptr<V{{name}}>& top) -> std::string;
@@ -40,6 +41,7 @@ auto main(int argc, char** argv, char** envp) -> int {
     size_t timeframe;
 
     circuit_set_clocks(top, 0u);
+    circuit_set_resets(top, 0u);
     top->eval();
 
     do {
@@ -134,6 +136,15 @@ auto circuit_set_clocks(std::unique_ptr<V{{name}}>& top, uint8_t value) -> void 
 {% endfor %}
 }
 
+auto circuit_set_resets(std::unique_ptr<V{{name}}>& top, uint8_t value) -> void {
+    auto get_value = [&value](auto const& previous, size_t shift) mutable -> auto {
+        return (previous & ~(1u << shift)) | ((value & 1u) << shift);
+    };
+{% for reset, shift in resets %}
+    top->{{reset|join("->")}} = get_value(top->{{reset|join("->")}}, {{shift}});
+{% endfor %}
+}
+
 auto circuit_get_flipflops(std::unique_ptr<V{{name}}>& top) -> std::string {
     std::string flipflops;
     auto put_value = [&](auto const& flipflop, size_t shift) mutable -> void {
@@ -191,14 +202,21 @@ if __name__ == '__main__':
     inputs = meta['circuit']['inputs']
     outputs = meta['circuit']['outputs']
     clocks = meta['circuit']['clocks']
+    resets = meta['circuit']['resets']
 
     config_path = pathlib.Path(args.output_path) / f'V{name}.vlt'
     config_path.parent.mkdir(parents=True, exist_ok=True)
     with open(config_path, 'wt', encoding='utf-8') as stream:
         print('`verilator_config', file=stream)
         print('lint_off -rule ASCRANGE', file=stream)
+        print('public -module "DL"', file=stream)
+        print('public -module "DLR"', file=stream)
         print('public -module "DFF"', file=stream)
+        print('public -module "DFFR"', file=stream)
+        print('public -module "DL" -var "out_reg"', file=stream)
+        print('public -module "DLR" -var "out_reg"', file=stream)
         print('public -module "DFF" -var "out_reg"', file=stream)
+        print('public -module "DFFR" -var "out_reg"', file=stream)
 
     subprocess.run([
         'verilator',
@@ -212,6 +230,7 @@ if __name__ == '__main__':
         '--prefix', f'V{name}',
         '--top-module', name,
         *itertools.chain(*[['--clk', clock] for clock in clocks]),
+        *itertools.chain(*[['--clk', reset] for reset in resets]),
         args.library_path,
         args.circuit_verilog,
         config_path,
@@ -224,6 +243,7 @@ if __name__ == '__main__':
     input_map = dict([(input_dict['name'], (input_dict['top'], input_dict['bottom'])) for input_dict in meta['circuit']['inputs_full']])
     output_map = dict([(output_dict['name'], (output_dict['top'], output_dict['bottom'])) for output_dict in meta['circuit']['outputs_full']])
     clock_map = dict([(clock_dict['name'], (clock_dict['top'], clock_dict['bottom'])) for clock_dict in meta['circuit']['clocks_full']])
+    reset_map = dict([(reset_dict['name'], (reset_dict['top'], reset_dict['bottom'])) for reset_dict in meta['circuit']['resets_full']])
     index_regex = re.compile(r'(.*) \[(\d+)\]')
     def _transform_port(port, port_map):
         match = index_regex.match(port)
@@ -242,6 +262,7 @@ if __name__ == '__main__':
     inputs_transformed = [_transform_port(input, input_map) for input in inputs]
     outputs_transformed = [_transform_port(output, output_map) for output in outputs]
     clocks_transformed = [_transform_port(clock, clock_map) for clock in clocks]
+    resets_transformed = [_transform_port(reset, reset_map) for reset in resets]
 
     context = {
         'name': name,
@@ -249,6 +270,7 @@ if __name__ == '__main__':
         'inputs': inputs_transformed,
         'outputs': outputs_transformed,
         'clocks': clocks_transformed,
+        'resets': resets_transformed,
     }
 
     template = environment.get_template('circuit.jinja2')

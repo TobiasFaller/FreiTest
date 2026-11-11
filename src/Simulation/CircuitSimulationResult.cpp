@@ -215,17 +215,14 @@ void SimulationResult::Fill(Logic value)
 std::string to_string(const SimulationResult& simulationResult)
 {
 	std::string result;
-
 	for (const SimulationTimeframe& timeframe : simulationResult)
 	{
 		if (result != "")
 		{
 			result += " -> ";
 		}
-
 		result += to_string(timeframe);
 	}
-
 	return result;
 }
 
@@ -239,11 +236,9 @@ std::string to_string(const SimulationTimeframe& timeframe)
 	return result;
 }
 
-
 std::string to_string(const SimulationResult& simulationResult, const MappedCircuit& circuit)
 {
 	std::string result;
-
 	size_t timeframeId = 0u;
 	for (const SimulationTimeframe& timeframe : simulationResult)
 	{
@@ -251,110 +246,16 @@ std::string to_string(const SimulationResult& simulationResult, const MappedCirc
 		result += to_string(timeframe, circuit);
 		timeframeId++;
 	}
-
 	return result;
 }
 
 std::string to_string(const SimulationTimeframe& timeframe, const MappedCircuit& circuit)
 {
 	std::string result;
-
 	for (const auto [nodeId, node] : circuit.EnumerateNodes())
 	{
 		result += std::to_string(nodeId) + " " + node->GetName() + ": " + to_string(timeframe[nodeId]) + "\n";
 	}
-	return result;
-}
-
-std::string to_string(const SimulationResult& goodResult, const SimulationResult& badResult, const Circuit::MappedCircuit& circuit)
-{
-	ASSERT(goodResult.size() == badResult.size());
-	std::string result;
-
-	for (size_t timeframeId = 0u; timeframeId < goodResult.size(); ++timeframeId)
-	{
-		result += "Timeframe " + std::to_string(timeframeId) + "\n";
-		result += to_string(goodResult[timeframeId], badResult[timeframeId], circuit);
-	}
-
-	return result;
-}
-
-std::string to_string(const SimulationTimeframe& goodTimeframe, const SimulationTimeframe& badTimeframe, const Circuit::MappedCircuit& circuit)
-{
-	std::string result;
-
-	for (size_t nodeId = 0u; nodeId < circuit.GetNumberOfNodes(); ++nodeId)
-	{
-		result += "NodeId: " + std::to_string(nodeId) + ", " + circuit.GetNode(nodeId)->GetName() + ": "
-				+ to_string(goodTimeframe[nodeId]) + "/" + to_string(badTimeframe[nodeId]);
-
-		if (goodTimeframe[nodeId] != badTimeframe[nodeId])
-		{
-			result += " <-----------";
-			if (goodTimeframe[nodeId] != Logic::LOGIC_INVALID && goodTimeframe[nodeId] != badTimeframe[nodeId])
-			{
-				result += " !!!!!";
-			}
-		}
-		result += "\n";
-	}
-	return result;
-}
-
-std::string to_string(const SimulationResult& atpgGoodResult, const SimulationResult& atpgBadResult,
-						const SimulationResult& simGoodResult, const SimulationResult& simBadResult, const Circuit::MappedCircuit& circuit)
-{
-	ASSERT(atpgGoodResult.size() == atpgBadResult.size());
-	ASSERT(atpgGoodResult.size() == simGoodResult.size());
-	ASSERT(simGoodResult.size() == simBadResult.size());
-
-	std::string result;
-
-	for (size_t timeframeId = 0u; timeframeId < atpgGoodResult.size(); ++timeframeId)
-	{
-		result += "\nTimeframe " + std::to_string(timeframeId) + "\n";
-		for (size_t nodeId = 0u; nodeId < circuit.GetNumberOfNodes(); ++nodeId)
-		{
-			result += "NodeId: " + std::to_string(nodeId) + ", " + circuit.GetNode(nodeId)->GetName() + ": ATPG= "
-					+ to_string(atpgGoodResult[timeframeId][nodeId]) + "/" + to_string(atpgBadResult[timeframeId][nodeId])
-					+ " vs " + to_string(simGoodResult[timeframeId][nodeId]) + "/" + to_string(simBadResult[timeframeId][nodeId]) + " =SIM";
-
-			if (atpgGoodResult[timeframeId][nodeId] != simGoodResult[timeframeId][nodeId]
-				|| atpgBadResult[timeframeId][nodeId] != simBadResult[timeframeId][nodeId])
-			{
-				result += " <-----------";
-				if ((atpgGoodResult[timeframeId][nodeId] != Logic::LOGIC_INVALID && atpgGoodResult[timeframeId][nodeId] != simGoodResult[timeframeId][nodeId])
-					|| (atpgBadResult[timeframeId][nodeId] != Logic::LOGIC_INVALID && atpgBadResult[timeframeId][nodeId] != simBadResult[timeframeId][nodeId]))
-				{
-					result += " !!!!!";
-				}
-			}
-			result += "\n";
-		}
-	}
-
-	return result;
-}
-
-std::string to_debug(const SimulationResult& goodResult, const SimulationResult& badResult, const Circuit::MappedCircuit& circuit)
-{
-	ASSERT(goodResult.size() == badResult.size());
-	std::string result;
-
-	for (const auto [nodeId, node] : circuit.EnumerateNodes())
-	{
-		result += "Node " + std::to_string(nodeId) + "(" + node->GetName() + ", " + to_string(node->GetCellType()) + "):\n";
-		std::string good;
-		std::string bad;
-		for (size_t timeframeId = 0u; timeframeId < goodResult.size(); ++timeframeId)
-		{
-			good += to_string(goodResult[timeframeId][nodeId]);
-			bad += to_string(badResult[timeframeId][nodeId]);
-		}
-		result += "good: " + good + "\nbad:  " + bad + "\n";
-	}
-
 	return result;
 }
 

@@ -23,7 +23,7 @@ CircuitEnvironment::CircuitEnvironment(void):
 
 CircuitEnvironment::~CircuitEnvironment(void) = default;
 
-string CircuitEnvironment::GetName(void) const
+const std::string& CircuitEnvironment::GetName(void) const
 {
 	return _circuitName;
 }
@@ -61,7 +61,7 @@ size_t CircuitEnvironment::GetUnmappedNodeId(size_t mappedNodeId) const
 	return _mappedToUnmappedTSorts[mappedNodeId];
 }
 
-std::vector<size_t> CircuitEnvironment::GetMappedNodeIds(size_t unmappedNodeId) const
+const std::vector<size_t>& CircuitEnvironment::GetMappedNodeIds(size_t unmappedNodeId) const
 {
 	ASSERT(unmappedNodeId < _unmappedToMappedTSorts.size()) << "Requested invalid node id: " << unmappedNodeId;
 	return _unmappedToMappedTSorts[unmappedNodeId];
@@ -85,7 +85,7 @@ size_t CircuitEnvironment::GetUnmappedPinId(size_t mappedPinId) const
 	return _mappedToUnmappedPSorts[mappedPinId];
 }
 
-std::vector<size_t> CircuitEnvironment::GetMappedPinIds(size_t unmappedPinId) const
+const std::vector<size_t>& CircuitEnvironment::GetMappedPinIds(size_t unmappedPinId) const
 {
 	ASSERT(unmappedPinId < _unmappedToMappedPSorts.size()) << "Requested invalid pin id: " << unmappedPinId;
 	return _unmappedToMappedPSorts[unmappedPinId];

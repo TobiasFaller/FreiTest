@@ -25,6 +25,7 @@ if __name__ == '__main__':
     inputs = meta['circuit']['inputs']
     outputs = meta['circuit']['outputs']
     clocks = meta['circuit']['clocks']
+    resets = meta['circuit']['resets']
 
     ff_init = ''.join([str(rand.randint(0, 1)) for _ in flipflops])
     in_assignments = [''.join([str(rand.randint(0, 1)) for _ in inputs]) for _ in range(args.stimuli_timeframes)]
@@ -42,6 +43,7 @@ if __name__ == '__main__':
                 'inputs': inputs,
                 'outputs': outputs,
                 'clocks': clocks,
+                'resets': resets,
             },
             'stimuli': {
                 'flipflops': ff_init,

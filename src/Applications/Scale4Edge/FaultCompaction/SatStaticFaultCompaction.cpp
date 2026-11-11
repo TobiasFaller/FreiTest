@@ -75,24 +75,24 @@ void SatCompactionData<Fault::SingleTransitionDelayFaultModel>::Run(void)
 }
 
 SatCompactionData<Fault::CellAwareFaultModel>::SatCompactionData(std::string configPrefix):
-	Mixin::UdfmMixin(configPrefix)
+	Mixin::CellAwareSpecificationMixin(configPrefix)
 {
 }
 SatCompactionData<Fault::CellAwareFaultModel>::~SatCompactionData(void) = default;
 
 bool SatCompactionData<Fault::CellAwareFaultModel>::SetSetting(std::string key, std::string value)
 {
-	return UdfmMixin::SetSetting(key, value);
+	return CellAwareSpecificationMixin::SetSetting(key, value);
 }
 
 void SatCompactionData<Fault::CellAwareFaultModel>::Init(void)
 {
-	UdfmMixin::Init();
+	CellAwareSpecificationMixin::Init();
 }
 
 void SatCompactionData<Fault::CellAwareFaultModel>::Run(void)
 {
-	UdfmMixin::Run();
+	CellAwareSpecificationMixin::Run();
 }
 
 template <typename FaultModel, typename FaultList>
@@ -128,8 +128,8 @@ void SatStaticFaultCompaction<FaultModel, FaultList>::Run(void)
 		}
 		else if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
 		{
-			ASSERT(this->GetUdfm()) << "No User-Defined Fault Model (UDFM) was loaded";
-			return Io::ImportFaults<FaultList>(importMetaDataHandle.GetStream(), *this->circuit, *this->GetUdfm());
+			return Io::ImportFaults<FaultList>(importMetaDataHandle.GetStream(), *this->circuit,
+				*this->GetCellAwareModelSpecification());
 		}
 		else
 		{

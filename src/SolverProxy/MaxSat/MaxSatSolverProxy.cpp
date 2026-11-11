@@ -4,6 +4,7 @@
 #include "SolverProxy/Sat/DimacsExportProxy.hpp"
 #include "SolverProxy/MaxSat/IncBmoSolverProxy.hpp"
 #include "SolverProxy/MaxSat/PacoseSolverProxy.hpp"
+#include "SolverProxy/Sat/ExternalSolverProxy.hpp"
 
 namespace SolverProxy
 {
@@ -45,6 +46,13 @@ std::unique_ptr<MaxSatSolverProxy> MaxSatSolverProxy::CreateMaxSatSolver(SatSolv
 		{
 			auto proxy = std::make_unique<DimacsExportProxy>();
 			proxy->SetFormat(DimacsExportProxy::Format::WDimacsClassic);
+			return proxy;
+		}
+
+		case SatSolver::EXTERNAL_ARBITRARY_SOLVER:
+		{
+			auto proxy = std::make_unique<ExternalSolverProxy>();
+			proxy->SetExportFormat(ExternalSolverProxy::Format::WDimacsClassic);
 			return proxy;
 		}
 #else

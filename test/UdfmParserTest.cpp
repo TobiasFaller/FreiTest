@@ -11,8 +11,8 @@
 #include "Helper/FileHandle.hpp"
 #include "Io/UserDefinedFaultModel/UdfmParser.hpp"
 
+using namespace FreiTest;
 using namespace FreiTest::Basic;
-using namespace FreiTest::Io::Udfm;
 
 int main(int argc, char* argv[], char* envp[])
 {
@@ -30,14 +30,14 @@ BOOST_AUTO_TEST_CASE( ParseSimpleEmptyThings )
 	FileHandle emptyFault("test/data/udfm/simple_empty_fault.udfm", true);
 	FileHandle emptyAlternative("test/data/udfm/simple_empty_alternative.udfm", true);
 
-	auto udfmEmptyCell = ParseUdfm(emptyCell.GetStream());
+	auto udfmEmptyCell = Io::Udfm::Parse(emptyCell.GetStream());
 	BOOST_CHECK(udfmEmptyCell);
 
 	BOOST_CHECK_EQUAL(1u, udfmEmptyCell->GetCells().size());
 	BOOST_CHECK(udfmEmptyCell->HasCell("EMPTY_CELL"));
 	BOOST_CHECK_EQUAL(0u, udfmEmptyCell->GetCell("EMPTY_CELL")->GetFaults().size());
 
-	auto udfmEmptyFault = ParseUdfm(emptyFault.GetStream());
+	auto udfmEmptyFault = Io::Udfm::Parse(emptyFault.GetStream());
 	BOOST_CHECK(udfmEmptyFault);
 
 	BOOST_CHECK_EQUAL(1u, udfmEmptyFault->GetCells().size());
@@ -49,7 +49,7 @@ BOOST_AUTO_TEST_CASE( ParseSimpleEmptyThings )
 	BOOST_CHECK_EQUAL(0u, emptyFaultCell->GetFault("FAULT1")->GetAlternatives().size());
 	BOOST_CHECK_EQUAL(1u, emptyFaultCell->GetFault("FAULT2")->GetAlternatives().size());
 
-	BOOST_CHECK(!ParseUdfm(emptyAlternative.GetStream()));
+	BOOST_CHECK(!Io::Udfm::Parse(emptyAlternative.GetStream()));
 }
 
 BOOST_AUTO_TEST_CASE( ParseSimpleExampleUdfm )
@@ -58,7 +58,7 @@ BOOST_AUTO_TEST_CASE( ParseSimpleExampleUdfm )
     Settings::SetInstance(settings);
 	FileHandle example("test/data/udfm/simple_example.udfm", true);
 
-	auto udfmExample = ParseUdfm(example.GetStream());
+	auto udfmExample = Io::Udfm::Parse(example.GetStream());
 	BOOST_CHECK(udfmExample);
 
 	BOOST_CHECK_EQUAL(1u, udfmExample->GetCells().size());
@@ -107,7 +107,7 @@ BOOST_AUTO_TEST_CASE( ParseTessentExampleUdfm )
     Settings::SetInstance(settings);
 	FileHandle example("test/data/udfm/tessent_example.udfm", true);
 
-	auto udfmExample = ParseUdfm(example.GetStream());
+	auto udfmExample = Io::Udfm::Parse(example.GetStream());
 	BOOST_CHECK(udfmExample);
 
 	BOOST_CHECK_EQUAL(1u, udfmExample->GetCells().size());

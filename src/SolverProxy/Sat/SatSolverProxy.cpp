@@ -15,6 +15,7 @@
 #include "SolverProxy/Sat/CryptoMinisatSolverProxy.hpp"
 #include "SolverProxy/Sat/IpasirDynamicSolverProxy.hpp"
 #include "SolverProxy/Sat/IpasirStaticSolverProxy.hpp"
+#include "SolverProxy/Sat/ExternalSolverProxy.hpp"
 
 #include "Basic/Logging.hpp"
 
@@ -118,7 +119,12 @@ std::unique_ptr<SatSolverProxy> SatSolverProxy::CreateSatSolver(SatSolver solver
 #else
 			Logging::Panic("DIMACS (CNF) export format is currently not supported!");
 #endif
-
+		case SatSolver::EXTERNAL_ARBITRARY_SOLVER:
+		{
+			auto proxy = std::make_unique<ExternalSolverProxy>();
+			proxy->SetExportFormat(ExternalSolverProxy::Format::Dimacs);
+			return proxy;
+		}
 		default:
 			LOG(FATAL) << "Unknown Solver type: " << solver;
 			return std::unique_ptr<SatSolverProxy>();
@@ -151,6 +157,8 @@ std::string to_string(const SatSolver& solver)
 			return "EXPORT_SAT_DIMACS";
 		case SatSolver::EXPORT_MAX_SAT_DIMACS:
 			return "EXPORT_MAX_SAT_DIMACS";
+		case SatSolver::EXTERNAL_ARBITRARY_SOLVER:
+			return "EXTERNAL_ARBITRARY_SOLVER";
 		default:
 			return "INVALID";
 	}
@@ -376,4 +384,3 @@ void SatSolverProxy::ClearAutomaticLiteral(void)
 };
 };
 
-	

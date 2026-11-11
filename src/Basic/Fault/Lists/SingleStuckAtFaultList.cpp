@@ -4,6 +4,7 @@
 #include <vector>
 #include <utility>
 #include <numeric>
+#include <random>
 #include <regex>
 
 #include "Circuit/MappedCircuit.hpp"
@@ -16,6 +17,9 @@ namespace FreiTest
 {
 namespace Fault
 {
+
+static std::pair<std::vector<SingleStuckAtFault>, std::vector<size_t>> RemapFaults(const std::vector<SingleStuckAtFault>& faultList, const std::vector<size_t>& faultIndices);
+static std::vector<size_t> GetSortIndices(const std::vector<SingleStuckAtFault>& faultList);
 
 SingleStuckAtFaultMetaData::SingleStuckAtFaultMetaData(void):
 	TargetedFaultMetaData(),
@@ -41,7 +45,7 @@ std::vector<SingleStuckAtFault> GenerateStuckAtFaultList(const CircuitEnvironmen
 	for(auto [nodeId, node] : mappedCircuit.EnumerateNodes())
 	{
 		if (node->GetCellCategory() == CellCategory::MAIN_IN
-			|| (node->GetCellCategory() == CellCategory::MAIN_CONSTANT && (node->GetCellType() == CellType::PRESET_0 || node->GetCellType() == CellType::PRESET_1)))
+			|| node->GetCellCategory() == CellCategory::MAIN_CONSTANT)
 		{
 			forwardConnection[nodeId] = true;
 		}
@@ -67,7 +71,7 @@ std::vector<SingleStuckAtFault> GenerateStuckAtFaultList(const CircuitEnvironmen
 	{
 		if (backwardConnection[nodeId - 1u])
 		{
-			const MappedNode* node = mappedCircuit.GetNode(nodeId - 1u);
+			const auto* node = mappedCircuit.GetNode(nodeId - 1u);
 			for (auto input : node->GetInputs())
 			{
 				backwardConnection[input->GetNodeId()] = true;
@@ -109,12 +113,12 @@ std::vector<SingleStuckAtFault> GenerateStuckAtFaultList(const CircuitEnvironmen
 	return faultList;
 }
 
-std::vector<size_t> GetSortIndicesForStuckAtFaultList(const std::vector<SingleStuckAtFault>& faultList)
+static std::vector<size_t> GetSortIndices(const std::vector<SingleStuckAtFault>& faultList)
 {
 	// Sort the index list by node-id to arrange consecutive faults after each other
-	std::vector<size_t> newFaultIndices(faultList.size());
-	std::iota(newFaultIndices.begin(), newFaultIndices.end(), 0u);
-	std::stable_sort(newFaultIndices.begin(), newFaultIndices.end(), [&faultList](size_t index1, size_t index2) {
+	std::vector<size_t> faultIndices(faultList.size());
+	std::iota(faultIndices.begin(), faultIndices.end(), 0u);
+	std::stable_sort(faultIndices.begin(), faultIndices.end(), [&faultList](size_t index1, size_t index2) {
 		const auto& f1 { faultList[index1] };
 		const auto& f2 { faultList[index2] };
 
@@ -127,21 +131,7 @@ std::vector<size_t> GetSortIndicesForStuckAtFaultList(const std::vector<SingleSt
 			: (f1.GetPort() < f2.GetPort());
 	});
 
-	return newFaultIndices;
-}
-
-std::pair<std::vector<SingleStuckAtFault>, std::vector<size_t>> SortStuckAtFaultList(const std::vector<SingleStuckAtFault>& faultList)
-{
-	auto newFaultIndices = GetSortIndicesForStuckAtFaultList(faultList);
-
-	std::vector<SingleStuckAtFault> newFaultList;
-	newFaultList.reserve(faultList.size());
-	for (size_t index { 0u }; index < newFaultIndices.size(); ++index)
-	{
-		newFaultList[newFaultIndices[index]] = faultList[index];
-	}
-
-	return { newFaultList, newFaultIndices };
+	return faultIndices;
 }
 
 std::pair<std::vector<SingleStuckAtFault>, std::vector<size_t>> ReduceStuckAtFaultList(const CircuitEnvironment& circuitEnvironment, StuckAtFaultReduction reduction, const std::vector<SingleStuckAtFault>& faultList)
@@ -178,42 +168,205 @@ std::pair<std::vector<SingleStuckAtFault>, std::vector<size_t>> ReduceStuckAtFau
 		}
 	};
 
-	if (reduction == StuckAtFaultReduction::RemoveNone)
+	const auto& mappedCircuit = circuitEnvironment.GetMappedCircuit();
+	const auto& metaData = circuitEnvironment.GetMetaData();
+
+	std::vector<size_t> faultIndices(faultList.size());
+	std::iota(faultIndices.begin(), faultIndices.end(), 0u);
+
+	if ((reduction & StuckAtFaultReduction::RemoveCellInternal) == StuckAtFaultReduction::RemoveCellInternal)
 	{
-		std::vector<size_t> unitMapping(faultList.size());
-		std::iota(unitMapping.begin(), unitMapping.end(), 0u);
-		return { faultList, unitMapping };
+		for (size_t index { 0u }; index < faultIndices.size(); ++index)
+		{
+			if (faultIndices[index] == REMOVED_FAULT)
+			{
+				continue;
+			}
+
+			auto const& fault { faultList[faultIndices[index]] };
+			auto const* group { metaData.GetGroup(fault.GetNode()) };
+			auto const* cell { group->GetParent() };
+			if (cell == nullptr)
+			{
+				continue;
+			}
+
+			auto const& sourceInfo { cell->GetSourceInfo() };
+			if (!sourceInfo.GetProperty<bool>("module-is-cell").value_or(false))
+			{
+				continue;
+			}
+
+			const auto connectionId { fault.GetNode()->GetPortConnectionId(fault.GetPort()) };
+
+			bool connectedToPort = false;
+			for (auto port: cell->GetPorts())
+			{
+				ASSERT(port.GetConnections().size() == 1u) << "Found a cell with a port that has more than a single wire in the bus.";
+				if (port.GetConnections()[0u] == nullptr)
+				{
+					continue;
+				}
+
+				if (port.GetConnections()[0u]->GetConnectionId() != connectionId)
+				{
+					continue;
+				}
+
+				const auto portType = port.GetSourceInfo().GetProperty<std::string>("port-type").value_or("unknown");
+				if ((fault.GetPort().portType == PortType::Input && portType == "input")
+						|| (fault.GetPort().portType == PortType::Output && portType == "output")) {
+					connectedToPort = true;
+					break;
+				}
+			}
+
+			if (!connectedToPort)
+			{
+				faultIndices[index] = REMOVED_FAULT;
+			}
+		}
 	}
 
-	const MappedCircuit& mappedCircuit = circuitEnvironment.GetMappedCircuit();
-	const CircuitMetaData& metaData = circuitEnvironment.GetMetaData();
+	if ((reduction & StuckAtFaultReduction::RemoveSequentialClock) == StuckAtFaultReduction::RemoveSequentialClock)
+	{
+		for (size_t index { 0u }; index < faultList.size(); ++index)
+		{
+			if (faultIndices[index] == REMOVED_FAULT)
+			{
+				continue;
+			}
 
-	std::vector<bool> faultMergedOrRemoved(faultList.size(), false);
-	std::vector<size_t> newFaultIndices(faultList.size());
-	std::iota(newFaultIndices.begin(), newFaultIndices.end(), 0u);
+			auto const& fault { faultList[faultIndices[index]] };
+			auto const* node { fault.GetNode() };
+			if (node->GetCellType() != CellType::S_OUT
+				&& node->GetCellType() != CellType::S_OUT_CLK
+				&& node->GetCellType() != CellType::S_OUT_EN)
+			{
+				continue;
+			}
 
+			if (fault.GetPort().portType == PortType::Input
+				&& fault.GetPort().portNumber == 1u)
+			{
+				faultIndices[index] = REMOVED_FAULT;
+			}
+		}
+	}
+
+	if ((reduction & StuckAtFaultReduction::RemoveSequentialSetReset) == StuckAtFaultReduction::RemoveSequentialSetReset)
+	{
+		for (size_t index { 0u }; index < faultList.size(); index++)
+		{
+			if (faultIndices[index] == REMOVED_FAULT)
+			{
+				continue;
+			}
+
+			auto const& fault = faultList[faultIndices[index]];
+			auto const* node { fault.GetNode() };
+			if (node->GetCellType() != CellType::S_OUT
+				&& node->GetCellType() != CellType::S_OUT_CLK
+				&& node->GetCellType() != CellType::S_OUT_EN)
+			{
+				continue;
+			}
+
+			if (fault.GetPort().portType == PortType::Input
+				&& fault.GetPort().portNumber >= 2u
+				&& fault.GetPort().portNumber <= 3u)
+			{
+				faultIndices[index] = REMOVED_FAULT;
+			}
+		}
+	}
+
+	if ((reduction & StuckAtFaultReduction::RemoveConnectedToDontCare) == StuckAtFaultReduction::RemoveConnectedToDontCare)
+	{
+		for (size_t index { 0u }; index < faultList.size(); index++)
+		{
+			if (faultIndices[index] == REMOVED_FAULT)
+			{
+				continue;
+			}
+
+			auto const& fault { faultList[faultIndices[index]] };
+			if (fault.GetPort().portType != PortType::Input)
+			{
+				continue;
+			}
+
+			auto const* driverNode { fault.GetNode()->GetInput(fault.GetPort().portNumber) };
+			if (driverNode->GetCellType() == CellType::PRESET_X)
+			{
+				faultIndices[index] = REMOVED_FAULT;
+			}
+		}
+	}
+
+	if ((reduction & StuckAtFaultReduction::RemoveConnectedToUnknown) == StuckAtFaultReduction::RemoveConnectedToUnknown)
+	{
+		for (size_t index { 0u }; index < faultList.size(); index++)
+		{
+			if (faultIndices[index] == REMOVED_FAULT)
+			{
+				continue;
+			}
+
+			auto const& fault { faultList[faultIndices[index]] };
+			if (fault.GetPort().portType != PortType::Input)
+			{
+				continue;
+			}
+
+			auto const* driverNode { fault.GetNode()->GetInput(fault.GetPort().portNumber) };
+			if (driverNode->GetCellType() == CellType::PRESET_U)
+			{
+				faultIndices[index] = REMOVED_FAULT;
+			}
+		}
+	}
+
+	if ((reduction & StuckAtFaultReduction::RemoveCircuitPort) == StuckAtFaultReduction::RemoveCircuitPort)
+	{
+		for (size_t index { 0u }; index < faultList.size(); index++)
+		{
+			if (faultIndices[index] == REMOVED_FAULT)
+			{
+				continue;
+			}
+
+			auto const& fault { faultList[faultIndices[index]] };
+			auto const* node { fault.GetNode() };
+			if (mappedCircuit.IsPrimaryInput(node) || mappedCircuit.IsPrimaryOutput(node))
+			{
+				faultIndices[index] = REMOVED_FAULT;
+			}
+		}
+	}
+
+	// Now remap remaining faults. If we remap first and then remove the original faults
+	// the remapped faults will point to a removed fault.
 	if ((reduction & StuckAtFaultReduction::RemoveEquivalent) == StuckAtFaultReduction::RemoveEquivalent)
 	{
 		// Sort the index list by node-id to arrange consecutive faults after each other
-		newFaultIndices = GetSortIndicesForStuckAtFaultList(faultList);
+		auto forwardFaultIndices = GetSortIndices(faultList);
 
 		// Build a reverse mapping to be able to traverse the fault list in sorted order.
-		// This mapping is not updated to enable the lookup if a fault has been remapped or not.
-		std::vector<size_t> reverseFaultIndices(newFaultIndices.size());
-		for (size_t index = 0u; index < newFaultIndices.size(); ++index)
+		std::vector<size_t> reverseFaultIndices(faultList.size());
+		for (size_t index { 0u }; index < faultList.size(); index++)
 		{
-			reverseFaultIndices[newFaultIndices[index]] = index;
+			reverseFaultIndices[forwardFaultIndices[index]] = index;
 		}
 
 		// Start index and end index + 1u for the faults for each node in the reverseFaultIndices array.
 		// This is used as an optimization to search for faults that share a specific node.
 		std::vector<std::pair<size_t, size_t>> nodeFaults(mappedCircuit.GetNumberOfNodes(), std::make_pair(0u, 0u));
-		for (size_t startIndex { 0u }; startIndex < reverseFaultIndices.size();)
+		for (size_t startIndex { 0u }; startIndex < faultList.size(); )
 		{
-			const size_t nodeId = faultList[reverseFaultIndices[startIndex]].GetNode()->GetNodeId();
-
-			size_t nextIndex = startIndex + 1u;
-			for (; nextIndex < reverseFaultIndices.size(); ++nextIndex)
+			const auto nodeId = faultList[reverseFaultIndices[startIndex]].GetNode()->GetNodeId();
+			auto nextIndex = startIndex + 1u;
+			for (; nextIndex < reverseFaultIndices.size(); nextIndex++)
 			{
 				if (faultList[reverseFaultIndices[nextIndex]].GetNode()->GetNodeId() != nodeId)
 				{
@@ -226,282 +379,85 @@ std::pair<std::vector<SingleStuckAtFault>, std::vector<size_t>> ReduceStuckAtFau
 			startIndex = nextIndex;
 		}
 
-		// Now filter the faults by removing duplicate entries.
-		// Use the sorted indices as a look-up table to get clusters of faults for the same node.
-		for (size_t revIndex = 0u; revIndex < reverseFaultIndices.size(); ++revIndex)
+		// Now filter the fault list by removing equivalent faults.
+		// Use the sorted indices as a look-up table to get clusters of faults for the same node
+		// and have a defined order of iteration through the circuit graph (from outputs to inputs).
+		for (size_t revIndex { faultList.size() }; revIndex > 0u; revIndex--)
 		{
-			const size_t faultIndex = reverseFaultIndices[revIndex];
+			const auto faultIndex = reverseFaultIndices[revIndex - 1u];
+			if (faultIndices[faultIndex] == REMOVED_FAULT)
+			{
+				continue;
+			}
+
 			const auto& fault { faultList[faultIndex] };
+			if (fault.GetPort().portType != PortType::Output)
+			{
+				continue;
+			}
 
 			// Case 1: Fan-outs: Fault f1 at output and f2 at input of single successor are equivalent.
 			// Condition: The parent node only has one successor.
-			// Since we are iterating the faults in node order from inputs to outputs
-			// we will always merge the faults at the input pins (node with larger id).
-			// => Keep only fault f1 and declare f2 as equivalent.
-			if (fault.GetPort().portType == PortType::Input)
+			// Since we are iterating the faults in reverse node order from outputs to inputs
+			// we will always merge the faults at the output pins (node with smaller id).
+			// => Keep only fault f2 and declare f1 as equivalent.
+			if (fault.GetNode()->GetNumberOfSuccessors() == 1)
 			{
-				const MappedNode* parentNode = fault.GetNode()->GetInput(fault.GetPort().portNumber);
-				const size_t parentNodeId = parentNode->GetNodeId();
-				if (parentNode->GetNumberOfSuccessors() == 1)
+				const auto* successor = fault.GetNode()->GetSuccessor(0);
+				const auto [startIndex, endIndex] = nodeFaults[successor->GetNodeId()];
+				for (size_t otherIndex { startIndex }; otherIndex <= endIndex; otherIndex++)
 				{
-					// Check all faults at the parent node for a match
-					const auto [parentRevFaultsStart, parentRevFaultsEnd] = nodeFaults[parentNodeId];
-					for (size_t parentRevFaultIndex = parentRevFaultsStart; parentRevFaultIndex <= parentRevFaultsEnd; ++parentRevFaultIndex)
+					const auto successorFaultIndex = reverseFaultIndices[otherIndex];
+					const auto& successorFault = faultList[successorFaultIndex];
+					if (successorFault.GetPort().portType == PortType::Input
+						&& successorFault.GetNode()->GetInput(successorFault.GetPort().portNumber) == fault.GetNode()
+						&& successorFault.GetType() == fault.GetType()
+						&& faultIndices[successorFaultIndex] != REMOVED_FAULT)
 					{
-						const size_t parentFaultIndex = reverseFaultIndices[parentRevFaultIndex];
-						const SingleStuckAtFault& parentFault = faultList[parentFaultIndex];
-						if (parentFault.GetType() == fault.GetType()
-							&& parentFault.GetPort().portType == PortType::Output)
-						{
-							faultMergedOrRemoved[faultIndex] = true;
-							newFaultIndices[faultIndex] = newFaultIndices[parentFaultIndex];
-							// Do not update the reverse mapping as it is still used.
-							goto nextFault;
-						}
+						faultIndices[faultIndex] = faultIndices[successorFaultIndex];
+						break;
 					}
 				}
 			}
 
-			// Case 2: Controlling values at the inputs of an AND / NAND / OR / NOR / BUF / INV gate
-			//         and the resulting output values are equivalent (keep only the input fault).
-			if (fault.GetPort().portType == PortType::Output)
+			// Case 2: Equivalent Fault Collapsing (EFC)
+			// Controlling values at the inputs of an AND / NAND / OR / NOR / BUF / INV gate
+			// and the resulting output values are equivalent (keep only the output fault).
+			if ((fault.GetNode()->GetCellCategory() == CellCategory::MAIN_AND && fault.GetStuckAt() == StuckAtFaultType::STUCK_AT_0)
+				|| (fault.GetNode()->GetCellCategory() == CellCategory::MAIN_NAND && fault.GetStuckAt() == StuckAtFaultType::STUCK_AT_1)
+				|| (fault.GetNode()->GetCellCategory() == CellCategory::MAIN_OR && fault.GetStuckAt() == StuckAtFaultType::STUCK_AT_1)
+				|| (fault.GetNode()->GetCellCategory() == CellCategory::MAIN_NOR && fault.GetStuckAt() == StuckAtFaultType::STUCK_AT_0)
+				|| fault.GetNode()->GetCellCategory() == CellCategory::MAIN_BUF
+				|| fault.GetNode()->GetCellCategory() == CellCategory::MAIN_INV)
 			{
-				if ((fault.GetNode()->GetCellCategory() == CellCategory::MAIN_AND && fault.GetStuckAt() == StuckAtFaultType::STUCK_AT_0)
-					|| (fault.GetNode()->GetCellCategory() == CellCategory::MAIN_NAND && fault.GetStuckAt() == StuckAtFaultType::STUCK_AT_1)
-					|| (fault.GetNode()->GetCellCategory() == CellCategory::MAIN_OR && fault.GetStuckAt() == StuckAtFaultType::STUCK_AT_1)
-					|| (fault.GetNode()->GetCellCategory() == CellCategory::MAIN_NOR && fault.GetStuckAt() == StuckAtFaultType::STUCK_AT_0)
-					|| fault.GetNode()->GetCellCategory() == CellCategory::MAIN_BUF || fault.GetNode()->GetCellCategory() == CellCategory::MAIN_INV)
+				const auto [startIndex, endIndex] = nodeFaults[fault.GetNode()->GetNodeId()];
+				for (size_t otherIndex { startIndex }; otherIndex <= endIndex; otherIndex++)
 				{
-					// Check all faults that are earlier in the fault list of the current node for a match
-					const auto [nodeRevFaultsStart, nodeRevFaultsEnd] = nodeFaults[fault.GetNode()->GetNodeId()];
-					for (size_t nodeRevFaultIndex = nodeRevFaultsStart; nodeRevFaultIndex < revIndex; ++nodeRevFaultIndex)
+					const auto inputFaultIndex = reverseFaultIndices[otherIndex];
+					const auto& inputFault = faultList[inputFaultIndex];
+					if (inputFault.GetPort().portType == PortType::Input
+						&& inputFault.GetStuckAt() == invert_fault_type(fault.GetStuckAt(), is_inverting_gate(fault.GetNode()->GetCellCategory()))
+						&& faultIndices[inputFaultIndex] != REMOVED_FAULT)
 					{
-						const size_t nodeFaultIndex = reverseFaultIndices[nodeRevFaultIndex];
-						const SingleStuckAtFault& nodeFault = faultList[nodeFaultIndex];
-						if (nodeFault.GetStuckAt() == invert_fault_type(fault.GetStuckAt(), is_inverting_gate(fault.GetNode()->GetCellCategory()))
-							&& nodeFault.GetPort().portType == PortType::Input)
-						{
-							faultMergedOrRemoved[faultIndex] = true;
-							newFaultIndices[faultIndex] = newFaultIndices[nodeFaultIndex];
-							// Do not update the reverse mapping as it is still used.
-							goto nextFault;
-						}
+						faultIndices[inputFaultIndex] = faultIndices[faultIndex];
 					}
 				}
 			}
-
-		nextFault:
-
-			; // Continue the loop
 		}
 	}
 
-	if ((reduction & StuckAtFaultReduction::RemoveCellInternal) == StuckAtFaultReduction::RemoveCellInternal)
-	{
-		for (size_t index { 0u }; index < newFaultIndices.size(); ++index)
-		{
-			if (faultMergedOrRemoved[index])
-			{
-				continue;
-			}
-
-			auto const& fault { faultList[newFaultIndices[index]] };
-			auto const* group { metaData.GetGroup(fault.GetNode()) };
-			auto const* cell { group->GetParent() };
-			if (cell == nullptr)
-			{
-				faultMergedOrRemoved[index] = true;
-				newFaultIndices[index] = REMOVED_FAULT;
-				continue;
-			}
-
-			auto const& sourceInfo { cell->GetSourceInfo() };
-			if (!sourceInfo.GetProperty<bool>("module-is-cell").value_or(false))
-			{
-				faultMergedOrRemoved[index] = true;
-				newFaultIndices[index] = REMOVED_FAULT;
-				continue;
-			}
-
-			const size_t connectionId { fault.GetNode()->GetPortConnectionId(fault.GetPort()) };
-
-			bool connectedToPort = false;
-			for (auto port: cell->GetPorts())
-			{
-				ASSERT(port.GetConnections().size() == 1u) << "Found a cell with a port that has more than a single wire in the bus.";
-				if (port.GetConnections()[0u] == nullptr)
-				{
-					continue;
-				}
-
-				if (port.GetConnections()[0u]->GetConnectionId() == connectionId)
-				{
-					connectedToPort = true;
-					break;
-				}
-			}
-
-			if (!connectedToPort)
-			{
-				faultMergedOrRemoved[index] = true;
-				newFaultIndices[index] = REMOVED_FAULT;
-				continue;
-			}
-		}
-	}
-
-	if ((reduction & StuckAtFaultReduction::RemoveSequentialClock) == StuckAtFaultReduction::RemoveSequentialClock)
-	{
-		for (size_t index { 0u }; index < newFaultIndices.size(); ++index)
-		{
-			if (faultMergedOrRemoved[index])
-			{
-				continue;
-			}
-
-			auto const& fault { faultList[newFaultIndices[index]] };
-			if (fault.GetPort().portType != PortType::Input
-				|| fault.GetPort().portNumber != 1u)
-			{
-				continue;
-			}
-
-			auto const* mappedNode { fault.GetNode() };
-			if (mappedNode->GetCellType() != CellType::S_OUT_CLK)
-			{
-				continue;
-			}
-
-			faultMergedOrRemoved[index] = true;
-			newFaultIndices[index] = REMOVED_FAULT;
-		}
-	}
-
-	if ((reduction & StuckAtFaultReduction::RemoveSequentialSetReset) == StuckAtFaultReduction::RemoveSequentialSetReset)
-	{
-		for (size_t index { 0u }; index < newFaultIndices.size(); ++index)
-		{
-			if (faultMergedOrRemoved[index])
-			{
-				continue;
-			}
-
-			auto const& fault = faultList[newFaultIndices[index]];
-			if (fault.GetPort().portType != PortType::Input
-				|| (fault.GetPort().portNumber < 2u) || (fault.GetPort().portNumber > 3u))
-			{
-				continue;
-			}
-
-			auto const* mappedNode { fault.GetNode() };
-			if (mappedNode->GetCellType() != CellType::S_OUT
-				&& mappedNode->GetCellType() != CellType::S_OUT_CLK
-				&& mappedNode->GetCellType() != CellType::S_OUT_EN)
-			{
-				continue;
-			}
-
-			faultMergedOrRemoved[index] = true;
-			newFaultIndices[index] = REMOVED_FAULT;
-		}
-	}
-
-	if ((reduction & StuckAtFaultReduction::RemoveConnectedToDontCare) == StuckAtFaultReduction::RemoveConnectedToDontCare)
-	{
-		for (size_t index { 0u }; index < newFaultIndices.size(); ++index)
-		{
-			if (faultMergedOrRemoved[index])
-			{
-				continue;
-			}
-
-			auto const& fault { faultList[newFaultIndices[index]] };
-			if (fault.GetPort().portType != PortType::Input)
-			{
-				continue;
-			}
-
-			auto const* driverNode { fault.GetNode()->GetInput(fault.GetPort().portNumber) };
-			if (driverNode->GetCellType() != CellType::PRESET_X)
-			{
-				continue;
-			}
-
-			faultMergedOrRemoved[index] = true;
-			newFaultIndices[index] = REMOVED_FAULT;
-		}
-	}
-
-	if ((reduction & StuckAtFaultReduction::RemoveConnectedToUnknown) == StuckAtFaultReduction::RemoveConnectedToUnknown)
-	{
-		for (size_t index { 0u }; index < newFaultIndices.size(); ++index)
-		{
-			if (faultMergedOrRemoved[index])
-			{
-				continue;
-			}
-
-			auto const& fault { faultList[newFaultIndices[index]] };
-			if (fault.GetPort().portType != PortType::Input)
-			{
-				continue;
-			}
-
-			auto const* driverNode { fault.GetNode()->GetInput(fault.GetPort().portNumber) };
-			if (driverNode->GetCellType() != CellType::PRESET_U)
-			{
-				continue;
-			}
-
-			faultMergedOrRemoved[index] = true;
-			newFaultIndices[index] = REMOVED_FAULT;
-		}
-	}
-
-	// Construct the new fault list by copying the untouched elements.
-	std::vector<SingleStuckAtFault> newFaultList;
-	newFaultList.reserve(std::count_if(faultMergedOrRemoved.begin(), faultMergedOrRemoved.end(), [](bool faultMergedOrRemoved) {
-		return !faultMergedOrRemoved;
-	}));
-
-	for (size_t faultIndex { 0u }; faultIndex < faultList.size(); ++faultIndex)
-	{
-		if (!faultMergedOrRemoved[faultIndex])
-		{
-			// Update the fault index to the new location.
-			newFaultIndices[faultIndex] = newFaultList.size();
-			newFaultList.emplace_back(faultList[faultIndex]);
-		}
-		else if (newFaultIndices[faultIndex] != REMOVED_FAULT)
-		{
-			// Update the merged index to the new location.
-			// This update method assumes that the referenced index has already
-			// been resolved by the update above.
-			newFaultIndices[faultIndex] = newFaultIndices[newFaultIndices[faultIndex]];
-		}
-	}
-
-	for (size_t faultIndex { 0u }; faultIndex < faultList.size(); ++faultIndex)
-	{
-		ASSERT(newFaultIndices[faultIndex] == REMOVED_FAULT
-				|| newFaultIndices[faultIndex] < newFaultList.size())
-			<< "The mapping has either point to a valid entry of the new fault list "
-			<< "or be equal to REMOVED_FAULT.";
-	}
-
-	return { newFaultList, newFaultIndices };
+	return RemapFaults(faultList, faultIndices);
 }
 
 std::pair<std::vector<SingleStuckAtFault>, std::vector<size_t>> FilterStuckAtFaultListByPattern(const Circuit::CircuitEnvironment& circuitEnvironment, const std::string& pattern, const FilterPatternType& type, const std::vector<SingleStuckAtFault>& faultList)
 {
-	std::vector<bool> faultMergedOrRemoved(faultList.size(), false);
-	std::vector<size_t> newFaultIndices(faultList.size());
-	std::iota(newFaultIndices.begin(), newFaultIndices.end(), 0u);
+	std::vector<size_t> faultIndices(faultList.size());
+	std::iota(faultIndices.begin(), faultIndices.end(), 0u);
 
 	// Let an empty pattern always return the original fault list.
 	if (pattern == "")
 	{
-		return { faultList, newFaultIndices };
+		return { faultList, faultIndices };
 	}
 
 	const auto& metaData { circuitEnvironment.GetMetaData() };
@@ -513,50 +469,17 @@ std::pair<std::vector<SingleStuckAtFault>, std::vector<size_t>> FilterStuckAtFau
 		if ((type == FilterPatternType::Normal && !result)
 			|| (type == FilterPatternType::Inverted && result))
 		{
-			faultMergedOrRemoved[faultIndex] = true;
-			newFaultIndices[faultIndex] = REMOVED_FAULT;
+			faultIndices[faultIndex] = REMOVED_FAULT;
 		}
 	}
 
-	// Construct the new fault list by copying the untouched elements.
-	std::vector<SingleStuckAtFault> newFaultList;
-	newFaultList.reserve(std::count_if(faultMergedOrRemoved.begin(), faultMergedOrRemoved.end(), [](bool faultMergedOrRemoved) {
-		return !faultMergedOrRemoved;
-	}));
-
-	for (size_t faultIndex { 0u }; faultIndex < faultList.size(); ++faultIndex)
-	{
-		if (!faultMergedOrRemoved[faultIndex])
-		{
-			// Update the fault index to the new location.
-			newFaultIndices[faultIndex] = newFaultList.size();
-			newFaultList.emplace_back(faultList[faultIndex]);
-		}
-		else if (newFaultIndices[faultIndex] != REMOVED_FAULT)
-		{
-			// Update the merged index to the new location.
-			// This update method assumes that the referenced index has already
-			// been resolved by the update above.
-			newFaultIndices[faultIndex] = newFaultIndices[newFaultIndices[faultIndex]];
-		}
-	}
-
-	for (size_t faultIndex { 0u }; faultIndex < faultList.size(); ++faultIndex)
-	{
-		ASSERT(newFaultIndices[faultIndex] == REMOVED_FAULT
-				|| newFaultIndices[faultIndex] < newFaultList.size())
-			<< "The mapping has either point to a valid entry of the new fault list "
-			<< "or be equal to REMOVED_FAULT.";
-	}
-
-	return { newFaultList, newFaultIndices };
+	return RemapFaults(faultList, faultIndices);
 }
 
 std::pair<std::vector<SingleStuckAtFault>, std::vector<size_t>> FilterStuckAtFaultListByNodes(const std::vector<SingleStuckAtFault>& faultList, const std::vector<Circuit::MappedNode*>& nodes)
 {
-	std::vector<bool> faultMergedOrRemoved(faultList.size(), false);
-	std::vector<size_t> newFaultIndices(faultList.size());
-	std::iota(newFaultIndices.begin(), newFaultIndices.end(), 0u);
+	std::vector<size_t> faultIndices(faultList.size());
+	std::iota(faultIndices.begin(), faultIndices.end(), 0u);
 
 	std::vector<Circuit::MappedNode*> sortedDrivers { nodes };
 	std::sort(sortedDrivers.begin(), sortedDrivers.end());
@@ -566,38 +489,85 @@ std::pair<std::vector<SingleStuckAtFault>, std::vector<size_t>> FilterStuckAtFau
 		auto const& fault { faultList[faultIndex] };
 		if (std::lower_bound(sortedDrivers.begin(), sortedDrivers.end(), fault.GetNode()) == sortedDrivers.end())
 		{
-			faultMergedOrRemoved[faultIndex] = true;
-			newFaultIndices[faultIndex] = REMOVED_FAULT;
+			faultIndices[faultIndex] = REMOVED_FAULT;
 		}
 	}
 
-	// Construct the new fault list by copying the untouched elements.
-	std::vector<SingleStuckAtFault> newFaultList;
-	newFaultList.reserve(std::count_if(faultMergedOrRemoved.begin(), faultMergedOrRemoved.end(), [](bool faultMergedOrRemoved) {
-		return !faultMergedOrRemoved;
-	}));
+	return RemapFaults(faultList, faultIndices);
+}
 
-	for (size_t faultIndex { 0u }; faultIndex < faultList.size(); ++faultIndex)
+std::pair<std::vector<SingleStuckAtFault>, std::vector<size_t>> SampleStuckAtFaultList(const std::vector<SingleStuckAtFault>& faultList, size_t samples)
+{
+	std::vector<size_t> faultIndices(faultList.size());
+	std::iota(faultIndices.begin(), faultIndices.end(), 0u);
+
+	if (samples == 0u)
 	{
-		if (!faultMergedOrRemoved[faultIndex])
+		return { faultList, faultIndices };
+	}
+
+	std::vector<size_t> sampledIndices;
+	sampledIndices.reserve(samples);
+
+	std::random_device randomDevice {};
+	std::mt19937 randomSource { randomDevice() };
+	std::sample(faultIndices.begin(), faultIndices.end(), std::back_inserter(sampledIndices), samples, randomSource);
+
+	for (auto& fault : faultIndices)
+	{
+		fault = REMOVED_FAULT;
+	}
+	for (auto const& fault : sampledIndices)
+	{
+		faultIndices[fault] = fault;
+	}
+
+	return RemapFaults(faultList, faultIndices);
+}
+
+static std::pair<std::vector<SingleStuckAtFault>, std::vector<size_t>> RemapFaults(const std::vector<SingleStuckAtFault>& faultList, const std::vector<size_t>& faultIndices)
+{
+	ASSERT(faultList.size() == faultIndices.size())
+		<< "Faults and indices list sizes have to match.";
+
+	size_t newFaultCount { 0u };
+	for (size_t index { 0u }; index < faultIndices.size(); index++)
+	{
+		if (faultIndices[index] == index)
 		{
-			// Update the fault index to the new location.
-			newFaultIndices[faultIndex] = newFaultList.size();
-			newFaultList.emplace_back(faultList[faultIndex]);
-		}
-		else if (newFaultIndices[faultIndex] != REMOVED_FAULT)
-		{
-			// Update the merged index to the new location.
-			// This update method assumes that the referenced index has already
-			// been resolved by the update above.
-			newFaultIndices[faultIndex] = newFaultIndices[newFaultIndices[faultIndex]];
+			newFaultCount++;
 		}
 	}
 
-	for (size_t faultIndex { 0u }; faultIndex < faultList.size(); ++faultIndex)
+	std::vector<size_t> newFaultIndices { };
+	std::vector<SingleStuckAtFault> newFaultList { };
+
+	// First re-index all the faults that have been kept.
+	newFaultList.reserve(newFaultCount);
+	newFaultIndices.resize(faultIndices.size(), REMOVED_FAULT);
+	for (size_t index { 0u }; index < faultIndices.size(); index++)
 	{
-		ASSERT(newFaultIndices[faultIndex] == REMOVED_FAULT
-				|| newFaultIndices[faultIndex] < newFaultList.size())
+		if (faultIndices[index] == index)
+		{
+			newFaultIndices[index] = newFaultList.size();
+			newFaultList.emplace_back(faultList[index]);
+		}
+	}
+
+	// Now re-index all the faults that have been merged or removed.
+	for (size_t index { 0u }; index < faultIndices.size(); index++)
+	{
+		if (faultIndices[index] != REMOVED_FAULT && faultIndices[index] != index)
+		{
+			ASSERT(newFaultIndices[faultIndices[index]] != REMOVED_FAULT);
+			newFaultIndices[index] = newFaultIndices[faultIndices[index]];
+		}
+	}
+
+	for (size_t index { 0u }; index < faultIndices.size(); index++)
+	{
+		ASSERT(newFaultIndices[index] == REMOVED_FAULT
+				|| newFaultIndices[index] < newFaultList.size())
 			<< "The mapping has either point to a valid entry of the new fault list "
 			<< "or be equal to REMOVED_FAULT.";
 	}

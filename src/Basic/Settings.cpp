@@ -295,7 +295,8 @@ bool Settings::SetSetting(LoadContext context, string key, string value, bool op
 			{ "PROD_MAX_SAT_PACOSE", SolverProxy::Sat::SatSolver::PROD_MAX_SAT_PACOSE },
 			{ "PROD_MAX_SAT_INC_BMO_COMPLETE", SolverProxy::Sat::SatSolver::PROD_MAX_SAT_INC_BMO_COMPLETE },
 			{ "EXPORT_SAT_DIMACS", SolverProxy::Sat::SatSolver::EXPORT_SAT_DIMACS },
-			{ "EXPORT_MAX_SAT_DIMACS", SolverProxy::Sat::SatSolver::EXPORT_MAX_SAT_DIMACS }
+			{ "EXPORT_MAX_SAT_DIMACS", SolverProxy::Sat::SatSolver::EXPORT_MAX_SAT_DIMACS },
+			{ "EXTERNAL_ARBITRARY_SOLVER", SolverProxy::Sat::SatSolver::EXTERNAL_ARBITRARY_SOLVER}
 		};
 		for (auto [name, solver] : solverList)
 		{

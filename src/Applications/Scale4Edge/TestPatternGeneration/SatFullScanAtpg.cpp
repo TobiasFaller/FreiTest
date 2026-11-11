@@ -39,6 +39,7 @@
 #include "Tpg/LogicGenerator/Constraint/PortConstraintEncoder.hpp"
 #include "Tpg/LogicGenerator/Constraint/SequentialConstraintEncoder.hpp"
 #include "Tpg/LogicGenerator/DChain/BackwardDChainEncoder.hpp"
+#include "Tpg/LogicGenerator/DChain/DChainSequentialConnectionEncoder.hpp"
 #include "Tpg/LogicGenerator/DChain/DChainBaseEncoder.hpp"
 #include "Tpg/LogicGenerator/CircuitLogic/DefaultLogicEncoder.hpp"
 #include "Tpg/LogicGenerator/FaultLogic/FaultPropagationConstraintEncoder.hpp"
@@ -52,6 +53,7 @@
 #include "Tpg/LogicGenerator/CircuitLogic/OutputLogicEncoder.hpp"
 #include "Tpg/LogicGenerator/CircuitLogic/SequentialInputLogicEncoder.hpp"
 #include "Tpg/LogicGenerator/CircuitLogic/SequentialOutputLogicEncoder.hpp"
+#include "Tpg/LogicGenerator/CircuitLogic/SequentialConnectionEncoder.hpp"
 #include "Tpg/LogicGenerator/Vcm/VcmOutputLogicEncoder.hpp"
 #include "Tpg/LogicGenerator/Vcm/VcmInputLogicEncoder.hpp"
 #include "Tpg/Vcm/VcmContext.hpp"
@@ -96,7 +98,7 @@ template<typename PinData> struct AtpgConfig<Fault::CellAwareFaultModel, PinData
 	using FaultSensitizationTimeframe = Tpg::CellAwareSensitizationTimeframe;
 	using FaultTagger = Tpg::CellAwareFaultCircuitTagger<PinData>;
 	using FaultTaggerMode = Tpg::CellAwareFaultTaggingMode;
-	static size_t GetRequiredTimeframeCount(const Fault::CellAwareFaultModel& faultModel) { return faultModel.GetFault()->GetTimeframeSpread(); }
+	static size_t GetRequiredTimeframeCount(const Fault::CellAwareFaultModel& faultModel) { return faultModel.GetFault()->GetStateMachine().GetTimeframes(); }
 };
 
 template <typename FaultModel, typename FaultList>
@@ -108,6 +110,7 @@ SatFullScanAtpg<FaultModel, FaultList>::SatFullScanAtpg(void):
 	VcdExportMixin<FaultList>(SCALE4EDGE_ATPG_CONFIG),
 	VcmMixin(SCALE4EDGE_ATPG_CONFIG),
 	AtpgBase<FaultModel, FaultList>(SCALE4EDGE_ATPG_CONFIG),
+	scanChainType(ScanChainType::LaunchOnShift),
 	maximizeDontCareValues(MaximizeDontCareValues::Disabled),
 	maximizeDontCarePorts(MaximizeDontCarePorts::Inputs),
 	maximizeDontCareFlipFlops(MaximizeDontCareFlipFlops::Inputs),
@@ -142,8 +145,8 @@ void SatFullScanAtpg<FaultModel, FaultList>::Run(void)
 	});
 	Logging::ClearCurrentFault();
 
-	this->statistics.Add("Encoding.PatternGeneration.LogicContainer", std::string("LogicContainer") + get_logic_container_name<LogicContainer>, "Type", "LogicContainer used");
-	this->statistics.Add("Encoding.PatternGeneration.PinData", std::string("PinData") + get_pin_data_name_v<PinData>, "Type", "PinData used");
+	this->statistics.Add("Atpg.Encoding.PatternGeneration.LogicContainer", std::string("LogicContainer") + get_logic_container_name<LogicContainer>, "Type", "LogicContainer used");
+	this->statistics.Add("Atpg.Encoding.PatternGeneration.PinData", std::string("PinData") + get_pin_data_name_v<PinData>, "Type", "PinData used");
 	AtpgBase<FaultModel, FaultList>::ExportStatistics();
 	AtpgBase<FaultModel, FaultList>::ExportTestPatterns(Pattern::InputCapture::PrimaryAndSecondaryInputs);
 	AtpgBase<FaultModel, FaultList>::ExportFaultList();
@@ -152,14 +155,14 @@ void SatFullScanAtpg<FaultModel, FaultList>::Run(void)
 template <typename FaultModel, typename FaultList>
 bool SatFullScanAtpg<FaultModel, FaultList>::SetSetting(std::string key, std::string value)
 {
-	if (key == "Scale4Edge/TestPatternGeneration/MaximizeDontCareValues")
+	if (Settings::IsOption(key, "MaximizeDontCareValues", SCALE4EDGE_ATPG_CONFIG))
 	{
 		return Settings::ParseEnum(value, maximizeDontCareValues, {
 			{ "Disabled", MaximizeDontCareValues::Disabled },
 			{ "Enabled", MaximizeDontCareValues::Enabled }
 		});
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/MaximizeDontCarePorts")
+	if (Settings::IsOption(key, "MaximizeDontCarePorts", SCALE4EDGE_ATPG_CONFIG))
 	{
 		return Settings::ParseEnum(value, maximizeDontCarePorts, {
 			{ "None", MaximizeDontCarePorts::None },
@@ -168,7 +171,7 @@ bool SatFullScanAtpg<FaultModel, FaultList>::SetSetting(std::string key, std::st
 			{ "InputAndOutputs", MaximizeDontCarePorts::InputAndOutputs }
 		});
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/MaximizeDontCareFlipFlops")
+	if (Settings::IsOption(key, "MaximizeDontCareFlipFlops", SCALE4EDGE_ATPG_CONFIG))
 	{
 		return Settings::ParseEnum(value, maximizeDontCareFlipFlops, {
 			{ "None", MaximizeDontCareFlipFlops::None },
@@ -177,14 +180,22 @@ bool SatFullScanAtpg<FaultModel, FaultList>::SetSetting(std::string key, std::st
 			{ "InputAndOutputs", MaximizeDontCareFlipFlops::InputAndOutputs }
 		});
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/MaximizeDontCarePortWeight")
+	if (Settings::IsOption(key, "MaximizeDontCarePortWeight", SCALE4EDGE_ATPG_CONFIG))
 	{
 		return Settings::ParseSizet(value, maximizeDontCarePortWeight);
 	}
-	if (key == "Scale4Edge/TestPatternGeneration/MaximizeDontCareFlipFlopWeight")
+	if (Settings::IsOption(key, "MaximizeDontCareFlipFlopWeight", SCALE4EDGE_ATPG_CONFIG))
 	{
 		return Settings::ParseSizet(value, maximizeDontCareFlipFlopWeight);
 	}
+	if (Settings::IsOption(key, "ScanChainType", SCALE4EDGE_ATPG_CONFIG))
+	{
+		return Settings::ParseEnum(value, scanChainType, {
+			{ "LaunchOnShift", ScanChainType::LaunchOnShift },
+			{ "EnhancedScan", ScanChainType::EnhancedScan }
+		});
+	}
+	return AtpgBase<FaultModel, FaultList>::SetSetting(key, value);
 
 	return AtpgBase<FaultModel, FaultList>::SetSetting(key, value);
 }
@@ -247,7 +258,10 @@ void SatFullScanAtpg<FaultModel, FaultList>::GeneratePatternForFault(size_t faul
 		logicGenerator->template EmplaceModule<Tpg::WholeCircuitTagger<PinData, GoodTag>>();
 	}
 	auto faultTagger = logicGenerator->template EmplaceModule<FaultTagger>(faultModel);
-	faultTagger->SetTaggingMode(FaultTaggerMode::FullScan);
+	switch (scanChainType) {
+		case ScanChainType::LaunchOnShift: faultTagger->SetTaggingMode(FaultTaggerMode::Functional); break;
+		case ScanChainType::EnhancedScan: faultTagger->SetTaggingMode(FaultTaggerMode::Independent); break;
+	}
 	if constexpr (has_diff_encoding_v<PinData>) logicGenerator->template EmplaceModule<Tpg::DChainCircuitTagger<PinData>>();
 
 	// Basic circuit encoding for exactly one timeframe.
@@ -259,15 +273,27 @@ void SatFullScanAtpg<FaultModel, FaultList>::GeneratePatternForFault(size_t faul
 	logicGenerator->template EmplaceModule<Tpg::SequentialInputLogicEncoder<PinData, BadTag>>(LogicConstraint::ONLY_LOGIC_01X);
 	logicGenerator->template EmplaceModule<Tpg::SequentialOutputLogicEncoder<PinData, GoodTag>>(Basic::MakeUnclockedSetResetFlipFlopModel());
 	logicGenerator->template EmplaceModule<Tpg::SequentialOutputLogicEncoder<PinData, BadTag>>(Basic::MakeUnclockedSetResetFlipFlopModel());
+	if (scanChainType == ScanChainType::LaunchOnShift)
+	{
+		logicGenerator->template EmplaceModule<Tpg::SequentialConnectionEncoder<PinData, GoodTag>>();
+		logicGenerator->template EmplaceModule<Tpg::SequentialConnectionEncoder<PinData, BadTag>>();
+	}
 	logicGenerator->template EmplaceModule<Tpg::OutputLogicEncoder<PinData, GoodTag>>();
 	logicGenerator->template EmplaceModule<Tpg::OutputLogicEncoder<PinData, BadTag>>();
 	if constexpr (has_diff_encoding_v<PinData>) logicGenerator->template EmplaceModule<Tpg::DChainBaseEncoder<PinData>>();
 	if constexpr (has_diff_encoding_v<PinData>) logicGenerator->template EmplaceModule<Tpg::BackwardDChainEncoder<PinData>>();
+	if (scanChainType == ScanChainType::LaunchOnShift)
+	{
+		if constexpr (has_diff_encoding_v<PinData>) logicGenerator->template EmplaceModule<Tpg::DChainSequentialConnectionEncoder<PinData>>();
+	}
 
 	// Test constraint encoding which requires the fault to be activated (a difference at the fault location)
 	// and the fault effect propagation (a difference at a circuit output port).
 	logicGenerator->template EmplaceModule<Tpg::PortConstraintEncoder<PinData, LDiffTag>>(Tpg::MakeConstantPortConstraint(Logic::LOGIC_ZERO), Tpg::ConstrainedPorts::Inputs);
-	logicGenerator->template EmplaceModule<Tpg::SequentialConstraintEncoder<PinData, LDiffTag>>(Tpg::MakeConstantSequentialInitializer(Logic::LOGIC_ZERO), Tpg::ConstrainedSequentials::Inputs);
+	switch (scanChainType) {
+		case ScanChainType::LaunchOnShift: logicGenerator->template EmplaceModule<Tpg::SequentialConstraintEncoder<PinData, LDiffTag>>(Tpg::MakeConstantSequentialInitializer(Logic::LOGIC_ZERO), Tpg::ConstrainedSequentials::Inputs); break;
+		case ScanChainType::EnhancedScan: logicGenerator->template EmplaceModule<Tpg::SequentialConstraintEncoder<PinData, LDiffTag>>(Tpg::MakeConstantSequentialConstraint(Logic::LOGIC_ZERO), Tpg::ConstrainedSequentials::Inputs); break;
+	}
 	logicGenerator->template EmplaceModule<FaultSensitization>(faultModel, FaultSensitizationTimeframe::Any);
 	// For the cell-aware model the propagation constraint "Any" is required due to different lengths of the patterns.
 	logicGenerator->template EmplaceModule<Tpg::FaultPropagationConstraintEncoder<PinData>>(Tpg::FaultPropagationTarget::PrimaryAndSecondaryOutputs, Tpg::FaultPropagationTimeframe::Any);
@@ -291,6 +317,7 @@ void SatFullScanAtpg<FaultModel, FaultList>::GeneratePatternForFault(size_t faul
 		vcmLogicGenerator->template EmplaceModule<Tpg::VcmInputLogicEncoder<VcmPinData, PinData>>(logicGenerator, this->vcmInputs, vcmContext.GetVcmParameters());
 		vcmLogicGenerator->template EmplaceModule<Tpg::SequentialInputLogicEncoder<VcmPinData, GoodTag>>(LogicConstraint::ONLY_LOGIC_01X);
 		vcmLogicGenerator->template EmplaceModule<Tpg::SequentialOutputLogicEncoder<VcmPinData, GoodTag>>(Basic::MakeUnclockedSetResetFlipFlopModel());
+		vcmLogicGenerator->template EmplaceModule<Tpg::SequentialConnectionEncoder<VcmPinData, GoodTag>>();
 		vcmLogicGenerator->template EmplaceModule<Tpg::DefaultLogicEncoder<VcmPinData, GoodTag>>(LogicConstraint::ONLY_LOGIC_01X);
 		vcmLogicGenerator->template EmplaceModule<Tpg::OutputLogicEncoder<VcmPinData, GoodTag>>();
 		vcmLogicGenerator->template EmplaceModule<Tpg::VcmOutputLogicEncoder<VcmPinData>>(this->vcmOutputs);
@@ -335,6 +362,7 @@ void SatFullScanAtpg<FaultModel, FaultList>::GeneratePatternForFault(size_t faul
 		|| ((this->vcmEnable == VcmMixin::VcmEnable::Enabled) && !vcmLogicGenerator->GenerateCircuitLogic()))
 	{
 		cnfGenerationTimer.Stop();
+		// Can happen if the fault sensitization module concludes that there is no faul propagation possible
 		LOG(INFO) << "Fault is untestable as no circuit output can be reached";
 
 		std::scoped_lock lock { this->parallelMutex };
@@ -362,7 +390,10 @@ void SatFullScanAtpg<FaultModel, FaultList>::GeneratePatternForFault(size_t faul
 		VLOG(3) << "Generated test pattern: " << to_string(pattern);
 
 		Simulation::SimulationConfig simConfig { Simulation::MakeSimulationConfig(Basic::MakeUnclockedSetResetFlipFlopModel()) };
-		simConfig.sequentialMode = Simulation::SequentialMode::FullScan;
+		switch (scanChainType) {
+			case ScanChainType::LaunchOnShift: simConfig.sequentialMode = Simulation::SequentialMode::Functional; break;
+			case ScanChainType::EnhancedScan: simConfig.sequentialMode = Simulation::SequentialMode::Independent; break;
+		}
 
 		if (this->checkAtpgResult == AtpgBase<FaultModel, FaultList>::CheckAtpgResult::CheckEqual)
 		{
@@ -399,6 +430,7 @@ void SatFullScanAtpg<FaultModel, FaultList>::GeneratePatternForFault(size_t faul
 			printer.AddDivider(Helper::ValuePrinter::DivideType::BoldSolid);
 			this->vcmPrinterImporter->ApplyPrinters(printer, vcmContext.GetTags(), vcmContext.GetTarget());
 		}
+		printer.SetTimeframes(timeframes);
 		LOG(INFO) << std::endl << printer.ToPrintable(watchedValues);
 
 		size_t testPatternIndex = this->testPatterns.emplace_back(pattern);
@@ -407,13 +439,14 @@ void SatFullScanAtpg<FaultModel, FaultList>::GeneratePatternForFault(size_t faul
 			FileHandle watchersHandle(boost::str(boost::format("%s/pattern-%d.json") % this->watcherExportPath % testPatternIndex), false);
 			Io::ExportWatchers(watchersHandle.GetOutStream(), watchedValues);
 		}
-		AtpgBase<FaultModel, FaultList>::RunFaultSimulation(vcmContext, faultIndex, testPatternIndex, Pattern::OutputCapture::PrimaryAndSecondaryOutputs, simConfig);
-
-		if (metadata->faultStatus != Fault::FaultStatus::FAULT_STATUS_DETECTED)
+		if (!this->printerExportPath.empty())
 		{
-			LOG(FATAL) << "Invalid test pattern was generated";
+			FileHandle printersHandle(boost::str(boost::format("%s/pattern-%d.txt") % this->printerExportPath % testPatternIndex), false);
+			printersHandle.GetOutStream() << printer.ToPrintable(watchedValues);
 		}
 
+		AtpgBase<FaultModel, FaultList>::RunFaultSimulation(vcmContext, faultIndex, testPatternIndex, Pattern::OutputCapture::PrimaryAndSecondaryOutputs, simConfig);
+		ASSERT (metadata->faultStatus == Fault::FaultStatus::FAULT_STATUS_DETECTED);
 		goto nextFault;
 	}
 

@@ -164,6 +164,7 @@ Logic GetLogicForString(const std::string& value)
 	if (value == "0") return Logic::LOGIC_ZERO;
 	if (value == "1") return Logic::LOGIC_ONE;
 	if (value == "X") return Logic::LOGIC_DONT_CARE;
+	if (value == "-") return Logic::LOGIC_INVALID;
 	return Logic::LOGIC_INVALID;
 }
 
@@ -263,6 +264,8 @@ Logic InvertLogicValue(const Logic& value)
 			return Logic::LOGIC_DONT_CARE;
 		case Logic::LOGIC_UNKNOWN:
 			return Logic::LOGIC_UNKNOWN;
+		case Logic::LOGIC_INVALID:
+			return Logic::LOGIC_INVALID;
 		default:
 			Logging::Panic();
 	}

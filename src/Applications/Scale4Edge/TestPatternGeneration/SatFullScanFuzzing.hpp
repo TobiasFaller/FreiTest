@@ -3,10 +3,6 @@
 #include <cstdint>
 
 #include "Applications/Scale4Edge/TestPatternGeneration/Base/FuzzingBase.hpp"
-#include "Basic/Fault/Models/CellAwareFaultModel.hpp"
-#include "Basic/Fault/Models/SingleStuckAtFaultModel.hpp"
-#include "Basic/Fault/Models/SingleTransitionDelayFaultModel.hpp"
-#include "Io/UserDefinedFaultModel/UdfmModel.hpp"
 
 namespace FreiTest
 {
@@ -25,10 +21,18 @@ public:
 
 	void Init(void) override;
 	void Run(void) override;
+	bool SetSetting(std::string key, std::string value) override;
 
 private:
+	enum class ScanChainType {
+		LaunchOnShift, // aka. skewed-load
+		// TODO: LaunchOnCapture, // aka. broadside, double-capture
+		EnhancedScan, // aka. enhanced-scan, hold-scan
+	};
+
 	void GeneratePatternForFault(size_t seed, size_t faultIndex);
 
+	ScanChainType scanChainType;
 };
 
 };

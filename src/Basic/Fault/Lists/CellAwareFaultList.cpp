@@ -1,6 +1,7 @@
 #include "Basic/Fault/Lists/CellAwareFaultList.hpp"
 
 #include <numeric>
+#include <random>
 #include <regex>
 
 #include "Circuit/CircuitEnvironment.hpp"
@@ -11,6 +12,8 @@ namespace FreiTest
 {
 namespace Fault
 {
+
+static std::pair<std::vector<CellAwareFault>, std::vector<size_t>> RemapFaults(const std::vector<CellAwareFault>& faultList, const std::vector<size_t>& faultIndices);
 
 CellAwareMetaData::CellAwareMetaData(void):
 	TargetedFaultMetaData(),
@@ -54,126 +57,9 @@ CellAwareFaultListDebug to_debug(const CellAwareFaultList &faultList, const Circ
 	return CellAwareFaultListDebug { faultList, circuit };
 }
 
-std::optional<CellAwareFault> MapUdfmFaultToCell(const Circuit::CircuitEnvironment& circuit, const Circuit::GroupMetaData* cell, const std::shared_ptr<Io::Udfm::UdfmFault>& fault)
+std::vector<CellAwareFault> GenerateCellAwareFaultList(const Circuit::CircuitEnvironment& circuit, const CellAwareModelSpecification& specification)
 {
 	const auto& circuitMetaData { circuit.GetMetaData() };
-
-	auto sourceInfo = cell->GetSourceInfo();
-	ASSERT(sourceInfo.GetProperty<bool>("module-is-cell").value_or(false)) << "The provided group has to be a cell.";
-
-	auto name = sourceInfo.GetProperty<std::string>("module-name").value_or("");
-	auto type = sourceInfo.GetProperty<std::string>("module-type").value_or("");
-
-	// Create port map to assign UDFM conditions and effects later.
-	std::map<std::string, Circuit::MappedCircuit::NodeAndPort> portMap;
-	for (auto port: cell->GetPorts())
-	{
-		const auto& portName = port.GetName();
-		ASSERT(port.GetConnections().size() == 1)
-			<< "Port \"" << portName << "\" in cell \"" << name << "\" has a bus with a size not equal to 1 as input / output port.";
-
-		const auto portType = port.GetSourceInfo().GetProperty<std::string>("port-type").value_or("");
-		ASSERT(portType == "input" || portType == "output")
-			<< "Port \"" << portName << "\" in cell \"" << name << "\" has invalid type " << portType << ".";
-
-		if (port.GetConnections()[0u] == nullptr)
-		{
-			continue;
-		}
-
-		auto const& ports = (portType == "input")
-			? port.GetConnections()[0]->GetMappedSinks()
-			: port.GetConnections()[0]->GetMappedSources();
-		for (auto& port : ports)
-		{
-			if (circuitMetaData.GetGroup(port.node)->GetParent() == cell)
-			{
-				portMap[portName] = port;
-			}
-		}
-	}
-
-	auto ports_to_string = [&](auto& ports) -> std::string {
-		std::string result;
-
-		for (auto const& [portName, nodeAndPort] : ports)
-		{
-			if (!result.empty())
-			{
-				result += ", ";
-			}
-			result += portName;
-			result += ": ";
-			result += nodeAndPort.node->GetName() + " (" + to_string(nodeAndPort.node->GetCellType()) + ") ";
-			result += (nodeAndPort.port.portType == Circuit::PortType::Input) ? " Input " : " Output ";
-			result += std::to_string(nodeAndPort.port.portNumber);
-		}
-
-		return result;
-	};
-
-	DVLOG(6) << "Cell " << name << " with type " << type << " (" << ports_to_string(portMap) << ")";
-
-	bool pinMappingWorked = true;
-	std::vector<CellAwareAlternative> mappedAlternative;
-	for (const auto& udfmAlternative : fault->GetAlternatives())
-	{
-		std::vector<CellAwarePort> conditions;
-		std::vector<CellAwarePort> effects;
-
-		for (const auto& [portName, portValue] : udfmAlternative->GetTestConditions())
-		{
-			if (__builtin_expect(portMap.find(portName) == portMap.end(), false))
-			{
-				LOG(WARNING) << "Was not able to find port \"" << portName << "\" in cell \"" << name << "\"! Ignoring it for fautlist generation.";
-				pinMappingWorked = false;
-				break;
-			}
-
-			conditions.push_back({
-				portMap[portName], portName,
-				udfmAlternative->GetTestConditionConstraints(portName)
-			});
-		}
-
-		for (const auto& [portName, portValue] : udfmAlternative->GetTestEffects())
-		{
-			if (__builtin_expect(portMap.find(portName) == portMap.end(), false))
-			{
-				LOG(WARNING) << "Was not able to find port \"" << portName << "\" in cell \"" << name << "\"! Ignoring it for fautlist generation.";
-				pinMappingWorked = false;
-				break;
-			}
-
-			effects.push_back({
-				portMap[portName], portName,
-				udfmAlternative->GetTestEffectConstraints(portName)
-			});
-		}
-
-		if (pinMappingWorked)
-		{
-			mappedAlternative.push_back({
-				.conditions = conditions,
-				.effects = effects
-			});
-		}
-	}
-
-	if (__builtin_expect(!pinMappingWorked, false))
-	{
-		LOG(WARNING) << "Condition pin mapping did not work for fault name \"" << fault->GetFaultName()
-			<< "\" for cell \"" << name << "\" of type \"" << type << "\"";
-		return std::nullopt;
-	}
-
-	return { CellAwareFault(fault, cell, mappedAlternative) };
-}
-
-std::vector<CellAwareFault> GenerateCellAwareFaultList(const Circuit::CircuitEnvironment& circuit, const Io::Udfm::UdfmModel& udfm)
-{
-	const auto& circuitMetaData { circuit.GetMetaData() };
-	const auto& udfmCells { udfm.GetCells() };
 
 	// Find cell instances and map ports
 	std::vector<CellAwareFault> faults;
@@ -188,17 +74,15 @@ std::vector<CellAwareFault> GenerateCellAwareFaultList(const Circuit::CircuitEnv
 		auto name = sourceInfo.GetProperty<std::string>("module-name").value_or("");
 		auto type = sourceInfo.GetProperty<std::string>("module-type").value_or("");
 
-		auto it = udfmCells.find(type);
-		if (it == udfmCells.end())
+		if (!specification.HasCell(type))
 		{
 			continue;
 		}
 
 		// Generate the expanded test pattern
-		auto& udfmEntry = it->second;
-		for (auto& [faultName, udfmFault] : udfmEntry->GetFaults())
+		for (auto& faultSpecification : specification.GetCell(type).GetFaults())
 		{
-			auto fault { MapUdfmFaultToCell(circuit, group, udfmFault) };
+			auto fault { CreateCellAwareFaultForCell(faultSpecification, group) };
 			if (!fault.has_value())
 			{
 				continue;
@@ -211,64 +95,146 @@ std::vector<CellAwareFault> GenerateCellAwareFaultList(const Circuit::CircuitEnv
 	return faults;
 }
 
+std::pair<std::vector<CellAwareFault>, std::vector<size_t>> ReduceCellAwareFaultList(const Circuit::CircuitEnvironment& circuitEnvironment, CellAwareFaultReduction reduction, const std::vector<CellAwareFault>& faultList)
+{
+	std::vector<size_t> faultIndices(faultList.size());
+	std::iota(faultIndices.begin(), faultIndices.end(), 0u);
+
+	return RemapFaults(faultList, faultIndices);
+}
+
 std::pair<std::vector<CellAwareFault>, std::vector<size_t>> FilterCellAwareFaultListByPattern(const Circuit::CircuitEnvironment& circuitEnvironment, const std::string& pattern, const FilterPatternType& type, const std::vector<CellAwareFault>& faultList)
 {
-	std::vector<bool> faultMergedOrRemoved(faultList.size(), false);
-	std::vector<size_t> newFaultIndices(faultList.size());
-	std::iota(newFaultIndices.begin(), newFaultIndices.end(), 0u);
+	std::vector<size_t> faultIndices(faultList.size());
+	std::iota(faultIndices.begin(), faultIndices.end(), 0u);
 
 	// Let an empty pattern always return the original fault list.
 	if (pattern == "")
 	{
-		return { faultList, newFaultIndices };
+		return { faultList, faultIndices };
 	}
 
 	std::regex patternRegex { pattern, std::regex_constants::ECMAScript };
 	for (size_t faultIndex { 0 }; faultIndex < faultList.size(); faultIndex++)
 	{
 		auto const* group { faultList[faultIndex].GetCell() };
-		auto const fullName { group->GetHierarchyName() + "/" + faultList[faultIndex].GetUserDefinedFault()->GetFaultName() };
+		auto const fullName { group->GetHierarchyName() + "/" + faultList[faultIndex].GetName() };
 		auto const result { std::regex_match(fullName, patternRegex) };
 		if ((type == FilterPatternType::Normal && !result)
 			|| (type == FilterPatternType::Inverted && result))
 		{
-			faultMergedOrRemoved[faultIndex] = true;
-			newFaultIndices[faultIndex] = REMOVED_FAULT;
+			faultIndices[faultIndex] = REMOVED_FAULT;
 		}
 	}
 
-	// Construct the new fault list by copying the untouched elements.
-	std::vector<CellAwareFault> newFaultList;
-	newFaultList.reserve(std::count_if(faultMergedOrRemoved.begin(), faultMergedOrRemoved.end(), [](bool faultMergedOrRemoved) {
-		return !faultMergedOrRemoved;
-	}));
+	return RemapFaults(faultList, faultIndices);
+}
 
-	for (size_t faultIndex { 0u }; faultIndex < faultList.size(); ++faultIndex)
+std::pair<std::vector<CellAwareFault>, std::vector<size_t>> SampleCellAwareFaultList(const std::vector<CellAwareFault>& faultList, size_t samples)
+{
+	std::vector<size_t> faultIndices(faultList.size());
+	std::iota(faultIndices.begin(), faultIndices.end(), 0u);
+
+	if (samples == 0u)
 	{
-		if (!faultMergedOrRemoved[faultIndex])
+		return { faultList, faultIndices };
+	}
+
+	std::vector<size_t> sampledIndices;
+	sampledIndices.reserve(samples);
+
+	std::random_device randomDevice {};
+	std::mt19937 randomSource { randomDevice() };
+	std::sample(faultIndices.begin(), faultIndices.end(), std::back_inserter(sampledIndices), samples, randomSource);
+
+	for (auto& fault : faultIndices)
+	{
+		fault = REMOVED_FAULT;
+	}
+	for (auto const& fault : sampledIndices)
+	{
+		faultIndices[fault] = fault;
+	}
+
+	return RemapFaults(faultList, faultIndices);
+}
+
+static std::pair<std::vector<CellAwareFault>, std::vector<size_t>> RemapFaults(const std::vector<CellAwareFault>& faultList, const std::vector<size_t>& faultIndices)
+{
+	ASSERT(faultList.size() == faultIndices.size())
+		<< "Faults and indices list sizes have to match.";
+
+	size_t newFaultCount { 0u };
+	for (size_t index { 0u }; index < faultIndices.size(); index++)
+	{
+		if (faultIndices[index] == index)
 		{
-			// Update the fault index to the new location.
-			newFaultIndices[faultIndex] = newFaultList.size();
-			newFaultList.emplace_back(faultList[faultIndex]);
-		}
-		else if (newFaultIndices[faultIndex] != REMOVED_FAULT)
-		{
-			// Update the merged index to the new location.
-			// This update method assumes that the referenced index has already
-			// been resolved by the update above.
-			newFaultIndices[faultIndex] = newFaultIndices[newFaultIndices[faultIndex]];
+			newFaultCount++;
 		}
 	}
 
-	for (size_t faultIndex { 0u }; faultIndex < faultList.size(); ++faultIndex)
+	std::vector<size_t> newFaultIndices { };
+	std::vector<CellAwareFault> newFaultList { };
+
+	// First re-index all the faults that have been kept.
+	newFaultList.reserve(newFaultCount);
+	newFaultIndices.resize(faultIndices.size(), REMOVED_FAULT);
+	for (size_t index { 0u }; index < faultIndices.size(); index++)
 	{
-		ASSERT(newFaultIndices[faultIndex] == REMOVED_FAULT
-				|| newFaultIndices[faultIndex] < newFaultList.size())
+		if (faultIndices[index] == index)
+		{
+			newFaultIndices[index] = newFaultList.size();
+			newFaultList.emplace_back(faultList[index]);
+		}
+	}
+
+	// Now re-index all the faults that have been merged or removed.
+	for (size_t index { 0u }; index < faultIndices.size(); index++)
+	{
+		if (faultIndices[index] != REMOVED_FAULT && faultIndices[index] != index)
+		{
+			ASSERT(newFaultIndices[faultIndices[index]] != REMOVED_FAULT);
+			newFaultIndices[index] = newFaultIndices[faultIndices[index]];
+		}
+	}
+
+	for (size_t index { 0u }; index < faultIndices.size(); index++)
+	{
+		ASSERT(newFaultIndices[index] == REMOVED_FAULT
+				|| newFaultIndices[index] < newFaultList.size())
 			<< "The mapping has either point to a valid entry of the new fault list "
 			<< "or be equal to REMOVED_FAULT.";
 	}
 
 	return { newFaultList, newFaultIndices };
+}
+
+CellAwareFaultReduction operator|(CellAwareFaultReduction lhs, CellAwareFaultReduction rhs)
+{
+	return static_cast<CellAwareFaultReduction>(
+		static_cast<std::underlying_type_t<CellAwareFaultReduction>>(lhs)
+		| static_cast<std::underlying_type_t<CellAwareFaultReduction>>(rhs)
+	);
+}
+
+CellAwareFaultReduction operator&(CellAwareFaultReduction lhs, CellAwareFaultReduction rhs)
+{
+	return static_cast<CellAwareFaultReduction>(
+		static_cast<std::underlying_type_t<CellAwareFaultReduction>>(lhs)
+		& static_cast<std::underlying_type_t<CellAwareFaultReduction>>(rhs)
+	);
+}
+
+CellAwareFaultReduction& operator&=(CellAwareFaultReduction& lhs, CellAwareFaultReduction rhs)
+{
+	lhs = lhs & rhs;
+	return lhs;
+}
+
+CellAwareFaultReduction& operator|=(CellAwareFaultReduction& lhs, CellAwareFaultReduction rhs)
+{
+	lhs = lhs | rhs;
+	return lhs;
 }
 
 };

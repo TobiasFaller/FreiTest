@@ -1,0 +1,123 @@
+b0000010 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.CMPEQ.H               % pv.cmpeq.h rd, rs1, rs2
+b0000010 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.CMPEQ.SC.H            % pv.cmpeq.sc.h rd, rs1, rs2
+b000001  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.CMPEQ.SCI.H       % pv.cmpeq.sci.h rd, rs1, imm
+b0000010 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.CMPEQ.B               % pv.cmpeq.b rd, rs1, rs2
+b0000010 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.CMPEQ.SC.B            % pv.cmpeq.sc.b rd, rs1, rs2
+b000001  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.CMPEQ.SCI.B       % pv.cmpeq.sci.b rd, rs1, imm
+b0000110 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.CMPNE.H               % pv.cmpne.h rd, rs1, rs2
+b0000110 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.CMPNE.SC.H            % pv.cmpne.sc.h rd, rs1, rs2
+b000011  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.CMPNE.SCI.H       % pv.cmpne.sci.h rd, rs1, imm
+b0000110 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.CMPNE.B               % pv.cmpne.b rd, rs1, rs2
+b0000110 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.CMPNE.SC.B            % pv.cmpne.sc.b rd, rs1, rs2
+b000011  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.CMPNE.SCI.B       % pv.cmpne.sci.b rd, rs1, imm
+b0001010 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.CMPGT.H               % pv.cmpgt.h rd, rs1, rs2
+b0001010 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.CMPGT.SC.H            % pv.cmpgt.sc.h rd, rs1, rs2
+b000101  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.CMPGT.SCI.H       % pv.cmpgt.sci.h rd, rs1, imm
+b0001010 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.CMPGT.B               % pv.cmpgt.b rd, rs1, rs2
+b0001010 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.CMPGT.SC.B            % pv.cmpgt.sc.b rd, rs1, rs2
+b000101  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.CMPGT.SCI.B       % pv.cmpgt.sci.b rd, rs1, imm
+b0001110 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.CMPGE.H               % pv.cmpge.h rd, rs1, rs2
+b0001110 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.CMPGE.SC.H            % pv.cmpge.sc.h rd, rs1, rs2
+
+b000111  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.CMPGE.SCI.H       % pv.cmpge.sci.h rd, rs1, imm
+b0001110 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.CMPGE.B               % pv.cmpge.b rd, rs1, rs2
+b0001110 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.CMPGE.SC.B            % pv.cmpge.sc.b rd, rs1, rs2
+b000111  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.CMPGE.SCI.B       % pv.cmpge.sci.b rd, rs1, imm
+b0010010 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.CMPLT.H               % pv.cmplt.h rd, rs1, rs2
+b0010010 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.CMPLT.SC.H            % pv.cmplt.sc.h rd, rs1, rs2
+b001001  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.CMPLT.SCI.H       % pv.cmplt.sci.h rd, rs1, imm
+b0010010 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.CMPLT.B               % pv.cmplt.b rd, rs1, rs2
+b0010010 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.CMPLT.SC.B            % pv.cmplt.sc.b rd, rs1, rs2
+b001001  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.CMPLT.SCI.B       % pv.cmplt.sci.b rd, rs1, imm
+b0010110 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.CMPLE.H               % pv.cmple.h rd, rs1, rs2
+b0010110 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.CMPLE.SC.H            % pv.cmple.sc.h rd, rs1, rs2
+b001011  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.CMPLE.SCI.H       % pv.cmple.sci.h rd, rs1, imm
+b0010110 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.CMPLE.B               % pv.cmple.b rd, rs1, rs2
+b0010110 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.CMPLE.SC.B            % pv.cmple.sc.b rd, rs1, rs2
+b001011  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.CMPLE.SCI.B       % pv.cmple.sci.b rd, rs1, imm
+b0011010 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.CMPGTU.H              % pv.cmpgtu.h rd, rs1, rs2
+b0011010 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.CMPGTU.SC.H           % pv.cmpgtu.sc.h rd, rs1, rs2
+b001101  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.CMPGTU.SCI.H      % pv.cmpgtu.sci.h rd, rs1, imm
+b0011010 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.CMPGTU.B              % pv.cmpgtu.b rd, rs1, rs2
+b0011010 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.CMPGTU.SC.B           % pv.cmpgtu.sc.b rd, rs1, rs2
+b001101  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.CMPGTU.SCI.B      % pv.cmpgtu.sci.b rd, rs1, imm
+b0011110 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.CMPGEU.H              % pv.cmpgeu.h rd, rs1, rs2
+b0011110 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.CMPGEU.SC.H           % pv.cmpgeu.sc.h rd, rs1, rs2
+b001111  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.CMPGEU.SCI.H      % pv.cmpgeu.sci.h rd, rs1, imm
+b0011110 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.CMPGEU.B              % pv.cmpgeu.b rd, rs1, rs2
+b0011110 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.CMPGEU.SC.B           % pv.cmpgeu.sc.b rd, rs1, rs2
+b001111  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.CMPGEU.SCI.B      % pv.cmpgeu.sci.b rd, rs1, imm
+b0100010 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.CMPLTU.H              % pv.cmpltu.h rd, rs1, rs2
+
+b0100010 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.CMPLTU.SC.H           % pv.cmpltu.sc.h rd, rs1, rs2
+b010001  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.CMPLTU.SCI.H      % pv.cmpltu.sci.h rd, rs1, imm
+b0100010 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.CMPLTU.B              % pv.cmpltu.b rd, rs1, rs2
+b0100010 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.CMPLTU.SC.B           % pv.cmpltu.sc.b rd, rs1, rs2
+b010001  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.CMPLTU.SCI.B      % pv.cmpltu.sci.b rd, rs1, imm
+b0100110 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.CMPLEU.H              % pv.cmpleu.h rd, rs1, rs2
+b0100110 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.CMPLEU.SC.H           % pv.cmpleu.sc.h rd, rs1, rs2
+b010011  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.CMPLEU.SCI.H      % pv.cmpleu.sci.h rd, rs1, imm
+b0100110 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.CMPLEU.B              % pv.cmpleu.b rd, rs1, rs2
+b0100110 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.CMPLEU.SC.B           % pv.cmpleu.sc.b rd, rs1, rs2
+b010011  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.CMPLEU.SCI.B      % pv.cmpleu.sci.b rd, rs1, imm
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

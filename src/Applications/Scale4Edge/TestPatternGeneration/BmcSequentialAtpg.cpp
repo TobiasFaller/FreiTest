@@ -41,7 +41,7 @@
 #include "Tpg/LogicGenerator/Constraint/SequentialConstraintEncoder.hpp"
 #include "Tpg/LogicGenerator/Constraint/PatternExclusionConstraintEncoder.hpp"
 #include "Tpg/LogicGenerator/Utility/UnaryCounterEncoder.hpp"
-#include "Tpg/LogicGenerator/DChain/BackwardDChainConnectionEncoder.hpp"
+#include "Tpg/LogicGenerator/DChain/DChainSequentialConnectionEncoder.hpp"
 #include "Tpg/LogicGenerator/DChain/BackwardDChainEncoder.hpp"
 #include "Tpg/LogicGenerator/DChain/DChainBaseEncoder.hpp"
 #include "Tpg/LogicGenerator/CircuitLogic/DefaultLogicEncoder.hpp"
@@ -155,8 +155,8 @@ void BmcSequentialAtpg<FaultModel, FaultList>::Run(void)
 	});
 	Logging::ClearCurrentFault();
 
-	this->statistics.Add("Encoding.PatternGeneration.LogicContainer", std::string("LogicContainer") + get_logic_container_name<LogicContainer>, "Type", "LogicContainer used");
-	this->statistics.Add("Encoding.PatternGeneration.PinData", std::string("PinData") + get_pin_data_name_v<PinData>, "Type", "PinData used");
+	this->statistics.Add("Atpg.Encoding.PatternGeneration.LogicContainer", std::string("LogicContainer") + get_logic_container_name<LogicContainer>, "Type", "LogicContainer used");
+	this->statistics.Add("Atpg.Encoding.PatternGeneration.PinData", std::string("PinData") + get_pin_data_name_v<PinData>, "Type", "PinData used");
 	AtpgBase<FaultModel, FaultList>::ExportStatistics();
 	AtpgBase<FaultModel, FaultList>::ExportTestPatterns(Pattern::InputCapture::PrimaryAndInitialSecondaryInputs);
 	AtpgBase<FaultModel, FaultList>::ExportFaultList();
@@ -240,18 +240,24 @@ void BmcSequentialAtpg<FaultModel, FaultList>::GeneratePatternForFault(size_t fa
 	logicGenerator->template EmplaceModule<Tpg::OutputLogicEncoder<PinData, BadTag>>();
 	if constexpr (has_diff_encoding_v<PinData>) logicGenerator->template EmplaceModule<Tpg::DChainBaseEncoder<PinData>>();
 	if constexpr (has_diff_encoding_v<PinData>) logicGenerator->template EmplaceModule<Tpg::BackwardDChainEncoder<PinData>>();
-	if constexpr (has_diff_encoding_v<PinData>) logicGenerator->template EmplaceModule<Tpg::BackwardDChainConnectionEncoder<PinData>>();
+	if constexpr (has_diff_encoding_v<PinData>) logicGenerator->template EmplaceModule<Tpg::DChainSequentialConnectionEncoder<PinData>>();
 
-	// Pattern generation constraints consist of the initial state (could be replaced with end state of synchronization sequence at some point)
-	// and the fault propagation and fault sensitization.
+	// Pattern generation constraints consist of the initial state and the fault propagation and fault sensitization.
 	logicGenerator->template EmplaceModule<Tpg::PortConstraintEncoder<PinData, LDiffTag>>(Tpg::MakeConstantPortConstraint(Logic::LOGIC_ZERO), Tpg::ConstrainedPorts::Inputs);
-	logicGenerator->template EmplaceModule<Tpg::SequentialConstraintEncoder<PinData, GoodTag>>(Tpg::MakeConstantSequentialInitializer(Logic::LOGIC_ZERO), Tpg::ConstrainedSequentials::Inputs);
-	logicGenerator->template EmplaceModule<Tpg::SequentialConstraintEncoder<PinData, BadTag>>(Tpg::MakeConstantSequentialInitializer(Logic::LOGIC_ZERO), Tpg::ConstrainedSequentials::Inputs);
+	if (this->settingsStartingState == SequentialAtpgBase<FaultModel, FaultList>::StartingState::Unconstrained)
+	{
+		logicGenerator->template EmplaceModule<Tpg::SequentialConstraintEncoder<PinData, LDiffTag>>(Tpg::MakeConstantSequentialInitializer(Logic::LOGIC_ZERO), Tpg::ConstrainedSequentials::Inputs);
+	}
+	else
+	{
+		logicGenerator->template EmplaceModule<Tpg::SequentialConstraintEncoder<PinData, GoodTag>>(Tpg::MakeConstantSequentialInitializer(this->startingState), Tpg::ConstrainedSequentials::Inputs);
+		logicGenerator->template EmplaceModule<Tpg::SequentialConstraintEncoder<PinData, BadTag>>(Tpg::MakeConstantSequentialInitializer(this->startingState), Tpg::ConstrainedSequentials::Inputs);
+	}
 	logicGenerator->template EmplaceModule<FaultSensitization>(faultModel, FaultSensitizationTimeframe::Any);
-	logicGenerator->template EmplaceModule<Tpg::FaultPropagationConstraintEncoder<PinData>>(Tpg::FaultPropagationTarget::PrimaryOutputsOnly, Tpg::FaultPropagationTimeframe::Last);
+	logicGenerator->template EmplaceModule<Tpg::FaultPropagationConstraintEncoder<PinData>>(Tpg::FaultPropagationTarget::PrimaryOutputsOnly, Tpg::FaultPropagationTimeframe::Any);
 
 	Tpg::Vcm::VcmContext vcmContext { "pattern_generation", "Pattern Generation" };
-	vcmContext.SetTargetStartState(std::vector<Basic::Logic>(this->circuit->GetMappedCircuit().GetNumberOfSecondaryInputs(), Basic::Logic::LOGIC_DONT_CARE));
+	vcmContext.SetTargetStartState(this->startingState);
 	vcmContext.AddTags(this->vcmTags);
 	vcmContext.AddVcmParameters(this->vcmParameters);
 	if (auto it = this->vcmConfigurations.find(this->vcmConfiguration); it != this->vcmConfigurations.end())
@@ -284,8 +290,25 @@ void BmcSequentialAtpg<FaultModel, FaultList>::GeneratePatternForFault(size_t fa
 	cnfGenerationTimer.SetTimeReference();
 	logicGenerator->GetContext().SetNumberOfTimeframes(this->settingsMaximumTimeframes + 1u);
 	if (this->vcmEnable == VcmMixin::VcmEnable::Enabled) vcmLogicGenerator->GetContext().SetNumberOfTimeframes(this->settingsMaximumTimeframes + 1u);
-	ASSERT(logicGenerator->GenerateCircuitLogic()) << "Invalid circuit tagging";
-	ASSERT((this->vcmEnable == VcmMixin::VcmEnable::Disabled) || vcmLogicGenerator->GenerateCircuitLogic()) << "Invalid circuit tagging";
+	if (!logicGenerator->GenerateCircuitLogic()
+		|| ((this->vcmEnable == VcmMixin::VcmEnable::Enabled) && !vcmLogicGenerator->GenerateCircuitLogic()))
+	{
+		// Can happen if the fault sensitization module concludes that there is no faul propagation possible
+		LOG(INFO) << "No test pattern can be created (" << bmcSolver->GetLastResult() << ")";
+
+		std::scoped_lock lock { this->parallelMutex };
+		if (metadata->faultStatus == Fault::FaultStatus::FAULT_STATUS_UNCLASSIFIED)
+		{
+			AtpgBase<FaultModel, FaultList>::SetFaultStatus(this->faultList, faultIndex,
+				(bmcSolver->GetLastResult() == Bmc::BmcResult::Unreachable)
+					? Fault::FaultStatus::FAULT_STATUS_UNDETECTED
+					: Fault::FaultStatus::FAULT_STATUS_UNCLASSIFIED,
+				(bmcSolver->GetLastResult() == Bmc::BmcResult::Unreachable)
+					? Fault::TargetedFaultStatus::FAULT_STATUS_UNTESTABLE
+					: Fault::TargetedFaultStatus::FAULT_STATUS_ABORTED_MAX_ITERATIONS);
+		}
+		goto nextFault;
+	}
 	cnfGenerationTimer.Stop();
 
 	VLOG(3) << "Invoking BMC-Solver to find solution";
@@ -297,19 +320,11 @@ void BmcSequentialAtpg<FaultModel, FaultList>::GeneratePatternForFault(size_t fa
 	{
 		case Bmc::BmcResult::Reachable:
 		{
-			//auto circuitResult { Tpg::Extractor::ExtractSimulationResult<PinData, GoodTag>(logicGenerator->GetContext()) };
-			//auto vcmResult { Tpg::Extractor::ExtractSimulationResult<PinData, GoodTag>(vcmLogicGenerator->GetContext()) };
-			//LOG(INFO) << to_string(circuitResult, *this->circuit);
-			//LOG(INFO) << to_string(vcmResult, *this->vcmCircuit);
-
 			Pattern::TestPattern pattern = Tpg::Extractor::ExtractTestPattern<PinData, GoodTag>(logicGenerator->GetContext(), Pattern::InputCapture::PrimaryAndInitialSecondaryInputs);
 			VLOG(6) << "Generated test pattern: " << to_string(pattern);
 
-			Simulation::SimulationConfig simConfig { Simulation::MakeSimulationConfig(Basic::MakeUnclockedSetResetFlipFlopModel()) };
-			//Simulation::SimulationResult simGoodResult(pattern.GetNumberOfTimeframes(), mappedCircuit.GetNumberOfNodes());
-			//Simulation::SimulateTestPatternEventDriven<Fault::FaultFreeModel>(mappedCircuit, pattern, {}, simGoodResult, simConfig);
-
 			auto const& mappedCircuit { this->circuit->GetMappedCircuit() };
+			Simulation::SimulationConfig simConfig { Simulation::MakeSimulationConfig(Basic::MakeUnclockedSetResetFlipFlopModel()) };
 			Simulation::SimulationResult simBadResult(pattern.GetNumberOfTimeframes(), mappedCircuit.GetNumberOfNodes());
 			Simulation::SimulateTestPatternEventDriven<FaultModel>(mappedCircuit, pattern, { fault }, simBadResult, simConfig);
 
@@ -338,15 +353,8 @@ void BmcSequentialAtpg<FaultModel, FaultList>::GeneratePatternForFault(size_t fa
 			watchedValues.insert(watchedValues.end(), circuitWatches.begin(), circuitWatches.end());
 			watchedValues.insert(watchedValues.end(), vcmWatches.begin(), vcmWatches.end());
 
-			size_t testPatternIndex = this->testPatterns.emplace_back(pattern);
-			if (!this->watcherExportPath.empty())
-			{
-				FileHandle watchersHandle(boost::str(boost::format("%s/pattern-%d.json") % this->watcherExportPath % testPatternIndex), false);
-				Io::ExportWatchers(watchersHandle.GetOutStream(), watchedValues);
-			}
-
 			Helper::ValuePrinter printer { };
-			printer.SetTitle(vcmContext.GetDisplayName() + " TP: " + std::to_string(testPatternIndex));
+			printer.SetTitle(vcmContext.GetDisplayName());
 			printer.SetTimeframeTitles(+[](size_t timeframe) { return "Timeframe #" + std::to_string(timeframe); });
 			printer.SetEqualColumnWidths(true);
 			this->circuitPrinterImporter->ApplyPrinters(printer, vcmContext.GetTags(), vcmContext.GetTarget());
@@ -355,14 +363,23 @@ void BmcSequentialAtpg<FaultModel, FaultList>::GeneratePatternForFault(size_t fa
 				printer.AddDivider(Helper::ValuePrinter::DivideType::BoldSolid);
 				this->vcmPrinterImporter->ApplyPrinters(printer, vcmContext.GetTags(), vcmContext.GetTarget());
 			}
+			printer.SetTimeframes(pattern.GetNumberOfTimeframes());
 			LOG(INFO) << std::endl << printer.ToPrintable(watchedValues);
 
-			AtpgBase<FaultModel, FaultList>::RunFaultSimulation(vcmContext, faultIndex, testPatternIndex, Pattern::OutputCapture::PrimaryOutputsOnly, simConfig);
+			size_t testPatternIndex = this->testPatterns.emplace_back(pattern);
+			if (!this->watcherExportPath.empty())
+			{
+				FileHandle watchersHandle(boost::str(boost::format("%s/pattern-%d.json") % this->watcherExportPath % testPatternIndex), false);
+				Io::ExportWatchers(watchersHandle.GetOutStream(), watchedValues);
+			}
+			if (!this->printerExportPath.empty())
+			{
+				FileHandle printersHandle(boost::str(boost::format("%s/pattern-%d.txt") % this->printerExportPath % testPatternIndex), false);
+				printersHandle.GetOutStream() << printer.ToPrintable(watchedValues);
+			}
 
-			//if (metadata->faultStatus != Fault::FaultStatus::FAULT_STATUS_DETECTED)
-			//{
-			//	LOG(FATAL) << "Invalid test pattern was generated";
-			//}
+			AtpgBase<FaultModel, FaultList>::RunFaultSimulation(vcmContext, faultIndex, testPatternIndex, Pattern::OutputCapture::PrimaryOutputsOnly, simConfig);
+			ASSERT (metadata->faultStatus == Fault::FaultStatus::FAULT_STATUS_DETECTED);
 			goto nextFault;
 		}
 

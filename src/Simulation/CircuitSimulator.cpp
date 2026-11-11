@@ -20,7 +20,6 @@ using namespace FreiTest::Basic;
 using namespace FreiTest::Circuit;
 using namespace FreiTest::Fault;
 using namespace FreiTest::Pattern;
-using namespace FreiTest::Io::Udfm;
 
 //#define ENABLE_LOOKUP_TABLES
 
@@ -34,6 +33,15 @@ struct SimulationParams { };
 
 template<> struct SimulationParams<FaultFreeModel> { };
 template<> struct SimulationParams<SingleStuckAtFaultModel> { };
+template<> struct SimulationParams<MultiStuckAtFaultModel> { };
+template<> struct SimulationParams<SingleTransitionDelayFaultModel> {
+	Logic currentValue;
+	Logic previousValue;
+};
+template<> struct SimulationParams<MultiTransitionDelayFaultModel> {
+	std::vector<Logic> currentValues;
+	std::vector<Logic> previousValues;
+};
 template<> struct SimulationParams<CellAwareFaultModel> {
 	size_t state;
 	ssize_t transition;
@@ -44,18 +52,17 @@ static const constexpr ssize_t TRANSITION_NONE = -2;
 
 static void ApplyTestPatternToTimeframe(const MappedCircuit& circuit, const TestPattern& pattern, SimulationResult& result, const SimulationConfig& config, size_t timeframe);
 static void CopySecondaryOutputsFromPreviousTimeframe(const MappedCircuit& circuit, SimulationResult& result, size_t timeframeId, const SimulationConfig& config);
+template<typename FaultModel>
+static inline __attribute__((always_inline)) Logic SimulateGate(const MappedCircuit& circuit, const SimulationResult& result, const FaultModel& faultModel, const SimulationConfig& config,
+	size_t timeframeId, size_t nodeId, SimulationParams<FaultModel>& params);
 
+template<typename FaultModel>
+static std::vector<size_t> GetFaultInputs(const FaultModel& faultModel, const MappedCircuit& circuit);
+template<typename FaultModel>
+static std::vector<size_t> GetFaultOutputs(const FaultModel& faultModel, const MappedCircuit& circuit);
 template<typename FaultModel>
 static Logic GetLogicValue(const MappedCircuit& circuit, const SimulationResult& result, const FaultModel& faultModel,
 	size_t timeframeId, size_t nodeId, PortType portType, size_t portNumber, Logic originalValue, SimulationParams<FaultModel>& params);
-template<typename FaultModel>
-static bool IsFaultLocation(const FaultModel& faultModel, size_t nodeId);
-template<typename FaultModel>
-static std::vector<size_t> GetFaultLocations(const FaultModel& faultModel, const MappedCircuit& circuit);
-template<typename FaultModel>
-__attribute__((always_inline))
-static inline Logic SimulateGate(const MappedCircuit& circuit, const SimulationResult& result, const FaultModel& faultModel, const SimulationConfig& config,
-	size_t timeframeId, size_t nodeId, SimulationParams<FaultModel>& params);
 
 SimulationConfig MakeSimulationConfig(Basic::SequentialConfig sequentialConfig)
 {
@@ -72,7 +79,7 @@ static void ApplyTestPatternToTimeframe(const MappedCircuit& circuit, const Test
 		result[timeframe][node->GetNodeId()] = pattern.GetPrimaryInput(timeframe, primaryInput);
 	}
 
-	if (config.sequentialMode == SequentialMode::FullScan
+	if (config.sequentialMode == SequentialMode::Independent
 		|| (config.sequentialMode == SequentialMode::Functional && timeframe == 0u))
 	{
 		for (auto [secondaryInput, node] : circuit.EnumerateSecondaryInputs())
@@ -119,9 +126,9 @@ static Logic GetLogicValue(const MappedCircuit& circuit, const SimulationResult&
 		};
 		for (auto const& stuckAt : get_stuck_ats())
 		{
-			bool faultPin = (stuckAt.GetNode()->GetNodeId() == nodeId)
-				&& (stuckAt.GetPort().portType == portType)
-				&& (stuckAt.GetPort().portNumber == portNumber);
+			bool faultPin = (nodeId == stuckAt.GetNode()->GetNodeId())
+				&& (portType == stuckAt.GetPort().portType)
+				&& (portNumber == stuckAt.GetPort().portNumber);
 
 			if (__builtin_expect(!faultPin, true))
 			{
@@ -146,51 +153,67 @@ static Logic GetLogicValue(const MappedCircuit& circuit, const SimulationResult&
 				return faultModel.GetFault()->GetTransitionDelays();
 			}
 		};
+
+		size_t indexInput { 0u };
 		for (auto const& transitionDelay : get_slow_transitions())
 		{
-			bool faultPin = (transitionDelay.GetNode()->GetNodeId() == nodeId)
-				&& (transitionDelay.GetPort().portType == portType)
-				&& (transitionDelay.GetPort().portNumber == portNumber);
-
-			if (__builtin_expect(!faultPin, true))
+			auto const* driver { transitionDelay.GetNode()->GetDriverForPort(transitionDelay.GetPort()) };
+			bool faultInputPin = (nodeId == driver->GetNodeId())
+				&& (portType == PortType::Output)
+				&& (portNumber == 0u);
+			if (__builtin_expect(faultInputPin, false))
 			{
-				continue;
+				if constexpr (std::is_same_v<FaultModel, Fault::SingleTransitionDelayFaultModel>)
+				{
+					params.previousValue = params.currentValue;
+					params.currentValue = originalValue;
+					//LOG(INFO) << "Update " << to_string(transitionDelay) << ", Timeframe " << timeframeId << ", Previous " << to_string(params.previousValue)
+					//	<< ", Current " << to_string(params.currentValue);
+				}
+				else if constexpr (std::is_same_v<FaultModel, Fault::MultiTransitionDelayFaultModel>)
+				{
+					params.previousValues[indexInput] = params.currentValues[indexInput];
+					params.currentValues[indexInput] = originalValue;
+				}
 			}
+			indexInput++;
+		}
 
-			if (timeframeId == 0u
-				|| (transitionDelay.GetType() == TransitionDelayFaultType::SLOW_TO_RISE && originalValue != Logic::LOGIC_ONE)
-				|| (transitionDelay.GetType() == TransitionDelayFaultType::SLOW_TO_FALL && originalValue != Logic::LOGIC_ZERO)
-				|| (transitionDelay.GetType() == TransitionDelayFaultType::SLOW_TO_TRANSITION && originalValue != Logic::LOGIC_ZERO && originalValue != Logic::LOGIC_ONE))
+		size_t indexOutput { 0u };
+		for (auto const& transitionDelay : get_slow_transitions())
+		{
+			bool faultOutputPin = (nodeId == transitionDelay.GetNode()->GetNodeId())
+				&& (portType == transitionDelay.GetPort().portType)
+				&& (portNumber == transitionDelay.GetPort().portNumber);
+			if (__builtin_expect(faultOutputPin, false))
 			{
+				Logic currentValue;
+				Logic previousValue;
+				if constexpr (std::is_same_v<FaultModel, Fault::SingleTransitionDelayFaultModel>)
+				{
+					currentValue = params.currentValue;
+					previousValue = params.previousValue;
+					//LOG(INFO) << "Use " << to_string(transitionDelay) << ", Timeframe " << timeframeId << ", Previous " << to_string(params.previousValue)
+					//	<< ", Current " << to_string(params.currentValue);
+				}
+				else if constexpr (std::is_same_v<FaultModel, Fault::MultiTransitionDelayFaultModel>)
+				{
+					currentValue = params.currentValues[indexOutput];
+					previousValue = params.previousValues[indexOutput];
+				}
+
+				if ((transitionDelay.GetType() == TransitionDelayFaultType::SLOW_TO_RISE && previousValue == Logic::LOGIC_ZERO && currentValue == Logic::LOGIC_ONE)
+					|| (transitionDelay.GetType() == TransitionDelayFaultType::SLOW_TO_FALL && previousValue == Logic::LOGIC_ONE && currentValue == Logic::LOGIC_ZERO)
+					|| (transitionDelay.GetType() == TransitionDelayFaultType::SLOW_TO_TRANSITION
+						&& ((previousValue == Logic::LOGIC_ZERO && currentValue == Logic::LOGIC_ONE) || (previousValue == Logic::LOGIC_ONE && currentValue == Logic::LOGIC_ZERO))))
+				{
+					// Delay the transition by one timeframe by using the previous value.
+					return previousValue;
+				}
 				return originalValue;
 			}
 
-			Logic previousValue;
-			switch (portType)
-			{
-				case Circuit::PortType::Input:
-					// The gate input value needs to be processed by the fault model.
-					previousValue = GetLogicValue(circuit, result, faultModel, timeframeId - 1u, nodeId, PortType::Input, portNumber,
-						result[timeframeId - 1u][circuit.GetNode(nodeId)->GetInput(portNumber)->GetNodeId()], params);
-					break;
-
-				case Circuit::PortType::Output:
-					// The gate output value already has the fault effect applied.
-					previousValue = result[timeframeId - 1u][nodeId];
-					break;
-
-				default:
-					__builtin_unreachable();
-			}
-			if ((transitionDelay.GetType() == TransitionDelayFaultType::SLOW_TO_RISE && previousValue == Logic::LOGIC_ZERO)
-				|| (transitionDelay.GetType() == TransitionDelayFaultType::SLOW_TO_FALL && previousValue == Logic::LOGIC_ONE)
-				|| (transitionDelay.GetType() == TransitionDelayFaultType::SLOW_TO_TRANSITION && previousValue == InvertLogicValue(originalValue)))
-			{
-				// Delay the transition by one timeframe by using the previous value.
-				return previousValue;
-			}
-
-			return originalValue;
+			indexOutput++;
 		}
 
 		return originalValue;
@@ -198,30 +221,31 @@ static Logic GetLogicValue(const MappedCircuit& circuit, const SimulationResult&
 	else if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
 	{
 		const auto& fault { faultModel.GetFault() };
-		const auto& states { fault->GetStateMachine() };
+		const auto& stateMachine { fault->GetStateMachine() };
+		const auto& states { stateMachine.GetStates() };
 		const auto& currentState { states[params.state] };
 
-		// Only evaluate after the last condition value has been settled.
+		// Only evaluate after the last input value has been settled.
 		// Only used when sequential mode is false.
-		if ((params.transition == TRANSITION_UNKNOWN) && (nodeId == fault->GetMaxConditionNodeId()))
+		if ((params.transition == TRANSITION_UNKNOWN) && (nodeId == stateMachine.GetMaxInputNodeId()))
 		{
 			params.transition = TRANSITION_NONE;
 			size_t index { 0u };
 			for (auto const& transition : currentState.transitions)
 			{
-				bool conditionsValid = true;
-				for (auto const& condition: transition.conditions)
+				bool inputsValid = true;
+				for (auto const& input: transition.inputs)
 				{
-					auto& [node, port] = condition.nodeAndPort;
-					assert (condition.nodeAndPort.port.portType == PortType::Input);
+					auto& [node, port] = input.nodeAndPort;
+					assert (input.nodeAndPort.port.portType == PortType::Input);
 					auto driverNodeId = node->GetDriverForPort(port)->GetNodeId();
-					if (!IsConstraintTrueForLogic(result[timeframeId][driverNodeId], condition.logicConstraints[0u]))
+					if (!IsConstraintTrueForLogic(result[timeframeId][driverNodeId], input.constraint))
 					{
-						conditionsValid = false;
+						inputsValid = false;
 						break;
 					}
 				}
-				if (conditionsValid)
+				if (inputsValid)
 				{
 					params.transition = index;
 					break;
@@ -229,15 +253,17 @@ static Logic GetLogicValue(const MappedCircuit& circuit, const SimulationResult&
 				index++;
 			}
 		}
-		else if ((params.transition >= 0) && (nodeId >= fault->GetMinEffectNodeId()) && (nodeId <= fault->GetMaxEffectNodeId()))
+		else if ((params.transition >= 0)
+			&& (nodeId >= stateMachine.GetMinOutputNodeId())
+			&& (nodeId <= stateMachine.GetMaxOutputNodeId()))
 		{
 			auto const& transition = currentState.transitions[params.transition];
-			for (auto const& effect : transition.effects)
+			for (auto const& output : transition.outputs)
 			{
-				auto const& [node, port] = effect.nodeAndPort;
+				auto const& [node, port] = output.nodeAndPort;
 				if ((node->GetNodeId() == nodeId) && (port.portType == portType) && (port.portNumber == portNumber))
 				{
-					return GetLogicForConstraint(effect.logicConstraints[0u]);
+					return GetLogicForConstraint(output.constraint);
 				}
 			}
 		}
@@ -251,122 +277,100 @@ static Logic GetLogicValue(const MappedCircuit& circuit, const SimulationResult&
 }
 
 template<typename FaultModel>
-static bool IsFaultLocation(const FaultModel& faultModel, [[maybe_unused]] size_t nodeId)
+static std::vector<size_t> GetFaultInputs(const FaultModel& faultModel, const MappedCircuit& circuit)
 {
+	std::vector<size_t> faultInputs;
 	if constexpr (std::is_same_v<FaultModel, Fault::FaultFreeModel>)
 	{
-		return false;
+		; // No inputs
 	}
 	else if constexpr (std::is_same_v<FaultModel, Fault::SingleStuckAtFaultModel>)
 	{
-		auto const& stuckAt { faultModel.GetFault()->GetStuckAt() };
-		return stuckAt.GetNode()->GetNodeId() == nodeId;
+		; // No inputs
 	}
 	else if constexpr (std::is_same_v<FaultModel, Fault::MultiStuckAtFaultModel>)
 	{
-		for (auto const& stuckAt : faultModel.GetFault()->GetStuckAts())
-		{
-			if (__builtin_expect(stuckAt.GetNode()->GetNodeId() == nodeId, false))
-			{
-				return true;
-			}
-		}
-
-		return false;
+		; // No inputs
 	}
 	else if constexpr (std::is_same_v<FaultModel, Fault::SingleTransitionDelayFaultModel>)
 	{
 		auto const& transitionDelay { faultModel.GetFault()->GetTransitionDelay() };
-		return transitionDelay.GetNode()->GetNodeId() == nodeId;
+		if (transitionDelay.GetPort().portType == PortType::Input)
+		{
+			auto const* driver { transitionDelay.GetNode()->GetDriverForPort(transitionDelay.GetPort()) };
+			faultInputs.push_back(driver->GetNodeId());
+		}
 	}
 	else if constexpr (std::is_same_v<FaultModel, Fault::MultiTransitionDelayFaultModel>)
 	{
 		for (auto const& transitionDelay : faultModel.GetFault()->GetTransitionDelays())
 		{
-			if (__builtin_expect(transitionDelay.GetNode()->GetNodeId() == nodeId, false))
+			if (transitionDelay.GetPort().portType == PortType::Input)
 			{
-				return true;
+				auto const* driver { transitionDelay.GetNode()->GetDriverForPort(transitionDelay.GetPort()) };
+				faultInputs.push_back(driver->GetNodeId());
 			}
 		}
-
-		return false;
 	}
 	else if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
 	{
-		if ((nodeId >= faultModel.GetFault()->GetMinEffectNodeId()) && (nodeId <= faultModel.GetFault()->GetMaxEffectNodeId()))
-		{
-			for (const auto& nodeAndPort : faultModel.GetFault()->GetEffectNodesAndPorts())
-			{
-				if (__builtin_expect(nodeAndPort.node->GetNodeId() == nodeId, false))
-				{
-					return true;
-				}
-			}
-		}
-		return false;
+		auto const& stateMachine { faultModel.GetFault()->GetStateMachine() };
+		faultInputs.push_back(stateMachine.GetMaxInputNodeId());
 	}
 	else
 	{
 		static_assert(std::is_void_v<FaultModel>, "This fault model is currently not supported!");
 	}
+
+	return faultInputs;
 }
 
 template<typename FaultModel>
-static std::vector<size_t> GetFaultLocations(const FaultModel& faultModel, const MappedCircuit& circuit)
+static std::vector<size_t> GetFaultOutputs(const FaultModel& faultModel, const MappedCircuit& circuit)
 {
-	std::vector<size_t> faultyNodes;
+	std::vector<size_t> faultOutputs;
 	if constexpr (std::is_same_v<FaultModel, Fault::FaultFreeModel>)
 	{
-		return faultyNodes;
+		; // No fault
 	}
 	else if constexpr (std::is_same_v<FaultModel, Fault::SingleStuckAtFaultModel>)
 	{
 		auto const& stuckAt { faultModel.GetFault()->GetStuckAt() };
-		faultyNodes.push_back(stuckAt.GetNode()->GetNodeId());
-		return faultyNodes;
+		faultOutputs.push_back(stuckAt.GetNode()->GetNodeId());
 	}
 	else if constexpr (std::is_same_v<FaultModel, Fault::MultiStuckAtFaultModel>)
 	{
-		for (auto stuckAt : faultModel.GetFault()->GetStuckAts())
+		for (auto const& stuckAt : faultModel.GetFault()->GetStuckAts())
 		{
-			faultyNodes.push_back(stuckAt.GetNode()->GetNodeId());
+			faultOutputs.push_back(stuckAt.GetNode()->GetNodeId());
 		}
-
-		return faultyNodes;
 	}
 	else if constexpr (std::is_same_v<FaultModel, Fault::SingleTransitionDelayFaultModel>)
 	{
 		auto const& transitionDelay { faultModel.GetFault()->GetTransitionDelay() };
-		faultyNodes.push_back(transitionDelay.GetNode()->GetNodeId());
-		return faultyNodes;
+		faultOutputs.push_back(transitionDelay.GetNode()->GetNodeId());
 	}
 	else if constexpr (std::is_same_v<FaultModel, Fault::MultiTransitionDelayFaultModel>)
 	{
-		for (auto transitionDelays : faultModel.GetFault()->GetTransitionDelays())
+		for (auto const& transitionDelay : faultModel.GetFault()->GetTransitionDelays())
 		{
-			faultyNodes.push_back(transitionDelays.GetNode()->GetNodeId());
+			faultOutputs.push_back(transitionDelay.GetNode()->GetNodeId());
 		}
-
-		return faultyNodes;
 	}
 	else if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
 	{
-		for (const auto& nodeAndPort : faultModel.GetFault()->GetEffectNodesAndPorts())
+		auto const& stateMachine { faultModel.GetFault()->GetStateMachine() };
+		for (const auto& nodeAndPort : stateMachine.GetOutputs())
 		{
-			faultyNodes.push_back(nodeAndPort.node->GetNodeId());
+			faultOutputs.push_back(nodeAndPort.node->GetNodeId());
 		}
-
-		// Add the condition node id as "faulty node" to trigger evaluation
-		// of the conditions. Otherwise, the node might not be simulated
-		// and therefore, the fault model not evaluated.
-		faultyNodes.push_back(faultModel.GetFault()->GetMaxConditionNodeId());
-
-		return faultyNodes;
 	}
 	else
 	{
 		static_assert(std::is_void_v<FaultModel>, "This fault model is currently not supported!");
 	}
+
+	return faultOutputs;
 }
 
 #ifdef ENABLE_LOOKUP_TABLES
@@ -931,11 +935,22 @@ void SimulateTestPatternNaive(const MappedCircuit& circuit, const TestPattern& p
 {
 	SimulationParams<FaultModel> params { };
 
-	if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
+	if constexpr (std::is_same_v<FaultModel, Fault::SingleTransitionDelayFaultModel>)
 	{
+		params.currentValue = Logic::LOGIC_INVALID;
+		params.previousValue = Logic::LOGIC_INVALID;
+	}
+	else if constexpr (std::is_same_v<FaultModel, Fault::MultiTransitionDelayFaultModel>)
+	{
+		params.currentValues = std::vector(faultModel.GetFault()->GetTransitionDelays().size(), Logic::LOGIC_INVALID);
+		params.previousValues = std::vector(faultModel.GetFault()->GetTransitionDelays().size(), Logic::LOGIC_INVALID);
+	}
+	else if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
+	{
+		auto const& states { faultModel.GetFault()->GetStateMachine().GetStates() };
 		params.state = 0;
-		params.transition = faultModel.GetFault()->IsSequential()
-			? (faultModel.GetFault()->GetStateMachine()[params.state].transitions.size() > 0u ? 0u : TRANSITION_NONE)
+		params.transition = faultModel.GetFault()->IsSequentialCell()
+			? (states[params.state].transitions.size() > 0u ? 0u : TRANSITION_NONE)
 			: TRANSITION_UNKNOWN;
 	}
 
@@ -959,15 +974,16 @@ resimulate:
 
 		if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
 		{
-			auto const& currentState { faultModel.GetFault()->GetStateMachine()[params.state] };
-			if (faultModel.GetFault()->IsSequential() && (params.transition != TRANSITION_NONE))
+			auto const& states { faultModel.GetFault()->GetStateMachine().GetStates() };
+			auto const& currentState { states[params.state] };
+			if (faultModel.GetFault()->IsSequentialCell() && (params.transition != TRANSITION_NONE))
 			{
-				for (auto const& condition: currentState.transitions[params.transition].conditions)
+				for (auto const& input: currentState.transitions[params.transition].inputs)
 				{
-					auto& [node, port] = condition.nodeAndPort;
-					assert (condition.nodeAndPort.port.portType == PortType::Input);
+					auto& [node, port] = input.nodeAndPort;
+					assert (input.nodeAndPort.port.portType == PortType::Input);
 					auto driverNodeId = node->GetDriverForPort(port)->GetNodeId();
-					if (!IsConstraintTrueForLogic(result[timeframeId][driverNodeId], condition.logicConstraints[0u]))
+					if (!IsConstraintTrueForLogic(result[timeframeId][driverNodeId], input.constraint))
 					{
 						params.transition = ((static_cast<size_t>(params.transition) + 1u) < currentState.transitions.size())
 							? (params.transition + 1u)
@@ -979,10 +995,10 @@ resimulate:
 
 			auto const targetState { (params.transition >= 0) ? currentState.transitions[params.transition].toState : 0 };
 			params.state = targetState;
-			params.transition = faultModel.GetFault()->IsSequential()
-				? (faultModel.GetFault()->GetStateMachine()[params.state].transitions.size() > 0u ? 0u : TRANSITION_NONE)
+			params.transition = faultModel.GetFault()->IsSequentialCell()
+				? (states[params.state].transitions.size() > 0u ? 0u : TRANSITION_NONE)
 				: TRANSITION_UNKNOWN;
-			assert (params.state < static_cast<size_t>(faultModel.GetFault()->GetStateMachine().size()));
+			assert (params.state < static_cast<size_t>(states.size()));
 		}
 	}
 }
@@ -992,13 +1008,27 @@ void SimulateTestPatternEventDriven(const MappedCircuit& circuit, const TestPatt
 {
 	SimulationParams<FaultModel> params { };
 
-	if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
+	if constexpr (std::is_same_v<FaultModel, Fault::SingleTransitionDelayFaultModel>)
 	{
+		params.currentValue = Logic::LOGIC_INVALID;
+		params.previousValue = Logic::LOGIC_INVALID;
+	}
+	else if constexpr (std::is_same_v<FaultModel, Fault::MultiTransitionDelayFaultModel>)
+	{
+		params.currentValues = std::vector(faultModel.GetFault()->GetTransitionDelays().size(), Logic::LOGIC_INVALID);
+		params.previousValues = std::vector(faultModel.GetFault()->GetTransitionDelays().size(), Logic::LOGIC_INVALID);
+	}
+	else if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
+	{
+		auto const& states { faultModel.GetFault()->GetStateMachine().GetStates() };
 		params.state = 0;
-		params.transition = faultModel.GetFault()->IsSequential()
-			? (faultModel.GetFault()->GetStateMachine()[params.state].transitions.size() > 0u ? 0u : TRANSITION_NONE)
+		params.transition = faultModel.GetFault()->IsSequentialCell()
+			? (states[params.state].transitions.size() > 0u ? 0u : TRANSITION_NONE)
 			: TRANSITION_UNKNOWN;
 	}
+
+	auto faultInputs = GetFaultInputs(faultModel, circuit);
+	auto faultOutputs = GetFaultOutputs(faultModel, circuit);
 
 	std::vector<bool> startNodes(circuit.GetNumberOfNodes(), false);
 	for (auto [nodeId, node] : circuit.EnumerateNodes())
@@ -1007,12 +1037,18 @@ void SimulateTestPatternEventDriven(const MappedCircuit& circuit, const TestPatt
 		if ( // Constant gates might introduce a value that is different from the current value
 			__builtin_expect(node->GetCellCategory() == CellCategory::MAIN_CONSTANT, false)
 			// Primary and Secondary input gates might introduce a value that is different from the current value
-			|| __builtin_expect(node->GetCellCategory() == CellCategory::MAIN_IN, false)
-			// The fault location might produce a different value from the current value depending on the fault model
-			|| __builtin_expect(IsFaultLocation(faultModel, nodeId), false))
+			|| __builtin_expect(node->GetCellCategory() == CellCategory::MAIN_IN, false))
 		{
 			startNodes[nodeId] = true;
 		}
+	}
+	for (auto& nodeId : faultInputs) {
+		// The fault inputs might be required to correctly evaluate the fault model
+		startNodes[nodeId] = true;
+	}
+	for (auto& nodeId : faultOutputs) {
+		// The fault outputs might produce a different value from the current value depending on the fault model
+		startNodes[nodeId] = true;
 	}
 
 	std::vector<bool> activeNodes(circuit.GetNumberOfNodes(), false);
@@ -1054,15 +1090,16 @@ resimulate:
 
 		if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
 		{
-			auto const& currentState { faultModel.GetFault()->GetStateMachine()[params.state] };
-			if (faultModel.GetFault()->IsSequential() && (params.transition != TRANSITION_NONE))
+			auto const& states { faultModel.GetFault()->GetStateMachine().GetStates() };
+			auto const& currentState { states[params.state] };
+			if (faultModel.GetFault()->IsSequentialCell() && (params.transition != TRANSITION_NONE))
 			{
-				for (auto const& condition: currentState.transitions[params.transition].conditions)
+				for (auto const& input: currentState.transitions[params.transition].inputs)
 				{
-					auto& [node, port] = condition.nodeAndPort;
-					assert (condition.nodeAndPort.port.portType == PortType::Input);
+					auto& [node, port] = input.nodeAndPort;
+					assert (input.nodeAndPort.port.portType == PortType::Input);
 					auto driverNodeId = node->GetDriverForPort(port)->GetNodeId();
-					if (!IsConstraintTrueForLogic(result[timeframeId][driverNodeId], condition.logicConstraints[0u]))
+					if (!IsConstraintTrueForLogic(result[timeframeId][driverNodeId], input.constraint))
 					{
 						params.transition = ((static_cast<size_t>(params.transition) + 1u) < currentState.transitions.size())
 							? (params.transition + 1u)
@@ -1074,10 +1111,10 @@ resimulate:
 
 			auto const targetState { (params.transition >= 0) ? currentState.transitions[params.transition].toState : 0 };
 			params.state = targetState;
-			params.transition = faultModel.GetFault()->IsSequential()
-				? (faultModel.GetFault()->GetStateMachine()[params.state].transitions.size() > 0u ? 0u : TRANSITION_NONE)
+			params.transition = faultModel.GetFault()->IsSequentialCell()
+				? (states[params.state].transitions.size() > 0u ? 0u : TRANSITION_NONE)
 				: TRANSITION_UNKNOWN;
-			assert (params.state < static_cast<size_t>(faultModel.GetFault()->GetStateMachine().size()));
+			assert (params.state < static_cast<size_t>(states.size()));
 		}
 	}
 }
@@ -1087,15 +1124,24 @@ void SimulateTestPatternEventDrivenIncremental(const MappedCircuit& circuit, con
 {
 	SimulationParams<FaultModel> params { };
 
-	if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
+	if constexpr (std::is_same_v<FaultModel, Fault::SingleTransitionDelayFaultModel>)
 	{
+		params.currentValue = Logic::LOGIC_INVALID;
+		params.previousValue = Logic::LOGIC_INVALID;
+	}
+	else if constexpr (std::is_same_v<FaultModel, Fault::MultiTransitionDelayFaultModel>)
+	{
+		params.currentValues = std::vector(faultModel.GetFault()->GetTransitionDelays().size(), Logic::LOGIC_INVALID);
+		params.previousValues = std::vector(faultModel.GetFault()->GetTransitionDelays().size(), Logic::LOGIC_INVALID);
+	}
+	else if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
+	{
+		auto const& states { faultModel.GetFault()->GetStateMachine().GetStates() };
 		params.state = 0;
-		params.transition = faultModel.GetFault()->IsSequential()
-			? (faultModel.GetFault()->GetStateMachine()[params.state].transitions.size() > 0u ? 0u : TRANSITION_NONE)
+		params.transition = faultModel.GetFault()->IsSequentialCell()
+			? (states[params.state].transitions.size() > 0u ? 0u : TRANSITION_NONE)
 			: TRANSITION_UNKNOWN;
 	}
-
-	auto faultyNodes = GetFaultLocations(faultModel, circuit);
 
 	// The initial state of the flip-flops might have changed:
 	// - Searching for differences here which indicate a different initial state.
@@ -1105,12 +1151,22 @@ void SimulateTestPatternEventDrivenIncremental(const MappedCircuit& circuit, con
 	{
 		const size_t nodeId = secondaryInput->GetNodeId();
 		const Logic value = pattern.GetSecondaryInput(0u, inputNumber);
-		if (__builtin_expect(result[0u][nodeId] != value, false)
-			|| __builtin_expect(IsFaultLocation(faultModel, nodeId), false))
+		if (__builtin_expect(result[0u][nodeId] != value, false))
 		{
 			result[0u][nodeId] = value;
 			activeNodes[nodeId] = true;
 		}
+	}
+
+	auto faultInputs = GetFaultInputs(faultModel, circuit);
+	auto faultOutputs = GetFaultOutputs(faultModel, circuit);
+	for (auto& nodeId : faultInputs) {
+		// The fault inputs might be required to correctly evaluate the fault model
+		activeNodes[nodeId] = true;
+	}
+	for (auto& nodeId : faultOutputs) {
+		// The fault outputs might produce a different value from the current value depending on the fault model
+		activeNodes[nodeId] = true;
 	}
 
 	for (size_t timeframeId = 0u; timeframeId < pattern.GetNumberOfTimeframes(); ++timeframeId)
@@ -1136,7 +1192,11 @@ resimulate:
 		}
 		// The primary inputs have already been applied by the reference simulation.
 
-		for (size_t nodeId : faultyNodes)
+		for (auto& nodeId : faultInputs)
+		{
+			activeNodes[nodeId] = true;
+		}
+		for (auto& nodeId : faultOutputs)
 		{
 			activeNodes[nodeId] = true;
 		}
@@ -1149,17 +1209,40 @@ resimulate:
 				continue;
 			}
 
-			// Check if the base differs or the current timeframe value.
-			// This is important in the case we have a fault at one of the inputs
-			// where the result matches the base value but the timeframe still
-			// holds the old fault free input value.
-			Logic value = SimulateGate(circuit, result, faultModel, config, timeframeId, nodeId, params);
+			// Overwrite the result in any case as the fault model might change the value.
+			// Then check if the base differs for the current timeframe value
+			// to see if the simulation should continue.
+			// It is not sufficient to first check the base timeframe, as the fault model
+			// might change the gate output value back to be equivalent to the fault free value.
+			//
+			// Example: Flip-Flop with stuck-at at output and two timeframes
+			//
+			// --|---+          +-------+  +---|---+
+			//  DFF  |          |  XOR  |  |  DFF  |
+			//   |   | SA1 +----+ I1    |  |   |   | SA1
+			//   | Q +--X--+    |     O +--+ D | Q +--X--
+			//   |   |        +-+ I2    |  |   |   |
+			// --|---+        | +-------+  +---|---+
+			//
+			//        Base  Result
+			// 1) TF0 Q=0,  Q=0    Initial, Node is fault location => Activate SIN
+			// 2) TF0 Q=0,  Q=1    SimulateGate, value != base => Activate XOR
+			// 3) TF0 I1=0  I1=1
+			//        I2=1  I2=1
+			//        O=1   O=0    SimulateGate, value != base => Activate SOUT
+			// 4) TF0 D=1   D=0
+			// 5) TF1 Q=1   Q=1    Initial
+			// 5) TF1 Q=1   Q=0    CopyFromPreviousTimeframe, Node is fault location => Activate SIN
+			// 6) TF1 Q=1   Q=0    SimulateGate, value == base, but value != result
+			//
+			// If in step 6 only the base is checked, then the wrong value is saved in result.
+			// => First store the resulting value, then check.
+			auto const value = SimulateGate(circuit, result, faultModel, config, timeframeId, nodeId, params);
+			resultTimeframe[nodeId] = value;
 			if (__builtin_expect(value == baseTimeframe[nodeId], true))
 			{
-				ASSERT(__builtin_expect(value == resultTimeframe[nodeId], true));
 				continue;
 			}
-			resultTimeframe[nodeId] = value;
 
 			for (auto successor : node->GetSuccessors())
 			{
@@ -1169,15 +1252,16 @@ resimulate:
 
 		if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
 		{
-			auto const& currentState { faultModel.GetFault()->GetStateMachine()[params.state] };
-			if (faultModel.GetFault()->IsSequential() && (params.transition >= 0))
+			auto const& states { faultModel.GetFault()->GetStateMachine().GetStates() };
+			auto const& currentState { states[params.state] };
+			if (faultModel.GetFault()->IsSequentialCell() && (params.transition >= 0))
 			{
-				for (auto const& condition: currentState.transitions[params.transition].conditions)
+				for (auto const& input: currentState.transitions[params.transition].inputs)
 				{
-					auto& [node, port] = condition.nodeAndPort;
-					assert (condition.nodeAndPort.port.portType == PortType::Input);
+					auto& [node, port] = input.nodeAndPort;
+					assert (input.nodeAndPort.port.portType == PortType::Input);
 					auto driverNodeId = node->GetDriverForPort(port)->GetNodeId();
-					if (!IsConstraintTrueForLogic(result[timeframeId][driverNodeId], condition.logicConstraints[0u]))
+					if (!IsConstraintTrueForLogic(result[timeframeId][driverNodeId], input.constraint))
 					{
 						// Reset result to initial good values so we can run an incremental simulation again.
 						result[timeframeId] = base[timeframeId];
@@ -1191,10 +1275,10 @@ resimulate:
 
 			auto const targetState { (params.transition >= 0) ? currentState.transitions[params.transition].toState : 0 };
 			params.state = targetState;
-			params.transition = faultModel.GetFault()->IsSequential()
-				? (faultModel.GetFault()->GetStateMachine()[params.state].transitions.size() > 0u ? 0u : TRANSITION_NONE)
+			params.transition = faultModel.GetFault()->IsSequentialCell()
+				? (states[params.state].transitions.size() > 0u ? 0u : TRANSITION_NONE)
 				: TRANSITION_UNKNOWN;
-			assert (params.state < static_cast<size_t>(faultModel.GetFault()->GetStateMachine().size()));
+			assert (params.state < static_cast<size_t>(states.size()));
 		}
 	}
 }

@@ -41,12 +41,13 @@ using SingleStuckAtFaultList = ConcurrentFaultList<SingleStuckAtFault, SingleStu
  * The & (and) operator can be used to test for the presence of a reduction: (value & RemoveEquivalent) == RemoveEquivalent
  *
  * - RemoveNone: Does nothing
- * - RemoveEquivalent: Merges equivalent faults and sorts the fault list according to the SortStuckAtFaultList method.
+ * - RemoveEquivalent: Merges equivalent faults and sorts the fault list.
  * - RemoveCellInternal: Removes faults that are not at the boundary of a cell.
  * - RemoveSequentialClock: Removes faults at the clock pin of sequential elements.
  * - RemoveSequentialSetReset: Removes faults at the set and reset lines of sequential elements.
  * - RemoveConnectedToDontCare: Removes faults that are at input ports connected to a constant don't care logic signal.
  * - RemoveConnectedToUnknown: Removes faults that are at input ports connected to a constant unknown logic signal.
+ * - RemoveCircuitPort: Removes faults that are at inputs and outputs of the circuit.
  */
 enum class StuckAtFaultReduction: size_t
 {
@@ -56,7 +57,8 @@ enum class StuckAtFaultReduction: size_t
 	RemoveSequentialClock = 4u,
 	RemoveSequentialSetReset = 8u,
 	RemoveConnectedToDontCare = 16u,
-	RemoveConnectedToUnknown = 32u
+	RemoveConnectedToUnknown = 32u,
+	RemoveCircuitPort = 64u,
 };
 
 StuckAtFaultReduction operator|(StuckAtFaultReduction lhs, StuckAtFaultReduction rhs);
@@ -74,37 +76,6 @@ StuckAtFaultReduction& operator&=(StuckAtFaultReduction& lhs, StuckAtFaultReduct
  * @return The newly generated fault list with all stuck-at faults.
  */
 std::vector<SingleStuckAtFault> GenerateStuckAtFaultList(const Circuit::CircuitEnvironment& circuit);
-
-/**
- * @brief Sorts the stuck-at fault list and returns the indices the new fault list should have.
- *
- * Sorts the fault list according to the following properties.
- * 1. Smallest to largest node id
- * 2. Input then output faults
- * 3. Smallest to largest pin id
- *
- * The mapping to the fault list is from original indices to the new location.
- * The original stuck-at fault list is not modified.
- *
- * @param faultList The fault list to use as a starting point.
- * @return The mapping from original indices to the new location.
- */
-std::vector<size_t> GetSortIndicesForStuckAtFaultList(const std::vector<SingleStuckAtFault>& faultList);
-
-/**
- * @brief Sorts the stuck-at fault list and returns the new list and the mapping.
- *
- * Sorts the fault list according to the following properties.
- * 1. Smallest to largest node id
- * 2. Input then output faults
- * 3. Smallest to largest pin id
- *
- * The mapping to the fault list is from original indices to the new location.
- *
- * @param faultList The fault list to use as a starting point.
- * @return The new fault list together with the mapping from original indices to the new location.
- */
-std::pair<std::vector<SingleStuckAtFault>, std::vector<size_t>> SortStuckAtFaultList(const std::vector<SingleStuckAtFault>& faultList);
 
 /**
  * @brief Removes unwanted faults from the fault list.
@@ -141,6 +112,15 @@ std::pair<std::vector<SingleStuckAtFault>, std::vector<size_t>> FilterStuckAtFau
  * @return The reduced fault list and the mapping of the original faults to the new fault list.
  */
 std::pair<std::vector<SingleStuckAtFault>, std::vector<size_t>> FilterStuckAtFaultListByNodes(const std::vector<SingleStuckAtFault>& faultList, const std::vector<Circuit::MappedNode*>& nodes);
+
+/**
+ * @brief Keeps only a random selection of faults from the fault list.
+ *
+ * @param faultList The original fault list.
+ * @param samples The number of samples to choose from the fault list
+ * @return The sampled fault list and the mapping of the original faults to the new fault list.
+ */
+std::pair<std::vector<SingleStuckAtFault>, std::vector<size_t>> SampleStuckAtFaultList(const std::vector<SingleStuckAtFault>& faultList, size_t samples);
 
 template<typename T>
 class SingleStuckAtFaultListDebug

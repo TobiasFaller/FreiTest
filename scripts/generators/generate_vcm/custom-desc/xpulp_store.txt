@@ -1,0 +1,11 @@
+imm[11:5] rs2[4:0] rs1[4:0] b000 imm[4:0] b0101011 P.SB_I_Inc % p.sb rs2, imm(rs1!)
+imm[11:5] rs2[4:0] rs1[4:0] b001 imm[4:0] b0101011 P.SH_I_Inc % p.sh rs2, imm(rs1!)
+imm[11:5] rs2[4:0] rs1[4:0] b010 imm[4:0] b0101011 P.SW_I_Inc % p.sw rs2, imm(rs1!)
+
+b0000000 rs2[4:0] rs1[4:0] b111 rd[4:0] b0101011 P.SB_R_Inc   % p.sb rs2, rs3(rs1!)
+b0000000 rs2[4:0] rs1[4:0] b111 rd[4:0] b0101011 P.SH_R_Inc   % p.sh rs2, rs3(rs1!)
+b0000000 rs2[4:0] rs1[4:0] b111 rd[4:0] b0101011 P.SW_R_Inc   % p.sw rs2, rs3(rs1!)
+
+b0000000 rs2[4:0] rs1[4:0] b111 rd[4:0] b0100011 P.SB_R       % p.sb rs2, rs3(rs1)
+b0000000 rs2[4:0] rs1[4:0] b111 rd[4:0] b0100011 P.SH_R       % p.sh rs2, rs3(rs1)
+b0000000 rs2[4:0] rs1[4:0] b111 rd[4:0] b0100011 P.SW_R       % p.sw rs2, rs3(rs1)

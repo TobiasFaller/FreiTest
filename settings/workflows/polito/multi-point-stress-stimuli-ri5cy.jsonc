@@ -1,0 +1,23 @@
+[
+	{"application": "POLITO_MULTI_POINT_STIMULI_GENERATION"},
+
+	{"include": "../../circuits/polito/ri5cy-rv32im-zicsr-xpulp2.freitest.jsonc"},
+	{"setting": "DataExportDirectory", "value": "./output/polito/[CircuitName]_MultiNetStress"},
+
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/ModuleWatcher", "value": "[CircuitDir]/ri5cy-watchers.jsonc"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/ModulePrinter", "value": "[CircuitDir]/ri5cy-table.jsonc"},
+
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/VcmBaseDirectory", "value": "[VcmDir]"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/VcmImportFilename", "value": "output/switching-vcm-ri5cy-rv32im-zicsr-xpulp2-nangate.v"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/VcmLibraryFilename", "value": "[LibraryDir]/nangate45_freitest.v"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/VcmTopLevelModuleName", "value": "ri5cy_vcm"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/VcmConfigurationsFilename", "value": "./settings/workflows/polito/multi-point-stress-stimuli-ri5cy-params.jsonc"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/VcmConfiguration", "value": "NONE"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/VcmExportPreprocessedFilename", "value": "[DataExportDirectory]/[Circuit]-vcm.preprocessed.v"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/VcmExportProcessedFilename", "value": "[DataExportDirectory]/[Circuit]-vcm.processed.v"},
+
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/ApplyInitialState", "value": "Enabled"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/InitialStateType", "value": "File"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/InitialStateFile", "value": "[SettingsDir]/ri5cy-rv32im-zicsr-xpulp2.init-state.txt"},
+
+]

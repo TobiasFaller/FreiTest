@@ -55,9 +55,7 @@ public:
 private:
 	void Export(void) const;
 
-	std::vector<SolverProxy::BaseLiteral> _currentClause;
 	std::vector<std::vector<SolverProxy::BaseLiteral>> _hardClauses;
-	std::vector<std::vector<SolverProxy::BaseLiteral>> _assumptions;
 	std::vector<std::tuple<size_t, std::vector<SolverProxy::BaseLiteral>>> _softClauses;
 
 	std::string _filename;

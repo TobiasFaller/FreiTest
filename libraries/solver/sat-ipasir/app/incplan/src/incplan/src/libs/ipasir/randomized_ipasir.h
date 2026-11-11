@@ -62,7 +62,7 @@ public:
 		learnedClauseCallback(mappedClause.data());
 	}
 
-	virtual BmcResult solve() {
+	virtual SolveResult solve() {
 		scrumbleVariables();
 		scrumbleClauses();
 

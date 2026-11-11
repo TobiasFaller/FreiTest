@@ -41,6 +41,8 @@ const std::string optionPrefix = "Fuzzing";
 StimBmcFuzzing::StimBmcFuzzing(void):
 	stimuliPath("UNINITIALIZED"),
 	stimuli(),
+	clockInputs(),
+	resetInputs(),
 	primaryInputs(),
 	primaryOutputs(),
 	secondaryInputs(),
@@ -133,14 +135,26 @@ void StimBmcFuzzing::Init(void)
 		}
 	};
 
+	auto const& clocks { root.get_child("circuit.clocks") };
+	auto const& resets { root.get_child("circuit.resets") };
 	auto const& inputs { root.get_child("circuit.inputs") };
 	auto const& outputs { root.get_child("circuit.outputs") };
 	auto const& flipflops { root.get_child("circuit.flipflops") };
+	find_all(clocks, clockInputs, Type::PrimaryInput);
+	find_all(resets, resetInputs, Type::PrimaryInput);
 	find_all(inputs, primaryInputs, Type::PrimaryInput);
 	find_all(outputs, primaryOutputs, Type::PrimaryOutput);
 	find_all(flipflops, secondaryInputs, Type::SecondaryInput);
 	find_all(flipflops, secondaryOutputs, Type::SecondaryOutput);
 
+	for (auto const* input : clockInputs)
+	{
+		ASSERT(mappedCircuit.IsPrimaryInput(input));
+	}
+	for (auto const* input : resetInputs)
+	{
+		ASSERT(mappedCircuit.IsPrimaryInput(input));
+	}
 	for (auto const* input : primaryInputs)
 	{
 		ASSERT(mappedCircuit.IsPrimaryInput(input));
@@ -173,6 +187,14 @@ void StimBmcFuzzing::Init(void)
 	{
 		auto const stimIns { it->second.template get_value<std::string>() };
 		ASSERT(stimIns.size() == primaryInputs.size());
+		for (size_t index { 0u }; index < resetInputs.size(); index++)
+		{
+			stimuli.SetPrimaryInput(timeframe, mappedCircuit.GetPrimaryInputNumber(resetInputs[index]), Basic::Logic::LOGIC_ZERO);
+		}
+		for (size_t index { 0u }; index < clockInputs.size(); index++)
+		{
+			stimuli.SetPrimaryInput(timeframe, mappedCircuit.GetPrimaryInputNumber(clockInputs[index]), Basic::Logic::LOGIC_DONT_CARE);
+		}
 		for (size_t index { 0u }; index < primaryInputs.size(); index++)
 		{
 			stimuli.SetPrimaryInput(timeframe, mappedCircuit.GetPrimaryInputNumber(primaryInputs[index]), Basic::GetLogicForCharacter(stimIns[index]));

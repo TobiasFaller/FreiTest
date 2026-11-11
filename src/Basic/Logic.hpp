@@ -36,6 +36,8 @@ enum class LogicConstraint: uint_fast8_t
 
 	ONLY_LOGIC_01 = 'N',
 	ONLY_LOGIC_01X = 'V',
+
+	ALWAYS_FALSE = '-',
 };
 
 enum class StabilityConstraint: uint_fast8_t

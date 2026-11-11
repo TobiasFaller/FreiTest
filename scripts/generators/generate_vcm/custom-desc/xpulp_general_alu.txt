@@ -1,0 +1,36 @@
+b000001000000 rs1[4:0] b000 rd[4:0] b0110011 P.ABS             % p.abs rd, rs1
+
+b0000010 rs2[4:0] rs1[4:0] b010 rd[4:0] b0110011 P.SLET        % p.slet rd, rs1, rs2
+b0000010 rs2[4:0] rs1[4:0] b011 rd[4:0] b0110011 P.SLETU       % p.sletu rd, rs1, rs2
+b0000010 rs2[4:0] rs1[4:0] b100 rd[4:0] b0110011 P.MIN         % p.min rd, rs1, rs2
+b0000010 rs2[4:0] rs1[4:0] b101 rd[4:0] b0110011 P.MINU        % p.minu rd, rs1, rs2
+b0000010 rs2[4:0] rs1[4:0] b110 rd[4:0] b0110011 P.MAX         % p.max rd, rs1, rs2
+b0000010 rs2[4:0] rs1[4:0] b111 rd[4:0] b0110011 P.MAXU        % p.maxu rd, rs1, rs2
+
+b000100000000 rs1[4:0] b100 rd[4:0] b0110011 P.EXTHS           % p.exths rd, rs1
+b000100000000 rs1[4:0] b101 rd[4:0] b0110011 P.EXTHZ           % p.exthz rd, rs1
+b000100000000 rs1[4:0] b110 rd[4:0] b0110011 P.EXTBS           % p.extbs rd, rs1
+b000100000000 rs1[4:0] b111 rd[4:0] b0110011 P.EXTBZ           % p.extbz rd, rs1
+
+b0001010 imm[4:0] rs1[4:0] b001 rd[4:0] b0110011 P.CLIP        % p.clip rd, rs1, imm
+b0001010 imm[4:0] rs1[4:0] b010 rd[4:0] b0110011 P.CLIPU       % p.clipu rd, rs1, imm
+b0001010 rs2[4:0]  rs1[4:0] b101 rd[4:0] b0110011 P.CLIPR      % p.clipr rd, rs1, rs2
+b0001010 rs2[4:0]  rs1[4:0] b110 rd[4:0] b0110011 P.CLIPUR     % p.clipur rd. rs1. rs2
+
+b00 imm[4:0] rs2[4:0] rs1[4:0] b010 rd[4:0] b1011011 P.ADDN    % p.addN rd, rs1, rs2, imm
+b10 imm[4:0] rs2[4:0] rs1[4:0] b010 rd[4:0] b1011011 P.ADDUN   % p.adduN rd, rs1, rs2, imm
+b00 imm[4:0] rs2[4:0] rs1[4:0] b110 rd[4:0] b1011011 P.ADDRN   % p.addRN rd, rs1, rs2, imm
+b10 imm[4:0] rs2[4:0] rs1[4:0] b110 rd[4:0] b1011011 P.ADDURN  % p.adduRN rd, rs1, rs2, imm
+b00 imm[4:0] rs2[4:0] rs1[4:0] b011 rd[4:0] b1011011 P.SUBN    % p.subN rd, rs1, rs2, imm
+b10 imm[4:0] rs2[4:0] rs1[4:0] b011 rd[4:0] b1011011 P.SUBUN   % p.subuN rd, rs1, rs2, imm
+b00 imm[4:0] rs2[4:0] rs1[4:0] b111 rd[4:0] b1011011 P.SUBRN   % p.subRN rd, rs1, rs2, imm
+b10 imm[4:0] rs2[4:0] rs1[4:0] b111 rd[4:0] b1011011 P.SUBURN  % p.subuRN rd, rs1, rs2, imm
+b01 imm[4:0] rs2[4:0] rs1[4:0] b010 rd[4:0] b1011011 P.ADDNR   % p.addNr rd, rs1, rs2
+
+b1100000 rs2[4:0] rs1[4:0] b010 rd[4:0] b1011011 P.ADDUNR      % p.adduNr rd, rs1, rs2
+b0100000 rs2[4:0] rs1[4:0] b110 rd[4:0] b1011011 P.ADDRNR      % p.addRNr rd, rs1, rs2
+b1100000 rs2[4:0] rs1[4:0] b110 rd[4:0] b1011011 P.ADDURNR     % p.adduRNr rd, rs1, rs2
+b0100000 rs2[4:0] rs1[4:0] b011 rd[4:0] b1011011 P.SUBNR       % p.subNr rd, rs1, rs2
+b1100000 rs2[4:0] rs1[4:0] b011 rd[4:0] b1011011 P.SUBUNR      % p.subuNr rd, rs1, rs2
+b0100000 rs2[4:0] rs1[4:0] b111 rd[4:0] b1011011 P.SUBRNR      % p.subRNr rd, rs1, rs2
+b1100000 rs2[4:0] rs1[4:0] b111 rd[4:0] b1011011 P.SUBURNR     % p.subuRNr rd, rs1, rs2

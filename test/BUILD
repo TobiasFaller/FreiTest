@@ -113,3 +113,11 @@ cc_test(
     linkstatic = True,
     deps = [ "//src:libfreitest" ]
 )
+
+cc_test(
+    name = "FaultListTest",
+    srcs = [ "FaultListTest.cpp"],
+    copts = ["-iquote", "src", "-iquote", "test"],
+    linkstatic = True,
+    deps = [ "//src:libfreitest" ]
+)

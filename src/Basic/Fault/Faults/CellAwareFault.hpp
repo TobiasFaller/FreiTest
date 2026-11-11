@@ -1,100 +1,112 @@
 #pragma once
 
 #include <string>
-#include <map>
 #include <vector>
 #include <memory>
+#include <unordered_map>
 
 #include "Basic/Logic.hpp"
+#include "Basic/Fault/Specification/CellAwareSpecification.hpp"
 #include "Circuit/MappedCircuit.hpp"
 #include "Circuit/CircuitMetaData.hpp"
-#include "Io/UserDefinedFaultModel/UdfmModel.hpp"
 
 namespace FreiTest
 {
 namespace Fault
 {
 
-struct CellAwarePort
+class CellAwareFaultStateMachine
 {
-	Circuit::MappedCircuit::NodeAndPort nodeAndPort;
-	std::string portName;
-	std::vector<Basic::LogicConstraint> logicConstraints;
-};
+public:
+	struct Port
+	{
+		Circuit::MappedCircuit::NodeAndPort nodeAndPort;
+		Basic::LogicConstraint constraint;
+	};
 
-struct CellAwareAlternative
-{
-	std::vector<CellAwarePort> conditions;
-	std::vector<CellAwarePort> effects;
-};
-
-struct CellAwareTransition
-{
 	enum class TransitionType { Primary, Secondary };
 
-	TransitionType type;
-	size_t toState;
-	std::vector<CellAwarePort> conditions;
-	std::vector<CellAwarePort> effects;
-	std::vector<size_t> alternatives;
-};
+	struct Transition
+	{
+		std::vector<Port> inputs;
+		std::vector<Port> outputs;
+		size_t toState;
+		TransitionType type;
+		bool accepting;
 
-struct CellAwareState
-{
-	size_t depth;
-	bool accepting;
-	std::vector<CellAwareTransition> transitions;
-	std::vector<size_t> alternatives;
+		const std::vector<Port>& GetInputs(void) const { return inputs; }
+		const std::vector<Port>& GetOutputs(void) const { return outputs; }
+		size_t GetTargetState(void) const { return toState; }
+		TransitionType GetTransitionType(void) const { return type; }
+		bool IsAccepting(void) const { return accepting; }
+	};
+
+	struct State
+	{
+		std::vector<Transition> transitions;
+		size_t depth;
+
+		const std::vector<Transition>& GetTransitions(void) const { return transitions; }
+		size_t GetDepth(void) const { return depth; }
+
+		const Transition&  GetTransition(size_t id) const { return transitions[id]; }
+	};
+
+	CellAwareFaultStateMachine(std::vector<State> states);
+	virtual ~CellAwareFaultStateMachine(void);
+
+	const std::vector<State>& GetStates(void) const { return states; }
+	const std::vector<Circuit::MappedCircuit::NodeAndPort>& GetInputs(void) const { return inputNodes; }
+	const std::vector<Circuit::MappedCircuit::NodeAndPort>& GetOutputs(void) const { return outputNodes; }
+	size_t GetTimeframes(void) const { return timeframes; }
+	size_t GetMinInputNodeId(void) const { return minInputNode; }
+	size_t GetMaxInputNodeId(void) const { return maxInputNode; }
+	size_t GetMinOutputNodeId(void) const { return minOutputNode; }
+	size_t GetMaxOutputNodeId(void) const { return maxOutputNode; }
+
+	const State& GetState(size_t id) const { return states[id]; }
+
+private:
+	std::vector<State> states;
+
+	// Derived data to speed up the fault model implementation:
+	std::vector<Circuit::MappedCircuit::NodeAndPort> inputNodes;
+	std::vector<Circuit::MappedCircuit::NodeAndPort> outputNodes;
+	size_t timeframes;
+	size_t minInputNode;
+	size_t maxInputNode;
+	size_t minOutputNode;
+	size_t maxOutputNode;
 };
 
 struct CellAwareFault
 {
 public:
-	CellAwareFault(
-		const std::shared_ptr<Io::Udfm::UdfmFault> userDefinedFault,
-		const Circuit::GroupMetaData* cell,
-		std::vector<CellAwareAlternative> alternatives
-	);
+	CellAwareFault(std::string name, Circuit::GroupMetaData const* cell, CellAwareFaultStateMachine stateMachine);
 	virtual ~CellAwareFault(void);
 
-	const std::shared_ptr<Io::Udfm::UdfmFault>& GetUserDefinedFault(void) const;
-	const Circuit::GroupMetaData* GetCell(void) const;
-	const std::vector<CellAwareAlternative>& GetAlternatives(void) const;
-	const std::vector<CellAwareState>& GetStateMachine(void) const;
+	const std::string& GetName(void) const { return name; }
+	const Circuit::GroupMetaData* GetCell(void) const { return cell; }
+	const CellAwareFaultStateMachine& GetStateMachine(void) const { return stateMachine; }
+	bool IsSequentialCell(void) const { return sequential; }
 
-	const std::vector<Circuit::MappedCircuit::NodeAndPort>& GetConditionNodesAndPorts(void) const;
-	const std::vector<Circuit::MappedCircuit::NodeAndPort>& GetEffectNodesAndPorts(void) const;
-
-	size_t GetTimeframeSpread(void) const;
-	size_t GetMinConditionNodeId(void) const;
-	size_t GetMaxConditionNodeId(void) const;
-	size_t GetMinEffectNodeId(void) const;
-	size_t GetMaxEffectNodeId(void) const;
-	bool IsSequential(void) const;
+	std::string GetCellName(void) const;
+	std::string GetCellType(void) const;
 
 private:
-	const std::shared_ptr<Io::Udfm::UdfmFault> _userDefinedFault;
-	const Circuit::GroupMetaData* _cell;
-	std::vector<CellAwareAlternative> _alternatives;
-	std::vector<CellAwareState> _states;
-
-	// All NodeAndPorts that occur at at least one condition/effect in at least one test alternative; ideal for e.g. tagging
-	std::vector<Circuit::MappedCircuit::NodeAndPort> _conditionNodesAndPorts;
-	std::vector<Circuit::MappedCircuit::NodeAndPort> _effectNodesAndPorts;
-	size_t _timeframeSpread;
-
-	size_t _minConditionNodeId;
-	size_t _maxConditionNodeId;
-	size_t _minEffectNodeId;
-	size_t _maxEffectNodeId;
-	bool _sequential;
+	std::string name;
+	Circuit::GroupMetaData const* cell;
+	CellAwareFaultStateMachine stateMachine;
+	bool sequential;
 };
 
+
+
+std::optional<CellAwareFault> CreateCellAwareFaultForCell(const CellAwareFaultSpecification& specification, const Circuit::GroupMetaData* cell);
+std::unordered_map<std::string, Circuit::MappedCircuit::NodeAndPort> CreateCellPortMapForCell(const Circuit::GroupMetaData* cell);
+
+std::string to_string(const CellAwareFaultStateMachine& stateMachine);
 std::string to_string(const CellAwareFault& fault);
-std::string to_string(const CellAwareAlternative& alternative);
-std::string to_string(const CellAwarePort& attribute);
-std::string to_string(const std::vector<CellAwareState>& states);
-std::string to_string(const CellAwareTransition::TransitionType& type);
 
 };
 };

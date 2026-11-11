@@ -18,9 +18,7 @@ namespace FreiTest
 namespace Tpg
 {
 
-// Determines the effect logic output if no alternative
-// was found in the UDFM for the input of the cell.
-enum class CellAwareNoAlternativeEffect
+enum class CellAwareNoTransitionOutput
 {
 	FixedOne,      // The output is always LOGIC_ONE
 	FixedZero,     // The output is always LOGIC_ZERO
@@ -39,8 +37,8 @@ public:
 	CellAwareFaultEncoder(std::shared_ptr<Fault::CellAwareFaultModel> faultModel);
 	virtual ~CellAwareFaultEncoder(void);
 
-	void SetEffectWhenNoAlternativeFound(CellAwareNoAlternativeEffect effect);
-	const CellAwareNoAlternativeEffect& GetEffectWhenNoAlternativeFound(void) const;
+	void SetOutputWhenNoTransitionFound(CellAwareNoTransitionOutput output);
+	const CellAwareNoTransitionOutput& GetOutputWhenNoTransitionFound(void) const;
 
 	std::string GetName(void) const override;
 
@@ -60,7 +58,7 @@ private:
 	using DiffContainer = get_pin_data_container_t<PinData, DiffTag>;
 
 	std::shared_ptr<Fault::CellAwareFaultModel> _faultModel;
-	CellAwareNoAlternativeEffect _noAlternativeEffect;
+	CellAwareNoTransitionOutput _noTransitionOutput;
 
 	std::vector<std::map<Circuit::MappedCircuit::NodeAndPort, BadContainer>> _badContainerForTimeframe;
 	std::vector<std::map<Circuit::MappedCircuit::NodeAndPort, DiffContainer>> _diffContainerForTimeframe;

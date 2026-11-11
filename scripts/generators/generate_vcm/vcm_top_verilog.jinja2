@@ -1,0 +1,106 @@
+{%- for instruction in instructions %}
+module {{ vcm_name }}_{{ instruction.get_name() }} (
+	input wire [31:0] opcode,
+	output wire opcode_valid,
+
+	{#- Add a port for the operands -#}
+{%- for operand in instruction.get_operands() %}
+	output wire [{{ operand.get_bits_top() }}:{{ operand.get_bits_bottom() }}] operand_{{ operand.get_name() -}}
+		{{- "," if not loop.last -}}
+{%- endfor %}
+);
+
+	// Create the opcode_valid output signal
+	assign opcode_valid = 1
+		{%- for (start, end, pattern) in instruction.get_patterns() %}
+		&& (opcode[{{ start }}:{{ end }}] == {{ start - end + 1 }}'b {{ pattern }})
+		{%- endfor %};
+
+	// Assign the decoded operands
+	{%- for operand in instruction.get_operands() %}
+	{%- for (start, end, operand, operand_start, operand_end) in instruction.get_operand_parts(operand.get_name()) %}
+	assign operand_{{ operand }}[{{ operand_start }}:{{ operand_end }}] = opcode[{{ start }}:{{ end }}];
+	{%- endfor %}
+	{%- endfor %}
+
+endmodule
+{% endfor %}
+
+module {{ vcm_name }} (
+	input wire [31:0] opcode,
+	output wire opcode_valid,
+
+	{#- Add a port for each instruction -#}
+	{%- for instruction in instructions %}
+	output wire is_{{ instruction.get_name() }}_instruction,
+	{%- endfor %}
+
+	{#- Add a port for each operand -#}
+	{%- for operand in operands %}
+	output wire has_operand_{{ operand }},
+	{%- endfor %}
+
+	{#- Add known operands that are collapsed #}
+	{%- for op_name, op_bits in constant_operands %}
+	output wire [{{ op_bits-1 }}:0] operand_{{ op_name }},
+	{%- endfor %}
+
+	{#- Add a port for the operands of each instruction -#}
+	{%- for op_name in operands -%}
+	{%- set loop_operands = loop -%}
+	{%- for instruction in instructions -%}
+	{%- set loop_instruction = loop -%}
+	{%- for operand in instruction.get_operands(include=[op_name], exclude=constant_operand_names) %}
+	output wire [{{ operand.get_bits_top() }}:{{ operand.get_bits_bottom() }}] operand_{{ operand.get_name()}}_{{ instruction.get_name() -}},
+	{%- endfor %}
+	{%- endfor %}
+	{%- endfor %}
+
+	output wire just_ignore_me
+
+);
+{%- for op_name in constant_operand_names -%}
+{%- for instruction in instructions %}
+	{%- for operand in instruction.get_operands(include=[op_name]) %}
+	wire [{{ operand.get_bits_top() }}:{{ operand.get_bits_bottom() }}] operand_{{ operand.get_name() }}_{{ instruction.get_name() }};
+	{%- endfor %}
+{%- endfor -%}
+{%- endfor %}
+
+{% for instruction in instructions %}
+	// Instance for {{ instruction.get_name() }} instruction
+	// Operands {{ instruction.get_operands() | string }}
+	{{ vcm_name }}_{{ instruction.get_name() }} {{ instruction.get_name() }}_inst (
+		  .opcode(opcode)
+		, .opcode_valid(is_{{ instruction.get_name() }}_instruction)
+		{%- for operand in instruction.get_operands() %}
+		, .operand_{{ operand.get_name() }}(operand_{{ operand.get_name() }}_{{ instruction.get_name() }})
+		{%- endfor %}
+	);
+{% endfor %}
+
+	assign opcode_valid = 0
+		{%- for instruction in instructions %}
+		|| is_{{ instruction.get_name() }}_instruction
+		{%- endfor %};
+
+	{%- for operand in operands %}
+	assign has_operand_{{ operand }} = 0
+		{%- for instruction in instructions -%}
+		{%- if operand in instruction.get_operand_names() %}
+		|| is_{{ instruction.get_name() }}_instruction
+		{%- endif -%}
+		{%- endfor %};
+	{%- endfor %}
+
+	{%- for op_name, op_bits in constant_operands %}
+	assign operand_{{ op_name }} =
+		{%- for instruction in instructions -%}
+		{%- if op_name in instruction.get_operand_names() %}
+		is_{{ instruction.get_name() }}_instruction ? operand_{{ op_name }}_{{ instruction.get_name() }} :
+		{%- endif -%}
+		{%- endfor %}
+		{{ op_bits }}'h 00;
+	{%- endfor %}
+
+endmodule

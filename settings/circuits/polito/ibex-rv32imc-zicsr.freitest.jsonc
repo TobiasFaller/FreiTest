@@ -1,0 +1,16 @@
+[
+	{"define": "CircuitDir", "value": "./data/processors"},
+	{"define": "LibraryDir", "value": "./data/cell-libraries/nangate"},
+	{"define": "VcmDir", "value": "./data/vcm"},
+	{"define": "SettingsDir", "value": "./settings/circuits/processors"},
+
+	{"setting": "CircuitName", "value": "IBEX"},
+	{"setting": "CircuitSourceType", "value": "Verilog"},
+	{"setting": "CircuitBaseDirectory", "value": "[CircuitDir]"},
+	{"setting": "TopLevelModuleName", "value": "ibex_top"},
+	{"setting": "VerilogImportFilename", "value": "./output-manual/ibex-nangate45.v"},
+	{"setting": "VerilogLibraryFilename", "value": "[LibraryDir]/nangate45_freitest.v"},
+	{"setting": "VerilogExportPreprocessedFilename", "value": "[DataExportDirectory]/[Circuit].preprocessed.v"},
+	{"setting": "VerilogExportProcessedFilename", "value": "[DataExportDirectory]/[Circuit].processed.v"},
+
+]

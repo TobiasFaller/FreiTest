@@ -1,5 +1,5 @@
 [
-	{"application": "POLITO_MACISH_SAFE_FAULT_ANALYSIS_TRANSITION"},
+	{"application": "POLITO_MACISH_SAFE_FAULT_ANALYSIS_TRANSITION_DELAY"},
 
 	{"setting": "DataExportDirectory", "value": "[OutputDir]/[CircuitName]_SafeFaultAnalysisTransitionDelay"},
 

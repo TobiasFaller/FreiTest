@@ -96,13 +96,5 @@ std::string to_string(const SimulationTimeframe& timeframe);
 std::string to_string(const SimulationResult& result, const Circuit::MappedCircuit& circuit);
 std::string to_string(const SimulationTimeframe& timeframe, const Circuit::MappedCircuit& circuit);
 
-std::string to_string(const SimulationResult& goodResult, const SimulationResult& badResult, const Circuit::MappedCircuit& circuit);
-std::string to_string(const SimulationTimeframe& goodTimeframe, const SimulationTimeframe& badTimeframe, const Circuit::MappedCircuit& circuit);
-
-std::string to_string(const SimulationResult& atpgGoodResult, const SimulationResult& atpgBadResult,
-						const SimulationResult& simGoodResult, const SimulationResult& simBadResult, const Circuit::MappedCircuit& circuit);
-
-std::string to_debug(const SimulationResult& goodResult, const SimulationResult& badResult, const Circuit::MappedCircuit& circuit);
-
 };
 };

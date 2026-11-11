@@ -45,8 +45,8 @@ namespace ipasir {
 		ipasir_assume(solver, lit);
 	}
 
-	BmcResult Solver::solve() {
-		return static_cast<BmcResult>(ipasir_solve(solver));
+	SolveResult Solver::solve() {
+		return static_cast<SolveResult>(ipasir_solve(solver));
 	}
 
 	int Solver::val(int lit) {

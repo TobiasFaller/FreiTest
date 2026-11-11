@@ -1,0 +1,29 @@
+[
+	{"application": "POLITO_MULTI_POINT_STIMULI_GENERATION"},
+
+	{"include": "../../circuits/polito/ibex-rv32imc-zicsr.freitest.jsonc"},
+	{"setting": "DataExportDirectory", "value": "./output/polito/[CircuitName]_MultiNetStress"},
+
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/ModuleWatcher", "value": "[CircuitDir]/ibex-watchers.jsonc"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/ModulePrinter", "value": "[CircuitDir]/ibex-table.jsonc"},
+
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/PrologueEpilogue", "value": "./settings/workflows/polito/multi-point-stress-stimuli-ibex-program-structure.txt"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/DisassemblerSource", "value": "./scripts/polito/rv_disassembler.lua"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/DisassemblerJsonSource", "value": "./scripts/generators/generate_vcm/json-dbt-rise/rv32i.json"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/DisassemblerJsonSource", "value": "./scripts/generators/generate_vcm/json-dbt-rise/rv32m.json"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/DisassemblerJsonSource", "value": "./scripts/generators/generate_vcm/json-dbt-rise/rv32c.json"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/ExportRiscvStressPrograms", "value": "Enabled"},
+
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/VcmBaseDirectory", "value": "[VcmDir]"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/VcmImportFilename", "value": "output/multipoint-switching-vcm-ibex-rv32imc-zicsr-nangate.v"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/VcmLibraryFilename", "value": "[LibraryDir]/nangate45_freitest.v"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/VcmTopLevelModuleName", "value": "ibex_vcm"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/VcmConfigurationsFilename", "value": "./settings/workflows/polito/multi-point-stress-stimuli-ibex-params.jsonc"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/VcmConfiguration", "value": "NONE"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/VcmExportPreprocessedFilename", "value": "[DataExportDirectory]/[Circuit]-vcm.preprocessed.v"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/VcmExportProcessedFilename", "value": "[DataExportDirectory]/[Circuit]-vcm.processed.v"},
+
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/ApplyInitialState", "value": "Enabled"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/InitialStateType", "value": "File"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/InitialStateFile", "value": "./settings/circuits/polito/ibex-rv32imc-zicsr.init-state.txt"},
+]

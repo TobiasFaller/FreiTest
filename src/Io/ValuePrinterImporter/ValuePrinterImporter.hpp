@@ -14,15 +14,6 @@ namespace Io
 class ValuePrinterImporter
 {
 public:
-	ValuePrinterImporter(void);
-	virtual ~ValuePrinterImporter(void);
-
-	bool LoadPrinters(std::istream& stream, std::string watcherPrefix = "");
-	void ClearPrinters(void);
-
-	std::vector<std::shared_ptr<Helper::ValuePrinter::PrintConfig>> ApplyPrinters(Helper::ValuePrinter& printer, const std::vector<std::string>& tags, const std::string& target) const;
-
-private:
 	struct PrinterEntry
 	{
 		PrinterEntry(Helper::ValuePrinter::PrintConfig config, std::vector<std::string> tags, std::vector<std::string> targets);
@@ -32,7 +23,18 @@ private:
 		std::vector<std::string> targets;
 	};
 
-	std::vector<PrinterEntry> printers = {};
+	ValuePrinterImporter(void);
+	virtual ~ValuePrinterImporter(void);
+
+	bool LoadPrinters(std::istream& stream, std::string watcherPrefix = "");
+	void AddPrinter(PrinterEntry printer, std::string watcherPrefix = "");
+	void ClearPrinters(void);
+	const std::vector<PrinterEntry>& GetPrinters(void) const;
+
+	std::vector<std::shared_ptr<Helper::ValuePrinter::PrintConfig>> ApplyPrinters(Helper::ValuePrinter& printer, const std::vector<std::string>& tags, const std::string& target) const;
+
+private:
+	std::vector<PrinterEntry> printers;
 
 };
 

@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "Applications/BaseApplication.hpp"
-#include "Applications/Mixins/Udfm/UdfmMixin.hpp"
+#include "Applications/Mixins/CellAware/CellAwareSpecificationMixin.hpp"
 #include "Basic/Fault/Models/SingleStuckAtFaultModel.hpp"
 #include "Basic/Fault/Models/SingleTransitionDelayFaultModel.hpp"
 #include "Basic/Fault/Models/CellAwareFaultModel.hpp"
@@ -51,7 +51,7 @@ public:
 
 template<>
 class GreedyCompactionData<Fault::CellAwareFaultModel>:
-	public Mixin::UdfmMixin
+	public Mixin::CellAwareSpecificationMixin
 {
 public:
 	GreedyCompactionData(std::string configPrefix);

@@ -1,0 +1,7 @@
+[
+	{"include": "./multi-point-stress-stimuli-ibex.jsonc"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/VcmTag", "value": "adder"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/VcmParameter", "value": "mode_of_operation=00"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/NetSampleSource", "value": "File"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/NetSamplesPath", "value": "./settings/workflows/polito/nets/ibex-rv32imc-zicsr-adder-stress-pairs.nets.txt"},
+]

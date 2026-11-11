@@ -39,14 +39,15 @@ if __name__ == '__main__':
 					parameters.append(line)
 
 	with open(args.output_script_path, 'wt', encoding='UTF-8') as stream:
-		for input_file in args.input_paths:
-			if args.input_format == 'verilog':
-				if args.slang:
-					stream.write(f'{debug}read_slang --top {args.top_module} {" ".join(f"-D{define}" for define in defines)} {" ".join(f"-I{path}" for path in args.input_include_paths)} {input_file}\n')
-				else:
-					stream.write(f'{debug}read_verilog -sv {" ".join(f"-D{define}" for define in defines)} {" ".join(f"-I{path}" for path in args.input_include_paths)} {input_file}\n')
-			elif args.input_format == 'blif':
+		if args.input_format == 'verilog' and not args.slang:
+			for input_file in args.input_paths:
+				stream.write(f'{debug}read_verilog -sv {" ".join(f"-D{define}" for define in defines)} {" ".join(f"-I{path}" for path in args.input_include_paths)} {input_file}\n')
+		elif args.input_format == 'verilog' and args.slang:
+			stream.write(f'{debug}read_slang --ignore-assertions --top {args.top_module} {" ".join(f"-D{define}" for define in defines)} {" ".join(f"-I{path}" for path in args.input_include_paths)} {" ".join(args.input_paths)}\n')
+		elif args.input_format == 'blif':
+			for input_file in args.input_paths:
 				stream.write(f'{debug}read_blif {input_file}; rename -top {args.top_module}\n')
+
 		stream.write('\n')
 		if parameters:
 			stream.write(f'{debug}chparam {" ".join(f"-set {param.split('=', 1)[0]} \"{param.split('=', 1)[1]}\"" for param in parameters)} {args.top_module}\n')

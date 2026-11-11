@@ -24,14 +24,19 @@ public:
 	virtual ~SequentialAtpgBase(void);
 
 	bool SetSetting(std::string key, std::string value) override;
+	void Init(void) override;
 
 protected:
 	enum class CombinationalTestabilityCheck { Enabled, Disabled };
+	enum class StartingState { Unconstrained, AllZeroes, AllOnes, AllDontCares, AllUnknowns, Custom };
 
 	bool SimulateTestPattern(size_t faultIndex, const Pattern::TestPattern& pattern);
 
 	CombinationalTestabilityCheck settingsCombinationalTestabilityCheck;
 	size_t settingsMaximumTimeframes;
+	StartingState settingsStartingState;
+	std::string settingsCustomStartingState;
+	std::vector<Basic::Logic> startingState;
 
 private:
 	std::string configPrefix;

@@ -268,7 +268,7 @@ void DimacsExportProxy::Export(void) const
 			case Format::WDimacsClassic: out << std::to_string(topValue) << " "; break;
 			case Format::WDimacs2021: out << "h "; break;
 		}
-		out << clause_to_string(_assumptions[clauseIndex]) << std::endl;
+		out << clause_to_string({ _assumptions[clauseIndex] }) << std::endl;
 	}
 	out << std::endl;
 

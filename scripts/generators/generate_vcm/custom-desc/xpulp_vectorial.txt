@@ -1,0 +1,159 @@
+b00000 b00 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.ADD.H                   % pv.add.h rd, rs1, rs2
+b00000 b00 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.ADD.SC.H                % pv.add.sc.h rd, rs1, rs2
+b00000 b0  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.ADD.SCI.H           % pv.add.sci.h rd, rs1, imm
+b00000 b00 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.ADD.B                   % pv.add.b rd, rs1, rs2
+b00000 b00 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.ADD.SC.B                % pv.add.sc.b  rd, rs1, rs2
+b00000 b0  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.ADD.SCI.B           % pv.add.sci.b rd, rs1, imm
+b00001 b00 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.SUB.H                   % pv.sub.h rd, rs1, rs2
+b00001 b00 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.SUB.SC.H                % pv.sub.sc.h rd, rs1, rs2
+b00001 b0  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.SUB.SCI.H           % pv.sub.sci.h rd, rs1, imm
+b00001 b00 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.SUB.B                   % pv.sub.b rd, rs1, rs2
+
+b0000100 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.SUB.SC.B                  % pv.sub.sc.b rd, rs1, rs2
+b000010  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.SUB.SCI.B             % pv.sub.sci.b rd, rs1, imm
+b0001000 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.AVG.H                     % pv.avg.h rd, rs1, rs2
+b0001000 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.AVG.SC.H                  % pv.avg.sc.h rd, rs1, rs2
+b000100  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.AVG.SCI.H             % pv.avg.sci.h rd, rs1, imm
+b0001000 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.AVG.B                     % pv.avg.b rd, rs1, rs2
+b0001000 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.AVG.SC.B                  % pv.avg.sc.b rd, rs1, rs2
+b000100  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.AVG.SCI.B             % pv.avg.sci.b rd, rs1, imm
+b0001100 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.AVGU.H                    % pv.avgu.h rd, rs1, rs2
+b0001100 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.AVGU.SC.H                 % pv.avgu.sc.h rd, rs1, rs2
+b000110  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.AVGU.SCI.H            % pv.avgu.sci.h rd, rs1, imm
+b0001100 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.AVGU.B                    % pv.avgu.b rd, rs1, rs2
+b0001100 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.AVGU.SC.B                 % pv.avgu.sc.b rd, rs1, rs2
+b000110  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.AVGU.SCI.B            % pv.avgu.sci.b rd, rs1, imm
+b0010000 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.MIN.H                     % pv.min.h rd, rs1, rs2
+b0010000 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.MIN.SC.H                  % pv.min.sc.h rd, rs1, rs2
+b001000  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.MIN.SCI.H             % pv.min.sci.h rd, rs1, imm
+b0010000 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.MIN.B                     % pv.min.b rd, rs1, rs2
+b0010000 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.MIN.SC.B                  % pv.min.sc.b rd, rs1, rs2
+b001000  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.MIN.SCI.B             % pv.min.sci.b rd, rs1, imm
+b0010100 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.MINU.H                    % pv.minu.h rd, rs1, rs2
+b0010100 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.MINU.SC.H                 % pv.minu.sc.h rd, rs1, rs2
+b001010  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.MINU.SCI.H            % pv.minu.sci.h rd, rs1, imm
+b0010100 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.MINU.B                    % pv.minu.b rd, rs1, rs2
+b0010100 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.MINU.SC.B                 % pv.minu.sc.b rd, rs1, rs2
+b001010  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.MINU.SCI.B            % pv.minu.sci.b rd, rs1, imm
+b0011000 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.MAX.H                     % pv.max.h rd, rs1, rs2
+b0011000 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.MAX.SC.H                  % pv.max.sc.h rd, rs1, rs2
+b001100  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.MAX.SCI.H             % pv.max.sci.h rd, rs1, rs2
+b0011000 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.MAX.B                     % pv.max.b rd, rs1, rs2
+b0011000 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.MAX.SC.B                  % pv.max.sc.b rd, rs1, rs2
+b001100  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.MAX.SCI.B             % pv.max.sci.b rd, rs1, imm
+b0011100 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.MAXU.H                    % pv.maxu.h rd, rs1, rs2
+b0011100 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.MAXU.SC.H                 % pv.maxu.sc.h rd, rs1, rs2
+b001110  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.MAXU.SCI.H            % pv.maxu.sci.h rd, rs1, imm
+b0011100 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.MAXU.B                    % pv.maxu.b rd, rs1, rs2
+b0011100 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.MAXU.SC.B                 % pv.maxu.sc.b rd, rs1, rs2
+b001110  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.MAXU.SCI.B            % pv.maxu.sci.b rd, rs1, imm
+b0100000 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.SRL.H                     % pv.srl.h rd, rs1, rs2
+b0100000 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.SRL.SC.H                  % pv.srl.sc.h rd, rs1, rs2
+b010000  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.SRL.SCI.H             % pv.srl.sci.h rd, rs1, imm
+b0100000 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.SRL.B                     % pv.srl.b rd, rs1, rs2
+b0100000 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.SRL.SC.B                  % pv.srl.sc.b rd, rs1, rs2
+b010000  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.SRL.SCI.B             % pv.srl.sci.b rd, rs1, imm
+b0100100 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.SRA.H                     % pv.sra.h rd, rs1, rs2
+b0100100 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.SRA.SC.H                  % pv.sra.sc.h rd, rs1, rs2
+b010010  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.SRA.SCI.H             % pv.sra.sci.h rd, rs1, imm
+b0100100 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.SRA.B                     % pv.sra.b rd, rs1, rs2
+b0100100 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.SRA.SC.B                  % pv.sra.sc.b rd, rs1, rs2
+b010010  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.SRA.SCI.B             % pv.sra.sci.b rd, rs1, imm
+b0101000 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.SLL.H                     % pv.sll.h rd, rs1, rs2
+b0101000 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.SLL.SC.H                  % pv.sll.sc.h rd, rs1, rs2
+b010100  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.SLL.SCI.H             % pv.sll.sci.h rd, rs1, imm
+b0101000 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.SLL.B                     % pv.sll.b rd, rs1, rs2
+b0101000 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.SLL.SC.B                  % pv.sll.sc.b rd, rs1, rs2
+b010100  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.SLL.SCI.B             % pv.sll.sci.b rd, rs1, imm
+b0101100 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.OR.H                      % pv.or.h rd, rs1, rs2
+b0101100 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.OR.SC.H                   % pv.or.sc.h rd, rs1, rs2
+
+b010110  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.OR.SCI.H              % pv.or.sci.h rd, rs1, imm
+b0101100 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.OR.B                      % pv.or.b rd, rs1, rs2
+b0101100 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.OR.SC.B                   % pv.or.sc.b rd, rs1, rs2
+b010110  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.OR.SCI.B              % pv.or.sci.b rd, rs1, imm
+b0110000 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.XOR.H                     % pv.xor.h rd, rs1, rs2
+b0110000 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.XOR.SC.H                  % pv.xor.sc.h rd, rs1, rs2
+b011000  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.XOR.SCI.H             % pv.xor.sci.h rd, rs1, imm
+b0110000 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.XOR.B                     % pv.xor.b rd, rs1, rs2
+b0110000 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.XOR.SC.B                  % pv.xor.sc.b rd, rs1, rs2
+b011000  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.XOR.SCI.B             % pv.xor.sci.b rd, rs1, imm
+b0110100 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.AND.H                     % pv.and.h rd, rs1, rs2
+b0110100 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.AND.SC.H                  % pv.and.sc.h rd, rs1, rs2
+b011010  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.AND.SCI.H             % pv.and.sci.h rd, rs1, imm
+b0110100 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.AND.B                     % pv.and.b rd, rs1, rs2
+b0110100 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.AND.SC.B                  % pv.and.sc.b rd, rs1, rs2
+b011010  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.AND.SCI.B             % pv.and.sci.b rd, rs1, imm
+b011100000000     rs1[4:0] b000 rd[4:0] b1010111 PV.ABS.H                     % pv.abs.h rd, rs1
+b011100000000     rs1[4:0] b001 rd[4:0] b1010111 PV.ABS.B                     % pv.abs.b rd, rs1
+b011110  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.EXTRACT.H             % pv.extract.h rd, imm
+b011110  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.EXTRACT.B             % pv.extract.b rd, imm
+b100100  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.EXTRACTU.H            % pv.extractu.h rd, imm
+b100100  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.EXTRACTU.B            % pv.extractu.b rd, imm
+b101100  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.INSERT.H              % pv.insert.h rd, imm
+b101100  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.INSERT.B              % pv.insert.b rd, imm
+b1000000 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.DOTUP.H                   % pv.dotup.h rd, rs1, rs2
+b1000000 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.DOTUP.SC.H                % pv.dotup.sc.h rd, rs1, rs2
+b100000  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.DOTUP.SCI.H           % pv.dotup.sci.h rd, rs1, imm
+b1000000 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.DOTUP.B                   % pv.dotup.b rd, rs1, rs2
+b1000000 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.DOTUP.SC.B                % pv.dotup.sc.b rd, rs1, rs2
+b100000  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.DOTUP.SCI.B           % pv.dotup.sci.b rd, rs1, imm
+b1000100 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.DOTUSP.H                  % pv.dotusp.h rd, rs1, rs2
+b1000100 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.DOTUSP.SC.H               % pv.dotusp.sc.h rd, rs1, rs2
+b100010  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.DOTUSP.SCI.H          % pv.dotusp.sci.h rd, rs1, imm
+b1000100 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.DOTUSP.B                  % pv.dotusp.b rd, rs1, rs2
+b1000100 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.DOTUSP.SC.B               % pv.dotusp.sc.b rd, rs1, rs2
+b100010  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.DOTUSP.SCI.B          % pv.dotusp.sci.b rd, rs1, imm
+b1001100 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.DOTSP.H                   % pv.dotsp.h rd, rs1, rs2
+b1001100 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.DOTSP.SC.H                % pv.dotsp.sc.h rd, rs1, rs2
+b100110  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.DOTSP.SCI.H           % pv.dotsp.sci.h rd, rs1, imm
+b1001100 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.DOTSP.B                   % pv.dotsp.b rd, rs1, rs2
+b1001100 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.DOTSP.SC.B                % pv.dotsp.sc.b rd, rs1, rs2
+b100110  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.DOTSP.SCI.B           % pv.dotsp.sci.b rd, rs1, imm
+b1010000 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.SDOTUP.H                  % pv.sdotup.h rd, rs1, rs2
+b1010000 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.SDOTUP.SC.H               % pv.sdotup.sc.h rd, rs1, rs2
+b101000  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.SDOTUP.SCI.H          % pv.sdotup.sci.h rd, rs1, imm
+b1010000 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.SDOTUP.B                  % pv.sdotup.b rd, rs1, rs2
+b1010000 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.SDOTUP.SC.B               % pv.sdotup.sc.b rd, rs1, rs2
+b101000  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.SDOTUP.SCI.B          % pv.sdotup.sci.b rd, rs1, imm
+b1010100 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.SDOTUSP.H                 % pv.sdotusp.h rd, rs1, rs2
+b1010100 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.SDOTUSP.SC.H              % pv.sdotusp.sc.h rd, rs1, rs2
+b101010  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.SDOTUSP.SCI.H         % pv.sdotusp.sci.h rd, rs1, imm
+b1010100 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.SDOTUSP.B                 % pv.sdotusp.b rd, rs1, rs2
+b1010100 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.SDOTUSP.SC.B              % pv.sdotusp.sc.b rd, rs1, rs2
+b101010  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.SDOTUSP.SCI.B         % pv.sdotusp.sci.b rd, rs1, imm
+b1011100 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.SDOTSP.H                  % pv.sdotsp.h rd, rs1, rs2
+b1011100 rs2[4:0] rs1[4:0] b100 rd[4:0] b1010111 PV.SDOTSP.SC.H               % pv.sdotsp.sc.h rd, rs1, rs2
+b101110  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.SDOTSP.SCI.H          % pv.sdotsp.sci.h rd, rs1, imm
+b1011100 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.SDOTSP.B                  % pv.sdotsp.b rd, rs1, rs2
+
+b1011100 rs2[4:0] rs1[4:0] b101 rd[4:0] b1010111 PV.SDOTSP.SC.B               % pv.sdotsp.sc.b rd, rs1, rs	2
+b101110  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.SDOTSP.SCI.B          % pv.sdotsp.sci.b rd, rs1, imm
+b1100000 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.SHUFFLE.H                 % pv.shuffle.h rd, rs1, rs	2
+b110000  imm[0:0|5:1] rs1[4:0] b110 rd[4:0] b1010111 PV.SHUFFLE.SCI.H         % pv.shuffle.sci.h rd, rs1, imm
+b1100000 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.SHUFFLE.B                 % pv.shuffle.b rd, rs1, rs	2
+b110000  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.SHUFFLEI0.SCI.B       % pv.shuffleI0.sci.b rd, rs1, imm
+b111010  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.SHUFFLEI1.SCI.B       % pv.shuffleI1.sci.b rd, rs1, imm
+b111100  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.SHUFFLEI2.SCI.B       % pv.shuffleI2.sci.b rd, rs1, imm
+b111110  imm[0:0|5:1] rs1[4:0] b111 rd[4:0] b1010111 PV.SHUFFLEI3.SCI.B       % pv.shuffleI3.sci.b rd, rs1, imm
+b1100100 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.SHUFFLE2.H                % pv.shuffle2.h rd, rs1, rs	2
+b1100100 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.SHUFFLE2.B                % pv.shuffle2.b rd, rs1, rs	2
+b1101000 rs2[4:0] rs1[4:0] b000 rd[4:0] b1010111 PV.PACK.H                    % pv.pack.h rd, rs1, rs	2
+b1101100 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.PACKHI.B                  % pv.packhi.b rd, rs1, rs	2
+b1110000 rs2[4:0] rs1[4:0] b001 rd[4:0] b1010111 PV.PACKLO.B                  % pv.packlo.b rd, rs1, rs	2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

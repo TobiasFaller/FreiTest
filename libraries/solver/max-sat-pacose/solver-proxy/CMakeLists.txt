@@ -24,11 +24,6 @@ add_library(solver-proxy-shared SHARED ${LIB_SOURCE_FILES})
 set_target_properties(solver-proxy-static PROPERTIES OUTPUT_NAME "SATSolverProxy")
 set_target_properties(solver-proxy-shared PROPERTIES OUTPUT_NAME "SATSolverProxy")
 
-target_compile_options(solver-proxy-static PRIVATE -fsanitize=address -fno-omit-frame-pointer)
-target_link_options(solver-proxy-static PRIVATE -fsanitize=address -fno-omit-frame-pointer)
-target_compile_options(solver-proxy-shared PRIVATE -fsanitize=address -fno-omit-frame-pointer)
-target_link_options(solver-proxy-shared PRIVATE -fsanitize=address -fno-omit-frame-pointer)
-
 # add_custom_target(glucose-4.2.1-build
 #     COMMAND mkdir -p build && cmake -S . -B build && make -C build -j 
 #     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/glucose-4.2.1)
@@ -77,7 +72,4 @@ ENDIF(APPLE)
 
 add_executable(SATSolverProxy Main.cpp)
 target_link_libraries(SATSolverProxy solver-proxy-static)
-
-target_compile_options(SATSolverProxy PRIVATE -fsanitize=address -fno-omit-frame-pointer)
-target_link_options(SATSolverProxy PRIVATE -fsanitize=address -fno-omit-frame-pointer)
 

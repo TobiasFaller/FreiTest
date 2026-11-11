@@ -5,6 +5,7 @@
 #include <memory>
 #include <variant>
 #include <functional>
+#include <limits>
 
 #include "Basic/Logic.hpp"
 #include "Circuit/CircuitEnvironment.hpp"
@@ -17,6 +18,8 @@ namespace FreiTest
 {
 namespace Helper
 {
+
+const constexpr size_t TIMEFRAMES_AUTO = std::numeric_limits<size_t>::max();
 
 class ValuePrinter
 {
@@ -99,6 +102,9 @@ public:
 	void SetTitle(std::string title);
 	const std::string& GetTitle(void) const;
 
+	void SetTimeframes(size_t timeframes);
+	size_t GetTimeframes(void) const;
+
 	void SetTimeframeTitles(std::function<std::string(size_t)> titles);
 	const std::function<std::string(size_t)>& GetTimeframeTitles(void) const;
 
@@ -143,6 +149,7 @@ private:
 
 	std::string title = "OBSERVED WIRES & PORT NAMES";
 	std::function<std::string(size_t)> timeframeTitles = +[](size_t timeframe){ return "TF #" + std::to_string(timeframe); };
+	size_t timeframes = TIMEFRAMES_AUTO;
 	bool equalColumnWidths = true;
 
 };

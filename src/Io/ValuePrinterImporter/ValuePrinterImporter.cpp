@@ -1,6 +1,7 @@
 #include "Io/ValuePrinterImporter/ValuePrinterImporter.hpp"
 
 #include "Io/JsoncParser/JsonCParser.hpp"
+#include "Basic/Overload.hpp"
 
 namespace FreiTest
 {
@@ -247,6 +248,25 @@ bool ValuePrinterImporter::LoadPrinters(std::istream& stream, std::string watche
 	}
 
 	Logging::Panic("Unreachable code has been reached");
+}
+
+void ValuePrinterImporter::AddPrinter(PrinterEntry printer, std::string watcherPrefix)
+{
+	std::visit(Basic::overload(
+		[&](Helper::ValuePrinter::WatcherConfig& config) {
+			config.watcher = watcherPrefix + config.watcher;
+		},
+		[&](Helper::ValuePrinter::SpaceConfig& config) { },
+		[&](Helper::ValuePrinter::DivideConfig& config) { },
+		[&](Helper::ValuePrinter::CustomConfig& config) { },
+		[&](Helper::ValuePrinter::TitleConfig& config) { }
+	), printer.config);
+	printers.push_back(printer);
+}
+
+const std::vector<ValuePrinterImporter::PrinterEntry>& ValuePrinterImporter::GetPrinters(void) const
+{
+	return printers;
 }
 
 std::vector<std::shared_ptr<Helper::ValuePrinter::PrintConfig>> ValuePrinterImporter::ApplyPrinters(Helper::ValuePrinter& valuePrinter, const std::vector<std::string>& tags, const std::string& target) const

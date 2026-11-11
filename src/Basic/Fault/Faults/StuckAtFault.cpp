@@ -111,8 +111,10 @@ std::string to_string(const StuckAtFault& fault)
 {
 	auto [node, port] = fault.nodeAndPort;
 	return to_string(fault.type) + " of "
-		+ node->GetName() + "(id " + std::to_string(node->GetNodeId()) + ") port "
-		+ to_string(port);
+		+ node->GetName() + "(id " + std::to_string(node->GetNodeId())
+		+ ", " + to_string(node->GetCellType())
+		+ ")/" + ((port.portType == Circuit::PortType::Input) ? "I" : "O")
+		+ std::to_string(port.portNumber);
 }
 
 };

@@ -169,9 +169,25 @@ bool ValueWatcherImporter::LoadWatchers(std::istream& stream, std::string watche
 	Logging::Panic("Unreachable code has been reached");
 }
 
+void ValueWatcherImporter::AddWatcher(WatcherEntry watcher, std::string watcherPrefix, std::string signalPrefix)
+{
+	watcher.name = watcherPrefix + watcher.name;
+	for (auto& signal : watcher.signals)
+	{
+		signal = (signal == "0" || signal == "1" || signal == "X")
+			? signal : (signalPrefix + signal);
+	}
+	watcherEntries.push_back(watcher);
+}
+
 void ValueWatcherImporter::ClearWatchers(void)
 {
 	watcherEntries.clear();
+}
+
+const std::vector<ValueWatcherImporter::WatcherEntry>& ValueWatcherImporter::GetWatchers(void) const
+{
+	return watcherEntries;
 }
 
 std::vector<std::shared_ptr<Helper::ValueWatcher::Watcher>> ValueWatcherImporter::ApplyWatchers(Helper::ValueWatcher& valueWatcher, const Circuit::CircuitEnvironment& circuit, const std::vector<std::string>& tags, const std::string& target) const

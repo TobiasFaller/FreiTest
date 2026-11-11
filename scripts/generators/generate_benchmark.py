@@ -16,9 +16,11 @@ class Gate:
 	type: str
 	num_inputs: int = 1
 	num_clocks: int = 1
+	num_resets: int = 1
 	num_outputs: int = 1
 	inputs: List[str] = None
 	clocks: List[str] = None
+	resets: List[str] = None
 	outputs: List[str] = None
 
 	def __init__(self, name, type, cell):
@@ -26,9 +28,11 @@ class Gate:
 		self.type = type
 		self.num_inputs = len(cell.get('inputs', []))
 		self.num_clocks = len(cell.get('clocks', []))
+		self.num_resets = len(cell.get('resets', []))
 		self.num_outputs = len(cell.get('outputs', []))
 		self.inputs = [None] * len(cell.get('inputs', []))
 		self.clocks = [None] * len(cell.get('clocks', []))
+		self.resets = [None] * len(cell.get('resets', []))
 		self.outputs = [None] * len(cell.get('outputs', []))
 
 @dataclass
@@ -37,6 +41,7 @@ class Circuit:
 	inputs: List[str]
 	outputs: List[str]
 	clocks: List[str]
+	resets: List[str]
 	wires: List[str]
 	assignments: Dict[str, str]
 	gates: Dict[str, Gate]
@@ -55,6 +60,7 @@ def generate_circuit(rand: Random, config: Dict[str, int]) -> Circuit:
 	type_submodule = []
 
 	primary_clock_names = []
+	primary_reset_names = []
 
 	# Create flip-flops with clock connections
 	gates: Dict[str, Gate] = {}
@@ -63,11 +69,16 @@ def generate_circuit(rand: Random, config: Dict[str, int]) -> Circuit:
 		gate_type, cell = rand.choice(sequential)
 		gates[gate_name] = Gate(gate_name, gate_type, cell)
 		type_sequential += [(gate_name, gate_type)]
-		for index, clock in enumerate(cell['clocks']):
+		for index, clock in enumerate(cell.get('clocks', [])):
 			clock = random.choice(config.get('names_clocks', ['CLOCK']))
 			if clock not in primary_clock_names:
 				primary_clock_names += [ clock ]
 			gates[gate_name].clocks[index] = clock
+		for index, reset in enumerate(cell.get('resets', [])):
+			reset = random.choice(config.get('names_resets', ['RESET']))
+			if reset not in primary_reset_names:
+				primary_reset_names += [ reset ]
+			gates[gate_name].resets[index] = reset
 
 	primary_input_names = config.get('names_inputs', [f'IN{i+1}' for i in range(config['num_inputs'])])
 	primary_output_names = config.get('names_outputs', [f'OUT{i+1}' for i in range(config['num_outputs'])])
@@ -154,11 +165,16 @@ def generate_circuit(rand: Random, config: Dict[str, int]) -> Circuit:
 			gate_type, cell = rand.choice(submodule)
 			gates[gate_name] = Gate(gate_name, gate_type, cell)
 			type_submodule += [(gate_name, gate_type)]
-			for index, clock in enumerate(cell['clocks']):
+			for index, clock in enumerate(cell.get('clocks', [])):
 				clock = random.choice(config.get('names_clocks', ['CLOCK']))
 				if clock not in primary_clock_names:
 					primary_clock_names += [ clock ]
 				gates[gate_name].clocks[index] = clock
+			for index, reset in enumerate(cell.get('resets', [])):
+				reset = random.choice(config.get('names_resets', ['RESET']))
+				if reset not in primary_reset_names:
+					primary_reset_names += [ reset ]
+				gates[gate_name].resets[index] = reset
 			module_index += 1
 		_connect(cell)
 
@@ -220,6 +236,7 @@ def generate_circuit(rand: Random, config: Dict[str, int]) -> Circuit:
 		inputs=primary_input_names,
 		outputs=primary_output_names,
 		clocks=primary_clock_names,
+		resets=primary_reset_names,
 		wires=list(wires),
 		assignments=assignments,
 		gates=gates,
@@ -232,6 +249,7 @@ def generate_circuit(rand: Random, config: Dict[str, int]) -> Circuit:
 def _convert_circuit(circuit: Circuit, cells: List[Any]) -> Dict[str, Any]:
 	ports = [('input', port[0], True, port[1], port[2]) if isinstance(port, tuple) else ('input', port, False, 0, 0) for port in circuit.inputs]
 	ports += [('input', port[0], True, port[1], port[2]) if isinstance(port, tuple) else ('input', port, False, 0, 0) for port in circuit.clocks]
+	ports += [('input', port[0], True, port[1], port[2]) if isinstance(port, tuple) else ('input', port, False, 0, 0) for port in circuit.resets]
 	ports += [('output', port[0], True, port[1], port[2]) if isinstance(port, tuple) else ('output', port, False, 0, 0) for port in circuit.outputs]
 
 	single_wires = [wire for wire in circuit.wires if not isinstance(wire, tuple)]
@@ -240,8 +258,8 @@ def _convert_circuit(circuit: Circuit, cells: List[Any]) -> Dict[str, Any]:
 	gates = []
 	for gate in circuit.gates.values():
 		gate_ports = list(zip(
-			itertools.chain(*[cells[gate.type].get(type, []) for type in ['inputs', 'clocks', 'outputs']]),
-			itertools.chain(*[gate.inputs, gate.clocks, gate.outputs])
+			itertools.chain(*[cells[gate.type].get(type, []) for type in ['inputs', 'clocks', 'resets', 'outputs']]),
+			itertools.chain(*[gate.inputs, gate.clocks, gate.resets, gate.outputs])
 		))
 		gate_ports = [(port, isinstance(connections, list), connections) for port, connections in gate_ports]
 		gates += [(gate.name, gate.type, gate_ports)]
@@ -263,6 +281,7 @@ def _replace_names(circuit: Circuit, forward_map: Dict[str, str]):
 	for gate_name, gate in circuit.gates.items():
 		gate.inputs = [(forward_map[name] if name in forward_map else name) for name in gate.inputs]
 		gate.clocks = [(forward_map[name] if name in forward_map else name) for name in gate.clocks]
+		gate.resets = [(forward_map[name] if name in forward_map else name) for name in gate.resets]
 		gate.outputs = [(forward_map[name] if name in forward_map else name) for name in gate.outputs]
 
 	assignments = {}
@@ -304,7 +323,7 @@ def _replace_port_names(circuit_map: Dict[str,  Circuit], port_maps: Dict[str, D
 					gate.outputs.append([old_outputs[t] for t in target[2]])
 				else:
 					gate.outputs.append(old_outputs[target])
-	
+
 	return circuit_map
 
 
@@ -573,6 +592,7 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description='Generate Verilog benchmark circuits.')
 	parser.add_argument('--seed', dest='seed', type=int, default=0, help='The seed for the random generator')
 	parser.add_argument('--library-path', dest='library_path', required=True, help='The json file describing the cells of the library')
+	parser.add_argument('--library-exclude', dest='library_exclude', default='', required=False, help='A regex that when matched excludes the cell from the library')
 	parser.add_argument('--circuit-path', dest='circuit_path', required=True, help='The output file to write the circuit to')
 	parser.add_argument('--circuit-name', dest='circuit_name', default='benchmark', help='The top-level name for the circuit')
 	parser.add_argument('--circuit-inputs', dest='circuit_inputs', type=int, default=10, help='The number of inputs for the circuit')
@@ -601,6 +621,13 @@ if __name__ == '__main__':
 
 	with open(args.library_path, 'rt', encoding='utf-8') as stream:
 		library = json.load(stream)
+
+	def is_cell_allowed(cell):
+		if args.library_exclude == '':
+			return True
+		return not re.match(args.library_exclude, cell[0])
+
+	library['cells'] = dict(filter(is_cell_allowed, library['cells'].items()))
 
 	cells_combinational = dict([(name, cell) for name, cell in library['cells'].items() if cell.get('combinational', False)])
 	cells_sequential = dict([(name, cell) for name, cell in library['cells'].items() if cell.get('sequential', False)])
@@ -631,6 +658,7 @@ if __name__ == '__main__':
 				'num_gates': args.circuit_gates,
 				'num_submodules': 0 if module_index < args.circuit_nosubmodules else args.circuit_submodules,
 				'names_clocks': ['CLOCK'],
+				'names_reset': ['RESET'],
 				'names_inputs': [f'IN{i+1}' for i in range(args.circuit_inputs)] ,
 				'names_outputs': [f'OUT{i+1}' for i in range(args.circuit_outputs)],
 				'cells_combinational': cells_combinational,
@@ -643,7 +671,8 @@ if __name__ == '__main__':
 				"inputs": circuit.inputs,
 				"outputs": circuit.outputs,
 				**({ "clocks": circuit.clocks } if len(circuit.clocks) > 0 else { }),
-				**({ "sequential": True } if len(circuit.clocks) > 0 else { "combinational": True }),
+				**({ "resets": circuit.resets } if len(circuit.resets) > 0 else { }),
+				**({ "sequential": True } if len(circuit.clocks) + len(circuit.resets) > 0 else { "combinational": True }),
 			}
 
 			circuit_meta = {
@@ -652,9 +681,11 @@ if __name__ == '__main__':
 				'inputs': circuit.inputs,
 				'outputs': circuit.outputs,
 				'clocks': circuit.clocks,
+				'resets': circuit.resets,
 				'inputs_full': [{ 'name': input, 'top': 0, 'bottom': 0 } for input in circuit.inputs],
 				'outputs_full': [{ 'name': output, 'top': 0, 'bottom': 0 } for output in circuit.outputs],
 				'clocks_full': [{ 'name': clock, 'top': 0, 'bottom': 0 } for clock in circuit.clocks],
+				'resets_full': [{ 'name': reset, 'top': 0, 'bottom': 0 } for reset in circuit.resets],
 				'gates_combinational': circuit.type_combinational,
 				'gates_sequential': circuit.type_sequential,
 				'gates_submodule': circuit.type_submodule,
@@ -715,7 +746,7 @@ if __name__ == '__main__':
 						gate.inputs[index] = _combine_busses(gate.inputs[index], port_maps[circuit.name], reverse_port_maps[circuit.name])
 					for index in range(len(gate.outputs)):
 						gate.outputs[index] = _combine_busses(gate.outputs[index], port_maps[circuit.name], reverse_port_maps[circuit.name])
-			
+
 				old_assignments = circuit.assignments
 				circuit.assignments = { }
 				for left, right in old_assignments.items():
@@ -727,16 +758,19 @@ if __name__ == '__main__':
 				meta['modules'][circuit_name]['inputs'] = list(_get_ports(circuit, 'inputs'))
 				meta['modules'][circuit_name]['outputs'] = list(_get_ports(circuit, 'outputs'))
 				meta['modules'][circuit_name]['clocks'] = list(_get_ports(circuit, 'clocks'))
+				meta['modules'][circuit_name]['resets'] = list(_get_ports(circuit, 'resets'))
 				meta['modules'][circuit_name]['inputs_full'] = [_get_full_port(input) for input in circuit.inputs]
 				meta['modules'][circuit_name]['outputs_full'] = [_get_full_port(output) for output in circuit.outputs]
 				meta['modules'][circuit_name]['clocks_full'] = [_get_full_port(clock) for clock in circuit.clocks]
+				meta['modules'][circuit_name]['resets_full'] = [_get_full_port(reset) for reset in circuit.resets]
 
 			cells_submodule = {
 				name: {
 					"inputs": [(input[0] if isinstance(input, tuple) else input) for input in circuit.inputs],
 					"outputs": [(output[0] if isinstance(output, tuple) else output) for output in circuit.outputs],
 					**({ "clocks": circuit.clocks } if len(circuit.clocks) > 0 else { }),
-					**({ "sequential": True } if len(circuit.clocks) > 0 else { "combinational": True }),
+					**({ "resets": circuit.resets } if len(circuit.resets) > 0 else { }),
+					**({ "sequential": True } if len(circuit.clocks) + len(circuit.resets) > 0 else { "combinational": True }),
 				} for name, circuit in circuits.items()
 			}
 
@@ -913,6 +947,7 @@ if __name__ == '__main__':
 			'num_gates': args.vcm_gates,
 			'num_submodules': 0,
 			'names_clocks': ['CLOCK_g'],
+			'names_resets': ['RESET_g'],
 			'names_inputs': random.choices(miter_ports, k=args.vcm_inputs),
 			'names_outputs': [f'CONSTRAINT{i+1}_{random.choice(["i", "c", "c", "c", "c", "c", "t"])}' for i in range(args.vcm_constraints)],
 			'cells_combinational': cells_combinational,

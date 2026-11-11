@@ -20,7 +20,7 @@ namespace Udfm
 
 static void CheckUdfm(const std::unique_ptr<UdfmModel>& udfm);
 
-std::unique_ptr<UdfmModel> ParseUdfm(std::istream& input)
+std::unique_ptr<UdfmModel> Parse(std::istream& input)
 {
 	ASSERT(input.good()) << "Got bad istream";
 	// Do not skip whitespace

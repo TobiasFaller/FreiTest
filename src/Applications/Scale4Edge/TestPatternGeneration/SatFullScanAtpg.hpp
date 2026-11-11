@@ -56,6 +56,11 @@ public:
 	Basic::ApplicationStatistics GetStatistics(void) override;
 
 protected:
+	enum class ScanChainType {
+		LaunchOnShift, // aka. skewed-load
+		// TODO: LaunchOnCapture, // aka. broadside, double-capture
+		EnhancedScan, // aka. enhanced-scan, hold-scan
+	};
 	enum class MaximizeDontCareValues {
 		Disabled,
 		Enabled
@@ -75,6 +80,7 @@ protected:
 
 	void GeneratePatternForFault(size_t faultIndex);
 
+	ScanChainType scanChainType;
 	MaximizeDontCareValues maximizeDontCareValues;
 	MaximizeDontCarePorts maximizeDontCarePorts;
 	MaximizeDontCareFlipFlops maximizeDontCareFlipFlops;

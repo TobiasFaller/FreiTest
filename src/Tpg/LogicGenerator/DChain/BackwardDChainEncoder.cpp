@@ -65,17 +65,15 @@ bool BackwardDChainEncoder<PinData>::EncodeTimeframe(GeneratorContext<PinData>& 
 		std::vector<DiffLogicContainer> differences;
 		for (size_t inputId = 0u; inputId < node->GetNumberOfInputs(); ++inputId)
 		{
-			if (!timeframe.template HasTag<DiffTag>(node->GetInput(inputId)->GetNodeId()))
-			{
-				continue;
-			}
-
+			// INFO: Only inputs which have a driver node with a DiffTag can produce a difference.
+			// However, if a fault model is present on this node, then the input can be intercepted
+			// and produce a fault difference.
+			// In case an input without DiffTag is used, the XOR encoding between GoodTag and BadTag
+			// will automatically be static LOGIC_ZERO and no overhead occurrs.
+			// => Always use all inputs for this node, including the ones without DiffTag.
 			const auto diff = timeframe.template GetContainer<DiffTag>(
 				context, nodeId, PortType::Input, inputId);
-			if (!diff.IsSet())
-			{
-				LOG(FATAL) << "Found difference color but no difference literal";
-			}
+			ASSERT (diff.IsSet()) << "Found difference color but no difference literal";
 			differences.emplace_back(diff);
 		}
 
@@ -117,7 +115,8 @@ bool BackwardDChainEncoder<PinData>::EncodeTimeframe(GeneratorContext<PinData>& 
 			//                      container
 			//               (is always intercepted)
 			//
-			auto& diff = timeframe.template GetInternalContainer<DiffTag>(context, nodeId);
+			const auto diff = timeframe.template GetInternalContainer<DiffTag>(
+				context, nodeId);
 			encoder.EncodeImplication(diff, encoder.EncodeOr(differences));
 		}
 	}

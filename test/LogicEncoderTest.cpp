@@ -32,14 +32,14 @@ int main(int argc, char* argv[], char* envp[])
     return boost::unit_test::unit_test_main(::init_unit_test, argc, argv);
 }
 
-struct Fixture {
+struct Fixture
+{
 
     Fixture():
         solver(SatSolverProxy::CreateSatSolver(SatSolver::PROD_SAT_SINGLE_GLUCOSE_421)),
         generator(std::dynamic_pointer_cast<SolverProxy::ISolverProxy>(solver))
     {
     }
-
     ~Fixture() = default;
 
 	template<typename LogicContainer>

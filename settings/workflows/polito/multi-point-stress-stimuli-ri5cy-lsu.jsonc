@@ -1,0 +1,6 @@
+[
+	{"include": "./multi-point-stress-stimuli-ri5cy.jsonc"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/VcmConfiguration", "value": "lsu"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/NetSampleSource", "value": "File"},
+	{"setting": "PoliTO/MultiPointStressStimuliGeneration/NetSamplesPath", "value": "./settings/workflows/polito/nets/ri5cy-rv32im-zicsr-xpulp2-lsu-stress-pairs.nets.txt"},
+]

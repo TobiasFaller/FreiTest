@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "Tpg/Container/LogicContainer.hpp"
+#include "Tpg/LogicGenerator/PinData.hpp"
 #include "Tpg/LogicGenerator/IConstraintEncoder.hpp"
 
 namespace FreiTest
@@ -49,7 +50,9 @@ protected:
 	TransitionSensitizationType _sensitizationType;
 
 	std::vector<std::vector<Tpg::LogicContainer01>> _transitionInitialValidForTimeframe;
-	std::vector<std::vector<Tpg::LogicContainer01>> _transitionInitialValueForTimeframe;
+	std::vector<std::vector<get_pin_data_container_t<PinData, BadTag>>> _transitionInitialValueForTimeframe;
+	std::vector<std::vector<Tpg::LogicContainer01>> _transitionSettledValidForTimeframe;
+	std::vector<std::vector<get_pin_data_container_t<PinData, BadTag>>> _transitionSettledValueForTimeframe;
 	std::vector<Tpg::LogicContainer01> _sensitizations;
 
 };

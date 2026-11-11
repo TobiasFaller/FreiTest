@@ -290,49 +290,22 @@ typename VcdExportMixin<FaultList>::VcdInfo VcdExportMixin<FaultList>::GetBadSim
 
 	if constexpr (std::is_same_v<FaultList, Fault::SingleStuckAtFaultList>)
 	{
-		auto const stuckAt = fault.GetStuckAt();
-		auto const faultName = to_string(to_logic(stuckAt.GetType()));
-		auto const connectionId = stuckAt.GetNode()->GetPortConnectionId(stuckAt.GetPort());
-
-		auto const* group = metaData.GetGroup(stuckAt.GetNode());
-		auto const& groupInfo = group->GetSourceInfo();
-		auto const* cell = group->GetParent();
-		auto const& cellInfo = cell->GetSourceInfo();
-		ASSERT(cellInfo.template GetProperty<bool>("module-is-cell").value_or(false)) << "Stuck-At fault is at unknown location";
-
-		bool portIsTopLevel = (groupInfo.template GetProperty<std::string>("primitive-category").value_or("gate") == "port");
-		if (portIsTopLevel)
-		{
-			// The parent module (the circuit top level module) contains the correct port names.
-			cell = cell->GetParent();
-		}
-
-		bool connectedToPort = false;
-		std::string portName;
-		for (auto port : cell->GetPorts())
-		{
-			for (const auto index : port.GetSize().GetIndicesTopToBottom())
+		auto const stuckAtFault = fault.GetStuckAt();
+		auto const faultName = [&]() -> std::string {
+			switch (stuckAtFault.GetType())
 			{
-				const auto* connection = port.GetConnectionForIndex(index);
-				if (connection == nullptr)
-				{
-					continue;
-				}
-
-				if (connection->GetConnectionId() == connectionId)
-				{
-					connectedToPort = true;
-					portName = (port.GetSize().GetSize() == 1u)
-						? port.GetHierarchyName()
-						: boost::str(boost::format("%s [%d]") % port.GetHierarchyName() % index);
-					break;
-				}
+				case StuckAtFaultType::STUCK_AT_0: return "SA0";
+				case StuckAtFaultType::STUCK_AT_1: return "SA1";
+				case StuckAtFaultType::STUCK_AT_X: return "SAX";
+				case StuckAtFaultType::STUCK_AT_U: return "SAU";
+				case StuckAtFaultType::STUCK_AT_FREE: return "SAF";
+				default: Logging::Panic();
 			}
-		}
-		ASSERT(connectedToPort) << "Stuck-At fault is not at cell port.";
+		}();
+		auto const friendlyName { metaData.GetFriendlyName(stuckAtFault) };
 
-		std::string header = boost::str(boost::format("%s-SA%s") % portName % faultName);
-		std::string file = boost::str(boost::format("%d-SA%s-%s-%d.vcd") % pattern.patternId % faultName % portName % vcdId);
+		std::string header = boost::str(boost::format("%s-%s") % friendlyName % faultName);
+		std::string file = boost::str(boost::format("%d-%s-%s-%d.vcd") % pattern.patternId % friendlyName % faultName % vcdId);
 
 		size_t pos;
 		while ((pos = file.find("[")) != std::string::npos) { file.replace(pos, 1, ""); }
@@ -346,49 +319,20 @@ typename VcdExportMixin<FaultList>::VcdInfo VcdExportMixin<FaultList>::GetBadSim
 	}
 	else if constexpr (std::is_same_v<FaultList, Fault::SingleTransitionDelayFaultList>)
 	{
-		auto const transitionDelay = fault.GetTransitionDelay();
-		auto const faultName = to_string(transitionDelay.GetType());
-		auto const connectionId = transitionDelay.GetNode()->GetPortConnectionId(transitionDelay.GetPort());
-
-		auto const* group = metaData.GetGroup(transitionDelay.GetNode());
-		auto const& groupInfo = group->GetSourceInfo();
-		auto const* cell = group->GetParent();
-		auto const& cellInfo = cell->GetSourceInfo();
-		ASSERT(cellInfo.template GetProperty<bool>("module-is-cell").value_or(false)) << "Transition delay fault is at unknown location";
-
-		bool portIsTopLevel = (groupInfo.template GetProperty<std::string>("primitive-category").value_or("gate") == "port");
-		if (portIsTopLevel)
-		{
-			// The parent module (the circuit top level module) contains the correct port names.
-			cell = cell->GetParent();
-		}
-
-		bool connectedToPort = false;
-		std::string portName;
-		for (auto port : cell->GetPorts())
-		{
-			for (const auto index : port.GetSize().GetIndicesTopToBottom())
+		auto const transitionDelayFault = fault.GetTransitionDelay();
+		auto const faultName = [&]() -> std::string {
+			switch (transitionDelayFault.GetType())
 			{
-				const auto* connection = port.GetConnectionForIndex(index);
-				if (connection == nullptr)
-				{
-					continue;
-				}
-
-				if (connection->GetConnectionId() == connectionId)
-				{
-					connectedToPort = true;
-					portName = (port.GetSize().GetSize() == 1u)
-						? port.GetHierarchyName()
-						: boost::str(boost::format("%s [%d]") % port.GetHierarchyName() % index);
-					break;
-				}
+				case TransitionDelayFaultType::SLOW_TO_RISE: return "STR";
+				case TransitionDelayFaultType::SLOW_TO_FALL: return "STF";
+				case TransitionDelayFaultType::SLOW_TO_TRANSITION: return "STT";
+				default: Logging::Panic();
 			}
-		}
-		ASSERT(connectedToPort) << "Stuck-At fault is not at cell port.";
+		}();
+		auto const friendlyName { metaData.GetFriendlyName(transitionDelayFault) };
 
-		std::string header = boost::str(boost::format("%s-SA%s") % portName % faultName);
-		std::string file = boost::str(boost::format("%d-SA%s-%s-%d.vcd") % pattern.patternId % faultName % portName % vcdId);
+		std::string header = boost::str(boost::format("%s-%s") % friendlyName % faultName);
+		std::string file = boost::str(boost::format("%d-%s-%s-%d.vcd") % pattern.patternId % friendlyName % faultName % vcdId);
 
 		size_t pos;
 		while ((pos = file.find("[")) != std::string::npos) { file.replace(pos, 1, ""); }
@@ -402,66 +346,20 @@ typename VcdExportMixin<FaultList>::VcdInfo VcdExportMixin<FaultList>::GetBadSim
 	}
 	else if constexpr (std::is_same_v<FaultList, Fault::CellAwareFaultList>)
 	{
-		std::string file;
-		std::string header;
+		auto const cellAwareFault = fault;
+		auto const faultName = cellAwareFault.GetName();
+		auto const cellName = cellAwareFault.GetCellName();
+		std::string file = boost::str(boost::format("%d-CA%s-%s-%d.vcd") % pattern.patternId % cellName % faultName % vcdId);
+		std::string header = boost::str(boost::format("%s-CA%s") % cellName % faultName);
 
-		// Get cell information of the cell aware fault
-		auto cell = fault.GetCell();
+		size_t pos;
+		while ((pos = file.find("[")) != std::string::npos) { file.replace(pos, 1, ""); }
+		while ((pos = file.find("]")) != std::string::npos) { file.replace(pos, 1, ""); }
+		while ((pos = file.find("/")) != std::string::npos) { file.replace(pos, 1, "'"); }
 
-		// If a UDFM entry has different alternatives to test for a fault,
-		// it is enough to note some information once
-		int numberOfEntries = 0;
+		DVLOG(3) << "Filename: " << file;
+		DVLOG(3) << "Header: " << header;
 
-		// testAlternative is a User Defined Fault Entry
-		for (auto& testAlternative : fault.GetUserDefinedFault()->GetAlternatives())
-		{
-			auto faultname = fault.GetUserDefinedFault()->GetFaultName();
-
-			// Returns a PortMapType (string, error) of Conditions for UDFM Entry
-			std::string conditionForHeader;
-
-			std::string cellHierarchyname = cell->GetHierarchyName();
-			for (auto& [portname, portvalue] : testAlternative->GetTestConditions())
-			{
-				// Get the key of the UDFMs condition map and get the port of the specific cell
-				auto port = cell->GetPort(portname);
-				conditionForHeader += port->GetHierarchyName() + ":" + to_string(portvalue) + "|";
-			}
-
-			// Doing the same (see above) for the effects of a fault
-			std::string effectsForHeader;
-			for (auto& [portname, portvalue] : testAlternative->GetTestEffects())
-			{
-				auto port = cell->GetPort(portname);
-				effectsForHeader += port->GetHierarchyName() + ":" + to_string(portvalue) +"|";
-			}
-
-			// like here: faultname is only needed once
-			if (numberOfEntries < 1)
-			{
-				header += faultname + " " + conditionForHeader + " " + effectsForHeader + ";";
-			}
-			else
-			{
-				header += conditionForHeader + " " + effectsForHeader + ";";
-			}
-
-			size_t pos;
-			while ((pos = cellHierarchyname.find("/")) != std::string::npos)
-			{
-				cellHierarchyname.replace(pos, 1, "'");
-			}
-
-			// here again
-			if (numberOfEntries < 1)
-			{
-				// to match the fault and fault free vcds
-				file += std::to_string(pattern.pattern.GetNumberOfTimeframes()) + "TF-" + std::to_string(pattern.patternId)
-			+ "-Inst-" + faultname + "_in_" + cellHierarchyname + "cell.vcd";
-			}
-
-			numberOfEntries++;
-		}
 		return {vcdId, file, header};
 	}
 	else

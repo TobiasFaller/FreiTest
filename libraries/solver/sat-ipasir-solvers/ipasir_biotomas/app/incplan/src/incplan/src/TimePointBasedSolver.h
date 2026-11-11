@@ -56,7 +56,7 @@ public:
 	}
 
 
-	ipasir::BmcResult solveSAT() {
+	ipasir::SolveResult solveSAT() {
 		return solver->solve();
 	}
 

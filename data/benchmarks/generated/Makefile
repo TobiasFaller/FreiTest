@@ -2,21 +2,22 @@ PROJECT_ROOT ?= ../../..
 SCRIPT_PATH ?= ${PROJECT_ROOT}/scripts
 GENERIC_CELL_LIBRARY ?= ${PROJECT_ROOT}/data/cell-libraries/generic/generic_meta.json
 GENERIC_CELL_VERILOG ?= ${PROJECT_ROOT}/data/cell-libraries/generic/generic_functional.v
+GENERIC_CELL_EXCLUDE ?= '^(DL|DLR)$$'
 
 SEEDS_TINY_PATH ?= seeds_tiny.txt
 SEEDS_SMALL_PATH ?= seeds_small.txt
 SEEDS_MEDIUM_PATH ?= seeds_medium.txt
 SEEDS_LARGE_PATH ?= seeds_large.txt
 SEEDS_HUGE_PATH ?= seeds_huge.txt
-SEEDS_ENDIANESS_PATH ?= seeds_endianess.txt
+SEEDS_FUZZING_PATH ?= seeds_fuzzing.txt
 OUTUPT_TINY_PATH ?= tiny
 OUTUPT_SMALL_PATH ?= small
 OUTUPT_MEDIUM_PATH ?= medium
 OUTUPT_LARGE_PATH ?= large
 OUTUPT_HUGE_PATH ?= huge
-OUTUPT_ENDIANESS_PATH ?= endianess
+OUTUPT_FUZZING_PATH ?= fuzzing
 
-.PHONY: default help clean mrproper build tiny small medium large huge endianess generate
+.PHONY: default help clean mrproper build tiny small medium large huge fuzzing generate
 
 default: build-generic
 
@@ -32,6 +33,9 @@ help:
 	@echo ""
 	@echo " To build for a 'custom' cell library use"
 	@echo "  make build CELL_LIBRARY=.../custom_meta.json OUTPUT_SUFFIX=-custom"
+	@echo ""
+	@echo "Fuzzes FreiTest vs Verilator on random benchmarks"
+	@echo "  fuzzing-generic: Fuzz small random benchmarks for generic cell-library"
 
 clean:
 	rm -rf ${OUTUPT_TINY_PATH} || true
@@ -46,6 +50,7 @@ mrproper: clean
 	$(MAKE) $* \
 		CELL_LIBRARY=${GENERIC_CELL_LIBRARY} \
 		CELL_VERILOG=${GENERIC_CELL_VERILOG} \
+		CELL_EXCLUDE=${GENERIC_CELL_EXCLUDE} \
 		OUTPUT_SUFFIX=-generic
 
 build:
@@ -80,26 +85,27 @@ huge:
 		CI=50 CO=20 CF=1000 CG=500000 VI=20 VO=10 VF=10 VG=500 CM=1 CSM=0 CNS=0 CWB=0 CPB=0 \
 		SEEDS_PATH=${SEEDS_HUGE_PATH} OUTPUT_PATH=${OUTUPT_HUGE_PATH}
 
-endianess:
+fuzzing:
 	$(MAKE) generate \
 		CI=5 CO=3 CF=3 CG=15 VI=3 VO=1 VF=0 VG=3 CM=5 CSM=3 CNS=3 CWB=3 CPB=3 \
-		SEEDS_PATH=${SEEDS_ENDIANESS_PATH} OUTPUT_PATH=${OUTUPT_ENDIANESS_PATH}
+		SEEDS_PATH=${SEEDS_FUZZING_PATH} OUTPUT_PATH=${OUTUPT_FUZZING_PATH}
 	$(MAKE) stimulate \
-		SEEDS_PATH=${SEEDS_ENDIANESS_PATH} OUTPUT_PATH=${OUTUPT_ENDIANESS_PATH}
+		SEEDS_PATH=${SEEDS_FUZZING_PATH} OUTPUT_PATH=${OUTUPT_FUZZING_PATH}
 	$(MAKE) verilate \
-		SEEDS_PATH=${SEEDS_ENDIANESS_PATH} OUTPUT_PATH=${OUTUPT_ENDIANESS_PATH}
+		SEEDS_PATH=${SEEDS_FUZZING_PATH} OUTPUT_PATH=${OUTUPT_FUZZING_PATH}
 	$(MAKE) run_freitest \
-		SEEDS_PATH=${SEEDS_ENDIANESS_PATH} OUTPUT_PATH=${OUTUPT_ENDIANESS_PATH}
+		SEEDS_PATH=${SEEDS_FUZZING_PATH} OUTPUT_PATH=${OUTUPT_FUZZING_PATH}
 	$(MAKE) run_verilator \
-		SEEDS_PATH=${SEEDS_ENDIANESS_PATH} OUTPUT_PATH=${OUTUPT_ENDIANESS_PATH}
+		SEEDS_PATH=${SEEDS_FUZZING_PATH} OUTPUT_PATH=${OUTUPT_FUZZING_PATH}
 	$(MAKE) run_compare \
-		SEEDS_PATH=${SEEDS_ENDIANESS_PATH} OUTPUT_PATH=${OUTUPT_ENDIANESS_PATH}
+		SEEDS_PATH=${SEEDS_FUZZING_PATH} OUTPUT_PATH=${OUTUPT_FUZZING_PATH}
 
 generate:
 	mkdir -p ${OUTPUT_PATH}; true
 	i=1; while read seed; do python3 ${SCRIPT_PATH}/generators/generate_benchmark.py \
 		--seed $$seed \
 		--library-path ${CELL_LIBRARY} \
+		--library-exclude '${CELL_EXCLUDE}' \
 		--circuit-path ${OUTPUT_PATH}/benchmark$$i${OUTPUT_SUFFIX}.v \
 			--circuit-name benchmark --circuit-inputs ${CI} --circuit-outputs ${CO} \
 			--circuit-flipflops ${CF} --circuit-gates ${CG} --circuit-modules ${CM} \
@@ -136,21 +142,21 @@ stimulate:
 run_freitest:
 	mkdir -p ${OUTPUT_PATH}; true
 	i=1; while read seed; do \
-		mkdir -p data/benchmarks/generated/endianess/benchmark$${i}_sat; \
-		mkdir -p data/benchmarks/generated/endianess/benchmark$${i}_sim; \
+		mkdir -p ${OUTPUT_PATH}/benchmark$${i}_sat; \
+		mkdir -p ${OUTPUT_PATH}/benchmark$${i}_sim; \
 		(cd ${PROJECT_ROOT}; \
 		./bazel-bin/src/freitest \
-			--Settings settings/workflows/fuzzing/fuzzing-sat.freitest.jsonc \
+			--Settings settings/workflows/fuzzing/fuzzing-stimuli-sat.freitest.jsonc \
 			--Settings settings/circuits/benchmarks/public-generic.freitest.jsonc \
-			--CircuitName endianess/benchmark$$i \
-			--Fuzzing/Stimuli data/benchmarks/generated/endianess/benchmark$$i-stimuli.json \
-			--DataExportDirectory data/benchmarks/generated/endianess/benchmark$${i}_sat; \
+			--CircuitName fuzzing/benchmark$$i \
+			--Fuzzing/Stimuli data/benchmarks/generated/fuzzing/benchmark$$i-stimuli.json \
+			--DataExportDirectory data/benchmarks/generated/fuzzing/benchmark$${i}_sat; \
 		./bazel-bin/src/freitest \
-			--Settings settings/workflows/fuzzing/fuzzing-simulation.freitest.jsonc \
+			--Settings settings/workflows/fuzzing/fuzzing-stimuli-simulation.freitest.jsonc \
 			--Settings settings/circuits/benchmarks/public-generic.freitest.jsonc \
-			--CircuitName endianess/benchmark$$i \
-			--Fuzzing/Stimuli data/benchmarks/generated/endianess/benchmark$$i-stimuli.json \
-			--DataExportDirectory data/benchmarks/generated/endianess/benchmark$${i}_sim; \
+			--CircuitName fuzzing/benchmark$$i \
+			--Fuzzing/Stimuli data/benchmarks/generated/fuzzing/benchmark$$i-stimuli.json \
+			--DataExportDirectory data/benchmarks/generated/fuzzing/benchmark$${i}_sim; \
 		); \
 		i=$$(($$i + 1)); \
 	done < ${SEEDS_PATH}
@@ -168,9 +174,12 @@ run_verilator:
 run_compare:
 	mkdir -p ${OUTPUT_PATH}; true
 	i=1; while read seed; do \
-		if [ $(cmp -s ${OUTPUT_PATH}/benchmark$${i}_ver/trace.txt ${OUTPUT_PATH}/benchmark$${i}_sat/trace.txt) ] \
-				|| [ $(cmp -s ${OUTPUT_PATH}/benchmark$${i}_ver/trace.txt ${OUTPUT_PATH}/benchmark$${i}_sim/trace.txt) ]; then \
+		cmp -s ${OUTPUT_PATH}/benchmark$${i}_ver/trace.txt ${OUTPUT_PATH}/benchmark$${i}_sat/trace.txt; exit_sat=$$?; \
+		cmp -s ${OUTPUT_PATH}/benchmark$${i}_ver/trace.txt ${OUTPUT_PATH}/benchmark$${i}_sim/trace.txt; exit_sim=$$?; \
+		if [ "$${exit_sat}" -ne 0 ] || [ "$${exit_sim}" -ne 0 ]; then \
 			echo "Benchmark $${i} doesn't match"; \
+		else \
+			echo "Benchmark $${i} does match"; \
 		fi; \
 		i=$$(($$i + 1)); \
 	done < ${SEEDS_PATH}

@@ -90,7 +90,7 @@ bool CellAwareFaultCircuitTagger<PinData>::TagTimeframe(GeneratorContext<PinData
 		}
 
 		std::vector<size_t> faultNodes;
-		for (const auto& [node, port] : fault->GetEffectNodesAndPorts())
+		for (const auto& [node, port] : fault->GetStateMachine().GetOutputs())
 		{
 			timeframe.template AddTag<GoodTag, BadTag, FaultLocationTag>(node->GetNodeId());
 			faultNodes.push_back(node->GetNodeId());
@@ -123,7 +123,7 @@ bool CellAwareFaultCircuitTagger<PinData>::TagTimeframe(GeneratorContext<PinData
 
 		// Tag nodes in backward direction from the fault
 		std::vector<size_t> faultNodes;
-		for (const auto& [node, port] : fault->GetConditionNodesAndPorts())
+		for (const auto& [node, port] : fault->GetStateMachine().GetInputs())
 		{
 			timeframe.template AddTag<GoodTag, FaultLocationTag>(node->GetNodeId());
 			faultNodes.push_back(node->GetNodeId());

@@ -8,6 +8,7 @@
 #include <string>
 #include <tuple>
 #include <variant>
+#include <unordered_set>
 
 #include "Basic/Logging.hpp"
 #include "Basic/Overload.hpp"
@@ -15,7 +16,6 @@
 #include "Io/VerilogInstantiator/InstantiationContext.hpp"
 #include "Io/VerilogSpiritParser/VerilogComponents.hpp"
 
-using namespace std;
 using namespace FreiTest::Basic;
 using namespace FreiTest::Circuit;
 using namespace FreiTest::Io::Verilog::Instance;
@@ -99,7 +99,7 @@ static void AddAttributeInfo(SourceInformation& info, const AttributeCollection&
 VerilogInstantiator::VerilogInstantiator(void) = default;
 VerilogInstantiator::~VerilogInstantiator(void) = default;
 
-std::unique_ptr<ModuleInstance> VerilogInstantiator::Instantiate(const Modules& modules, const string& moduleName) const
+std::unique_ptr<ModuleInstance> VerilogInstantiator::Instantiate(const Modules& modules, const std::string& moduleName) const
 {
 	std::string name;
 	if (moduleName == "FIRST_DEFINED" || moduleName == "LAST_DEFINED")
@@ -179,9 +179,9 @@ std::unique_ptr<ModuleInstance> VerilogInstantiator::Instantiate(const Modules& 
 				auto primitive = context.FindPrimitive(primitiveType, primitiveInputCount + primitiveOutputCount);
 				LOG_IF(!primitive, FATAL) << "Could not find port " << primitiveType << " in primitives. Can not create port!";
 
-				PrefixedScopeGuard primitiveGuard { context, portName };
-				SourceInformation primitiveInfo { NO_SOURCE_FILE, context.GetPrefix(), portName, "primitive" };
-				AddGeneralInfo(primitiveInfo, portName, primitive->name, GroupType::Primitive, "port");
+				PrefixedScopeGuard primitiveGuard { context, "port" };
+				SourceInformation primitiveInfo { NO_SOURCE_FILE, context.GetPrefix(), "port", "primitive" };
+				AddGeneralInfo(primitiveInfo, "port", primitive->name, GroupType::Primitive, "port");
 				context.GetCurrentGroup().sourceInfo = primitiveInfo;
 
 				const size_t gate = context.AddGate(primitiveType, primitive, primitiveInputCount, primitiveOutputCount);
@@ -324,6 +324,108 @@ static bool InstantiateModule(InstantiationContext& context, const Instantiation
 	}
 
 	// ------------------------------------------------------------------------------------------
+	// Uniquify ports
+	//
+	// The uniquification is required as some fault models require matching connections to ports.
+	// An example for this are cell-based stuck-at and transition-delay faults which are
+	// created for each cell port, but use the node ids as fault location for encoding.
+	// Without unique connection ids on the cell / module inputs, the fault model can't
+	// uniquely identify the corresponding port and not all faults could be modelled.
+	// ------------------------------------------------------------------------------------------
+
+	// Go into parent context as the buffer gate and connection should be outside the current instance.
+	context.currentHierarchy.push_back(context.GetCurrentGroup().parent);
+
+	std::unordered_set<size_t> seenConnections;
+	std::vector<std::tuple<std::string, size_t, size_t>> uniquifications;
+	for (auto& port : nameContext.ports)
+	{
+		for (size_t index { 0u }; index < port.connections.size(); index++)
+		{
+			if (port.connections[index] == NO_CONNECTION
+				|| seenConnections.emplace(port.connections[index]).second)
+			{
+				continue;
+			}
+
+			const auto uniqueConnection {
+				context.AddConnection(boost::str(boost::format("uniquify_%s_%s_%d") % instantiation.name % port.name % index)) };
+			uniquifications.emplace_back(port.name, index, uniqueConnection);
+
+			const auto uniqueName { boost::str(boost::format("uniquify_%s_%s_%d") % instantiation.name % port.name % index) };
+			PrefixedScopeGuard uniqueGuard { context, context.GetCurrentGroup().parent, uniqueName };
+			SourceInformation uniqueInfo { NO_SOURCE_FILE, context.GetPrefix(), uniqueName, "unique" };
+			AddGeneralInfo(uniqueInfo, uniqueName, "unique", GroupType::Virtual, "unique");
+			context.GetCurrentGroup().sourceInfo = uniqueInfo;
+
+			const auto [sourceConnection, targetConnection] = [&]() -> std::tuple<size_t, size_t> {
+				switch (port.type) {
+					case PortType::PORT_IN: return { port.connections[index], uniqueConnection };
+					case PortType::PORT_OUT: return { uniqueConnection, port.connections[index] };
+					case PortType::PORT_INOUT:
+						LOG(FATAL) << "Uniquification of bidirectional ports is currently not supported (there are no bidirectional buffers)";
+						__builtin_unreachable();
+
+					default:
+						LOG(FATAL) << "Unsupported port type";
+						__builtin_unreachable();
+				}
+			}();
+			AddPort(context, "source", 0u, 0u, Instance::PortType::Input, PORT_NO_INDEX, { sourceConnection });
+			AddPort(context, "target", 0u, 0u, Instance::PortType::Output, PORT_NO_INDEX, { targetConnection });
+
+			const auto bufferPrimitive = context.FindPrimitive("buf", 2u);
+			LOG_IF(!bufferPrimitive, FATAL) << "Could not find buffer primitive in primitive list. Can not create unique connection buffer!";
+
+			const std::string bufferName { boost::str(boost::format("uniquify_%s_%s_%d_buffer") % instantiation.name % port.name % index) };
+			const PrefixedScopeGuard bufferGuard { context, bufferName };
+			SourceInformation bufferInfo { NO_SOURCE_FILE, context.GetPrefix(), bufferName, "primitive" };
+			AddGeneralInfo(bufferInfo, bufferName, bufferPrimitive->name, GroupType::Primitive, "uniquify");
+			context.GetCurrentGroup().sourceInfo = bufferInfo;
+
+			AddPort(context, "in", 0u, 0u, Instance::PortType::Input, index, { sourceConnection });
+			AddPort(context, "out", 0u, 0u, Instance::PortType::Output, index, { targetConnection });
+
+			const size_t gate = context.AddGate(bufferName, bufferPrimitive, 1, 1);
+			context.gates[gate].sourceInfo = bufferInfo;
+			if (sourceConnection != GATE_NO_CONNECTION)
+			{
+				context.connections[sourceConnection].drivenGates.push_back(gate);
+				context.gates[gate].inputs[0] = sourceConnection;
+			}
+			if (targetConnection != GATE_NO_CONNECTION)
+			{
+				context.connections[targetConnection].drivingGates.push_back(gate);
+				context.gates[gate].outputs[0] = targetConnection;
+			}
+		}
+	}
+
+	// Return back to module context
+	context.currentHierarchy.pop_back();
+
+	// Update the connection id for the uniquified ports.
+	// The sub-instances of this instance have not been created yet,
+	// so no updates are required for those instances.
+	for (auto const& [portName, index, uniqueConnection] : uniquifications)
+	{
+		LOG(INFO) << "Uniquifying connection id to port " << context.PrefixName(portName);
+		for (auto& port : context.GetCurrentGroup().ports)
+		{
+			if (port.name == portName)
+			{
+				port.connectionIds[index] = uniqueConnection;
+			}
+		}
+
+		nameContext.ports.get<flattened_index_tag>().modify(
+			nameContext.ports.get<flattened_index_tag>().find(portName),
+			[&](auto& port){
+				port.connections[index] = uniqueConnection;
+			});
+	}
+
+	// ------------------------------------------------------------------------------------------
 	// Handle assignment statements
 	// ------------------------------------------------------------------------------------------
 
@@ -334,8 +436,8 @@ static bool InstantiateModule(InstantiationContext& context, const Instantiation
 			boost::str(boost::format("Assignment %d in %s module %s has unknown attribute(s). These attributes are currently ignored!")
 				% (assignmentNumber + 1u) % module.name % context.GetPrefix()));
 
-		vector<size_t> sourceConnections;
-		vector<size_t> targetConnections;
+		std::vector<size_t> sourceConnections;
+		std::vector<size_t> targetConnections;
 		if (!MapBusToConnections(context, nameContext, assignment.source, sourceConnections))
 		{
 			LOG(ERROR) << "Assignment source in " << module.name << " module " << context.GetPrefix() << " could not be resolved!";
@@ -354,10 +456,10 @@ static bool InstantiateModule(InstantiationContext& context, const Instantiation
 			return false;
 		}
 
-		auto bufferPrimitive = context.FindPrimitive("buf", 2u);
+		const auto bufferPrimitive = context.FindPrimitive("buf", 2u);
 		LOG_IF(!bufferPrimitive, FATAL) << "Could not find buffer primitive in primitive list. Can not create assignment buffer!";
 
-		const string assignmentName { boost::str(boost::format("assignment_%u") % assignmentNumber) };
+		const auto assignmentName { boost::str(boost::format("assignment_%u") % assignmentNumber) };
 		PrefixedScopeGuard assignmentGuard { context, assignmentName };
 		SourceInformation assignmentInfo { NO_SOURCE_FILE, context.GetPrefix(), assignmentName, "assignment" };
 		AddGeneralInfo(assignmentInfo, assignmentName, "assignment", GroupType::Virtual, "assignment");
@@ -648,7 +750,7 @@ static bool InstantiateWires(InstantiationContext& context, const Module& module
 	return true;
 }
 
-static bool MapBusToConnections(InstantiationContext& context, const NameContext& names, const Bus& source, vector<size_t>& outConnections)
+static bool MapBusToConnections(InstantiationContext& context, const NameContext& names, const Bus& source, std::vector<size_t>& outConnections)
 {
 	for (const BusValue& sourceValue : source.sources)
 	{
@@ -831,7 +933,7 @@ static bool MapInstantiationToConnections(InstantiationContext& context, const N
 			}
 		}
 
-		vector<size_t> connections;
+		std::vector<size_t> connections;
 		if (!MapBusToConnections(context, names, mappingIt->bus, connections))
 		{
 			LOG(ERROR) << "Assignment source in module " << module.name << " could not be resolved!";
@@ -1081,7 +1183,7 @@ static void AddAttributeInfo(SourceInformation& info, const AttributeCollection&
 	constexpr auto attribute_to_size_t_vector = [](const auto& value) -> std::vector<size_t> {
 		return boost::apply_visitor(Basic::overload(
 			[](const std::string& value) -> std::vector<size_t> {
-				stringstream stream(value);
+				std::stringstream stream(value);
 				std::vector<size_t> indices;
 				while(stream.good() && !stream.eof())
 				{

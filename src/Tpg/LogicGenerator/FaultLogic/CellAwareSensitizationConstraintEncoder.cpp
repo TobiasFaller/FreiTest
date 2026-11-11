@@ -16,7 +16,6 @@
 using namespace FreiTest::Basic;
 using namespace FreiTest::Circuit;
 using namespace FreiTest::Fault;
-using namespace FreiTest::Io::Udfm;
 using namespace SolverProxy::Bmc;
 using namespace SolverProxy::Sat;
 
@@ -89,6 +88,7 @@ bool CellAwareSensitizationConstraintEncoder<PinData>::ConstrainTimeframe(Genera
 
 	const auto& fault { _faultModel->GetFault() };
 	const auto& stateMachine { fault->GetStateMachine() };
+	const auto& states { stateMachine.GetStates() };
 	const auto& timeframe { context.GetTimeframe(timeframeId) };
 	auto& encoder { context.GetEncoder() };
 
@@ -97,10 +97,10 @@ bool CellAwareSensitizationConstraintEncoder<PinData>::ConstrainTimeframe(Genera
 		_states.resize(timeframeId + 1);
 		_nextStates.resize(timeframeId + 1);
 		_transitions.resize(timeframeId + 1);
-		_transitions[timeframeId].resize(stateMachine.size());
+		_transitions[timeframeId].resize(states.size());
 		_sensitizations.resize(timeframeId + 1);
 	}
-	for (size_t stateIndex { 0u }; stateIndex < stateMachine.size(); stateIndex++)
+	for (size_t stateIndex { 0u }; stateIndex < states.size(); stateIndex++)
 	{
 		if (bmcSolver)
 		{
@@ -124,47 +124,46 @@ bool CellAwareSensitizationConstraintEncoder<PinData>::ConstrainTimeframe(Genera
 
 	std::vector<LogicContainer01> sensitized { encoder.template NewLogicContainer<LogicContainer01>(Logic::LOGIC_ZERO) };
 	std::vector<LogicContainer01> transitionsTaken { encoder.template NewLogicContainer<LogicContainer01>(Logic::LOGIC_ZERO) };
-	for (auto transitionType : std::vector<CellAwareTransition::TransitionType> {
+	for (auto transitionType : std::vector<CellAwareFaultStateMachine::TransitionType> {
 			// First encode primary, then secondary transitions which have a lower priority.
-			CellAwareTransition::TransitionType::Primary,
-			CellAwareTransition::TransitionType::Secondary
+			CellAwareFaultStateMachine::TransitionType::Primary,
+			CellAwareFaultStateMachine::TransitionType::Secondary
 		})
 	{
 		// This will result in LOGIC_ONE for primary transitions.
 		// For secondary transitions, this will only be LOGIC_ONE
 		// if no primary transitions were taken.
 		auto transitionAllowed = -encoder.EncodeOr(transitionsTaken);
-		for (size_t stateIndex { 0u }; stateIndex < stateMachine.size(); stateIndex++)
+		for (size_t stateIndex { 0u }; stateIndex < states.size(); stateIndex++)
 		{
-			for (auto const& transition : stateMachine[stateIndex].transitions)
+			for (auto const& transition : states[stateIndex].transitions)
 			{
 				if (transition.type != transitionType)
 				{
 					continue;
 				}
 
-				std::vector<LogicContainer01> conditions;
-				for (auto const& condition : transition.conditions)
+				std::vector<LogicContainer01> inputs;
+				for (auto const& input : transition.inputs)
 				{
-					const auto& [node, port] = condition.nodeAndPort;
-					const auto& logicConstraint { condition.logicConstraints[0u] };
+					const auto& [node, port] = input.nodeAndPort;
 					const auto container { timeframe.template GetContainer<BadTag>(
 						context, node->GetNodeId(), port.portType, port.portNumber, AllowContainerInterceptor::Enable) };
-					conditions.push_back(encoder.EncodeLogicValueConstraintDetector(container, logicConstraint));
+					inputs.push_back(encoder.EncodeLogicValueConstraintDetector(container, input.constraint));
 				}
 
 				auto transitionTaken {
 					encoder.EncodeAnd(
 						encoder.EncodeAnd(transitionAllowed, _states[timeframeId][stateIndex]),
-						encoder.EncodeAnd(conditions))
+						encoder.EncodeAnd(inputs))
 				};
-				for (size_t index { 0u }; index < stateMachine.size(); index++)
+				for (size_t index { 0u }; index < states.size(); index++)
 				{
 					encoder.EncodeImplication(transitionTaken, encoder.EncodeLogicValueDetector(_nextStates[timeframeId][index],
 						(index == transition.toState) ? Logic::LOGIC_ONE : Logic::LOGIC_ZERO));
 				}
 				transitionsTaken.push_back(transitionTaken);
-				if (stateMachine[transition.toState].accepting) {
+				if (transition.accepting) {
 					sensitized.push_back(transitionTaken);
 				}
 				_transitions[timeframeId][stateIndex].push_back(transitionTaken);
@@ -173,7 +172,7 @@ bool CellAwareSensitizationConstraintEncoder<PinData>::ConstrainTimeframe(Genera
 	}
 
 	auto noTransition { -encoder.EncodeOr(transitionsTaken) };
-	for (size_t nextIndex { 0u }; nextIndex < stateMachine.size(); nextIndex++)
+	for (size_t nextIndex { 0u }; nextIndex < states.size(); nextIndex++)
 	{
 		encoder.EncodeImplication(noTransition, encoder.EncodeLogicValueDetector(_nextStates[timeframeId][nextIndex],
 			(nextIndex == 0) ? Logic::LOGIC_ONE : Logic::LOGIC_ZERO));

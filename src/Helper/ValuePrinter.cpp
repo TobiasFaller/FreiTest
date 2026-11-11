@@ -224,20 +224,24 @@ std::ostream& operator<<(std::ostream& stream, const ValuePrinter::ValuesPrinter
 		), *configurations[configIndex]));
 	}
 
-	size_t timeframes { 0u };
-	for (size_t configIndex { 0u }; configIndex < configurations.size(); ++configIndex)
+	size_t timeframes { printer.timeframes };
+	if (timeframes == TIMEFRAMES_AUTO)
 	{
-		std::visit(Basic::overload(
-			[&](const ValuePrinter::WatcherConfig& config) -> void {
-				timeframes = std::max(timeframes, values[configToValueIndex[configIndex]].timeframes.size());
-			},
-			[&](const ValuePrinter::SpaceConfig& config) -> void { },
-			[&](const ValuePrinter::DivideConfig& config) -> void { },
-			[&](const ValuePrinter::CustomConfig& config) -> void {
-				timeframes = std::max(timeframes,  get_function(config.function).timeframes());
-			},
-			[&](const ValuePrinter::TitleConfig& config) -> void { }
-		), *configurations[configIndex]);
+		timeframes = 0;
+		for (size_t configIndex { 0u }; configIndex < configurations.size(); ++configIndex)
+		{
+			std::visit(Basic::overload(
+				[&](const ValuePrinter::WatcherConfig& config) -> void {
+					timeframes = std::max(timeframes, values[configToValueIndex[configIndex]].timeframes.size());
+				},
+				[&](const ValuePrinter::SpaceConfig& config) -> void { },
+				[&](const ValuePrinter::DivideConfig& config) -> void { },
+				[&](const ValuePrinter::CustomConfig& config) -> void {
+					timeframes = std::max(timeframes,  get_function(config.function).timeframes());
+				},
+				[&](const ValuePrinter::TitleConfig& config) -> void { }
+			), *configurations[configIndex]);
+		}
 	}
 
 	size_t nameColumnWidth { printer.title.size() };
@@ -280,28 +284,26 @@ std::ostream& operator<<(std::ostream& stream, const ValuePrinter::ValuesPrinter
 	}
 
 	// First row of the title bar
-	stream << std::left << TOP_LEFT << repeat(HORIZONTAL, nameColumnWidth + 2u) << UPDOWN;
+	stream << std::left << TOP_LEFT << repeat(HORIZONTAL, nameColumnWidth + 2u);
 	for (size_t timeframe { 0u }; timeframe < timeframes; ++timeframe)
 	{
-		if (timeframe > 0u) stream << UPDOWN;
-		stream << repeat(HORIZONTAL, columnWidths[timeframe] + 2u);
+		stream << UPDOWN << repeat(HORIZONTAL, columnWidths[timeframe] + 2u);
 	}
 	stream << TOP_RIGHT << std::endl;
 
 	// Titles of each timeframe
-	stream << VERTICAL << ' ' << std::setw(nameColumnWidth) << printer.title << ' ' << VERTICAL;
+	stream << VERTICAL << ' ' << std::setw(nameColumnWidth) << printer.title << ' ';
 	for (size_t timeframe { 0u }; timeframe < timeframes; ++timeframe)
 	{
-		stream << ' ' << std::setw(columnWidths[timeframe]) << printer.timeframeTitles(timeframe) << ' ' << VERTICAL;
+		stream << VERTICAL << ' ' << std::setw(columnWidths[timeframe]) << printer.timeframeTitles(timeframe) << ' ';
 	}
-	stream << std::endl;
+	stream << VERTICAL << std::endl;
 
 	// Last row of the title bar
-	stream << VERTICAL_RIGHT << repeat(HORIZONTAL, nameColumnWidth + 2u) << CROSS;
+	stream << VERTICAL_RIGHT << repeat(HORIZONTAL, nameColumnWidth + 2u);
 	for (size_t timeframe { 0u }; timeframe < timeframes; ++timeframe)
 	{
-		if (timeframe > 0u) stream << CROSS;
-		stream << repeat(HORIZONTAL, columnWidths[timeframe] + 2u);
+		stream << CROSS << repeat(HORIZONTAL, columnWidths[timeframe] + 2u);
 	}
 	stream << VERTICAL_LEFT << std::endl;
 
@@ -384,11 +386,10 @@ std::ostream& operator<<(std::ostream& stream, const ValuePrinter::ValuesPrinter
 	}
 
 	// Last row of the table
-	stream << BOT_LEFT << repeat(HORIZONTAL, nameColumnWidth + 2u) << DOWNUP;
+	stream << BOT_LEFT << repeat(HORIZONTAL, nameColumnWidth + 2u);
 	for (size_t timeframe { 0u }; timeframe < timeframes; ++timeframe)
 	{
-		if (timeframe > 0u) stream << DOWNUP;
-		stream << repeat(HORIZONTAL, columnWidths[timeframe] + 2u);
+		stream << DOWNUP << repeat(HORIZONTAL, columnWidths[timeframe] + 2u);
 	}
 	stream << BOT_RIGHT << std::endl;
 
@@ -447,8 +448,6 @@ const std::string& ValuePrinter::GetTitle(void) const
 {
 	return title;
 }
-
-
 void ValuePrinter::SetTimeframeTitles(std::function<std::string(size_t)> titles)
 {
 	this->timeframeTitles = titles;
@@ -457,6 +456,16 @@ void ValuePrinter::SetTimeframeTitles(std::function<std::string(size_t)> titles)
 const std::function<std::string(size_t)>& ValuePrinter::GetTimeframeTitles(void) const
 {
 	return timeframeTitles;
+}
+
+void ValuePrinter::SetTimeframes(size_t timeframes)
+{
+	this->timeframes = timeframes;
+}
+
+size_t ValuePrinter::GetTimeframes(void) const
+{
+	return timeframes;
 }
 
 void ValuePrinter::SetEqualColumnWidths(bool equal)

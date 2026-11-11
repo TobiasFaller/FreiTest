@@ -60,6 +60,7 @@ Mixin::VcmMixin::VcmMixin(std::string configPrefix):
 	vcmWatcherImporter(std::make_unique<Io::ValueWatcherImporter>()),
 	vcmPrinterImporter(std::make_unique<Io::ValuePrinterImporter>()),
 	watcherExportPath(),
+	printerExportPath(),
 	vcmConfigPrefix(configPrefix),
 	vcmStatistics()
 {
@@ -281,6 +282,11 @@ bool Mixin::VcmMixin::SetSetting(std::string key, std::string value)
 		watcherExportPath = value;
 		return true;
 	}
+	if (Settings::IsOption(key, "PrinterExportPath", vcmConfigPrefix))
+	{
+		printerExportPath = value;
+		return true;
+	}
 
 	return false;
 }
@@ -301,6 +307,25 @@ void Mixin::VcmMixin::Run(void)
 			LOG(FATAL) << "Could not load circuit value watchers from file " << circuitWatcherImportFilename;
 		}
 	}
+	else
+	{
+		LOG(WARNING) << "No circuit value watchers have been specified. Creating default mapping!";
+		for (auto const& port : this->circuit->GetMetaData().GetRoot()->GetPorts())
+		{
+			circuitWatcherImporter->AddWatcher({
+				.name = port.GetName(),
+				.endianess = Io::ValueWatcherImporter::Endianess::Little,
+				.signals = { port.GetName() },
+				.setBits = std::vector<bool>(port.GetSize().GetSize(), false),
+				.clearBits = std::vector<bool>(port.GetSize().GetSize(), false),
+				.invertBits = std::vector<bool>(port.GetSize().GetSize(), false),
+				.maskBits = std::vector<bool>(port.GetSize().GetSize(), false),
+				.tags = { "*" },
+				.targets = { "*" },
+			}, "circuit/", this->circuit->GetName() + "/");
+		}
+	}
+
 	if (!circuitPrinterImportFilename.empty())
 	{
 		LOG(INFO) << "Loading circuit printers from file " << circuitPrinterImportFilename;
@@ -309,6 +334,24 @@ void Mixin::VcmMixin::Run(void)
 		if (!circuitPrinterImporter->LoadPrinters(handle.GetStream(), "circuit/"))
 		{
 			LOG(FATAL) << "Could not load circuit value printers from file " << circuitPrinterImportFilename;
+		}
+	}
+	else
+	{
+		LOG(WARNING) << "No circuit printers have been specified. Creating default mapping!";
+		for (auto const& watcher : circuitWatcherImporter->GetWatchers())
+		{
+			circuitPrinterImporter->AddPrinter({
+				/* .config = */ Helper::ValuePrinter::WatcherConfig {
+					watcher.name,
+					watcher.name,
+					Helper::ValuePrinter::ValueFormat::Binary,
+					Helper::ValuePrinter::ValueAlignment::Internal,
+					Helper::ValuePrinter::ValuePrefix::No
+				},
+				/* .tags = */ { "*" },
+				/* .targets = */ { "*" },
+			});
 		}
 	}
 
@@ -326,6 +369,25 @@ void Mixin::VcmMixin::Run(void)
 				LOG(FATAL) << "Could not load VCM value watchers from file " << vcmWatcherImportFilename;
 			}
 		}
+		else
+		{
+			LOG(WARNING) << "No VCM value watchers have been specified. Creating default mapping!";
+			for (auto const& port : this->vcmCircuit->GetMetaData().GetRoot()->GetPorts())
+			{
+				vcmWatcherImporter->AddWatcher({
+					.name = port.GetName(),
+					.endianess = Io::ValueWatcherImporter::Endianess::Little,
+					.signals = { port.GetName() },
+					.setBits = std::vector<bool>(port.GetSize().GetSize(), false),
+					.clearBits = std::vector<bool>(port.GetSize().GetSize(), false),
+					.invertBits = std::vector<bool>(port.GetSize().GetSize(), false),
+					.maskBits = std::vector<bool>(port.GetSize().GetSize(), false),
+					.tags = { "*" },
+					.targets = { "*" },
+				}, "vcm/", this->vcmCircuit->GetName() + "/");
+			}
+		}
+
 		if (!vcmPrinterImportFilename.empty())
 		{
 			LOG(INFO) << "Loading VCM printers from file " << vcmPrinterImportFilename;
@@ -334,6 +396,24 @@ void Mixin::VcmMixin::Run(void)
 			if (!vcmPrinterImporter->LoadPrinters(handle.GetStream(), "vcm/"))
 			{
 				LOG(FATAL) << "Could not load vcm value printers from file " << vcmPrinterImportFilename;
+			}
+		}
+		else
+		{
+			LOG(WARNING) << "No VCM printers have been specified. Creating default mapping!";
+			for (auto const& watcher : vcmWatcherImporter->GetWatchers())
+			{
+				vcmPrinterImporter->AddPrinter({
+					/* .config = */ Helper::ValuePrinter::WatcherConfig {
+						watcher.name,
+						watcher.name,
+						Helper::ValuePrinter::ValueFormat::Binary,
+						Helper::ValuePrinter::ValueAlignment::Internal,
+						Helper::ValuePrinter::ValuePrefix::No
+					},
+					/* .tags = */ { "*" },
+					/* .targets = */ { "*" },
+				});
 			}
 		}
 	}

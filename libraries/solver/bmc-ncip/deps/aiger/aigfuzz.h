@@ -33,7 +33,6 @@ struct aigfuzz_opts
   int large;
   int combinational;
   int version;
-  int functions;
   int safety;
   int liveness;
   int bad;

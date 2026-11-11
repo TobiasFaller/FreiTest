@@ -64,6 +64,12 @@ const UnmappedCircuit& GeneratorContext<PinData>::GetUnmappedCircuit(void) const
 }
 
 template<typename PinData>
+const CircuitMetaData& GeneratorContext<PinData>::GetCircuitMetaData(void) const
+{
+	return _circuit->GetMetaData();
+}
+
+template<typename PinData>
 shared_ptr<ISolverProxy> GeneratorContext<PinData>::GetSolver(void)
 {
 	return _solver;

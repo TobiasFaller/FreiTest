@@ -1,5 +1,4 @@
 /***************************************************************************
-Copyright (c) 2025 Armin Biere, University of Freiburg.
 Copyright (c) 2013 - 2020 Armin Biere, Johannes Kepler University.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -33,7 +32,6 @@ static const char * USAGE =
 "usage: aigunconstraint [-h][-v] [<input> [<output>]]\n"
 "\n"
 "  -h   print this command line option summary\n"
-"  -q   quiet (no warnings)\n"
 "  -v   increase verbosity\n"
 "\n"
 "The input is assumed to have bad state and constraint properties.\n"
@@ -55,7 +53,6 @@ static void die (const char *fmt, ...) {
 }
 
 static void warn (const char *fmt, ...) {
-  if (verbose < 0) return;
   va_list ap;
   fputs ("*** [aigunconstraint] warning: ", stderr);
   va_start (ap, fmt);
@@ -67,7 +64,7 @@ static void warn (const char *fmt, ...) {
 
 static void msg (const char *fmt, ...) {
   va_list ap;
-  if (verbose <= 0) return;
+  if (!verbose) return;
   fputs ("[aigunconstraint] ", stderr);
   va_start (ap, fmt);
   vfprintf (stderr, fmt, ap);
@@ -97,7 +94,6 @@ int main (int argc, char ** argv) {
   for (i = 1; i < argc; i++) {
     if (!strcmp (argv[i], "-h")) { printf ("%s", USAGE); exit (0); }
     else if (!strcmp (argv[i], "-v")) verbose = 1;
-    else if (!strcmp (argv[i], "-q")) verbose = -1;
     else if (argv[i][0] == '-')
       die ("invalid command line option '%s'", argv[i]);
     else if (output) die ("too many arguments");
@@ -127,20 +123,19 @@ int main (int argc, char ** argv) {
     src->num_justice,
     src->num_fairness);
   
-  const char * input_path = input ? input : "<stdin>";
   if (src->num_outputs)
-    die ("can not handle outputs in '%s'", input_path);
+    die ("can not handle outputs in '%s'", input);
   if (!src->num_bad)
-    die ("no bad state properties in '%s'", input_path);
+    die ("no bad state properties in '%s'", input);
 
   if (!src->num_constraints) {
-    warn ("no environment constraints in '%s'", input_path);
+    warn ("no environment constraints in '%s'", input);
     dst = src;
     goto COPY;
   }
 
   if (src->num_justice)
-    die ("can not handle justice properties in '%s'", input_path);
+    die ("can not handle justice properties in '%s'", input);
 
   dst = aiger_init ();
 

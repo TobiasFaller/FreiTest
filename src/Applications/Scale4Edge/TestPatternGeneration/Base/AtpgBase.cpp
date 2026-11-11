@@ -40,20 +40,27 @@
 #include "Circuit/CircuitMetaData.hpp"
 #include "Circuit/DriverFinder.hpp"
 #include "Helper/FileHandle.hpp"
+#include "Helper/AtpgDebug.hpp"
 #include "Io/FaultListParser/FaultListParser.hpp"
 #include "Io/StilExporter/StilExporter.hpp"
 #include "Io/TestPatternParser/TestPatternParser.hpp"
 #include "Io/VcdExporter/VcdExporter.hpp"
 #include "Io/VcdExporter/VcdModel.hpp"
 #include "Io/UserDefinedFaultModel/UdfmParser.hpp"
+#include "Io/CircuitGuard/CircuitGuard.hpp"
 #include "Simulation/CircuitSimulator.hpp"
 #include "SolverProxy/Sat/SatSolverProxy.hpp"
 #include "Tpg/LogicGenerator/TestPatternExtractor.hpp"
 #include "Tpg/LogicGenerator/LogicGenerator.hpp"
+#include "Tpg/LogicGenerator/Tagger/DChain/DChainCircuitTagger.hpp"
 #include "Tpg/LogicGenerator/Tagger/Fault/StuckAtFaultCircuitTagger.hpp"
 #include "Tpg/LogicGenerator/Tagger/Fault/TransitionDelayFaultCircuitTagger.hpp"
 #include "Tpg/LogicGenerator/Tagger/Fault/CellAwareFaultCircuitTagger.hpp"
 #include "Tpg/LogicGenerator/Constraint/PortConstraintEncoder.hpp"
+#include "Tpg/LogicGenerator/Constraint/SequentialConstraintEncoder.hpp"
+#include "Tpg/LogicGenerator/DChain/BackwardDChainEncoder.hpp"
+#include "Tpg/LogicGenerator/DChain/DChainSequentialConnectionEncoder.hpp"
+#include "Tpg/LogicGenerator/DChain/DChainBaseEncoder.hpp"
 #include "Tpg/LogicGenerator/FaultLogic/FaultPropagationConstraintEncoder.hpp"
 #include "Tpg/LogicGenerator/FaultLogic/StuckAtFaultEncoder.hpp"
 #include "Tpg/LogicGenerator/FaultLogic/StuckAtSensitizationConstraintEncoder.hpp"
@@ -65,6 +72,7 @@
 #include "Tpg/LogicGenerator/CircuitLogic/DefaultLogicEncoder.hpp"
 #include "Tpg/LogicGenerator/CircuitLogic/SequentialInputLogicEncoder.hpp"
 #include "Tpg/LogicGenerator/CircuitLogic/SequentialOutputLogicEncoder.hpp"
+#include "Tpg/LogicGenerator/CircuitLogic/SequentialConnectionEncoder.hpp"
 #include "Tpg/LogicGenerator/CircuitLogic/OutputLogicEncoder.hpp"
 #include "Tpg/LogicGenerator/SimulationResultExtractor.hpp"
 
@@ -104,11 +112,11 @@ template<typename PinData> struct AtpgConfig<Fault::CellAwareFaultModel, PinData
 	using FaultSensitizationTimeframe = Tpg::CellAwareSensitizationTimeframe;
 	using FaultTagger = Tpg::CellAwareFaultCircuitTagger<PinData>;
 	using FaultTaggerMode = Tpg::CellAwareFaultTaggingMode;
-	static size_t GetRequiredTimeframeCount(const Fault::CellAwareFaultModel& faultModel) { return faultModel.GetFault()->GetTimeframeSpread(); }
+	static size_t GetRequiredTimeframeCount(const Fault::CellAwareFaultModel& faultModel) { return faultModel.GetFault()->GetStateMachine().GetTimeframes(); }
 };
 
 AtpgData<SingleStuckAtFaultModel>::AtpgData(std::string configPrefix):
-	faultListReduction(FaultListReduction::RemoveEquivalent),
+	faultListReduction(SettingFaultReduction::RemoveEquivalent),
 	configPrefix(configPrefix)
 {
 }
@@ -116,12 +124,38 @@ AtpgData<SingleStuckAtFaultModel>::~AtpgData(void) = default;
 
 bool AtpgData<SingleStuckAtFaultModel>::SetSetting(std::string key, std::string value)
 {
-	if (Settings::IsOption(key, "FaultListReduction", configPrefix))
+	if (Settings::IsOption(key, "FaultListReduce", configPrefix))
 	{
-		return Settings::ParseEnum(value, faultListReduction, {
-			{ "Original", FaultListReduction::Original },
-			{ "RemoveEquivalent", FaultListReduction::RemoveEquivalent },
+		SettingFaultReduction reduction = SettingFaultReduction::Original;
+		auto result = Settings::ParseEnum(value, reduction, {
+			{ "Original", SettingFaultReduction::Original },
+			{ "RemoveEquivalent", SettingFaultReduction::RemoveEquivalent },
+			{ "RemoveCellInternal", SettingFaultReduction::RemoveCellInternal },
+			{ "RemoveSequentialClock", SettingFaultReduction::RemoveSequentialClock },
+			{ "RemoveSequentialSetReset", SettingFaultReduction::RemoveSequentialSetReset },
+			{ "RemoveConnectedToDontCare", SettingFaultReduction::RemoveConnectedToDontCare },
+			{ "RemoveConnectedToUnknown", SettingFaultReduction::RemoveConnectedToUnknown },
+			{ "RemoveCircuitPort", SettingFaultReduction::RemoveCircuitPort },
 		});
+		if (result)
+		{
+			switch (reduction)
+			{
+				case SettingFaultReduction::Original:
+					faultListReduction = SettingFaultReduction::Original;
+					break;
+				case SettingFaultReduction::RemoveEquivalent:
+				case SettingFaultReduction::RemoveCellInternal:
+				case SettingFaultReduction::RemoveSequentialClock:
+				case SettingFaultReduction::RemoveSequentialSetReset:
+				case SettingFaultReduction::RemoveConnectedToDontCare:
+				case SettingFaultReduction::RemoveConnectedToUnknown:
+				case SettingFaultReduction::RemoveCircuitPort:
+					faultListReduction = faultListReduction | reduction;
+					break;
+			}
+		}
+		return result;
 	}
 
 	return false;
@@ -136,7 +170,7 @@ void AtpgData<SingleStuckAtFaultModel>::Run(void)
 }
 
 AtpgData<SingleTransitionDelayFaultModel>::AtpgData(std::string configPrefix):
-	faultListReduction(FaultListReduction::RemoveEquivalent),
+	faultListReduction(SettingFaultReduction::RemoveEquivalent),
 	configPrefix(configPrefix)
 {
 }
@@ -144,12 +178,38 @@ AtpgData<SingleTransitionDelayFaultModel>::~AtpgData(void) = default;
 
 bool AtpgData<SingleTransitionDelayFaultModel>::SetSetting(std::string key, std::string value)
 {
-	if (Settings::IsOption(key, "FaultListReduction", configPrefix))
+	if (Settings::IsOption(key, "FaultListReduce", configPrefix))
 	{
-		return Settings::ParseEnum(value, faultListReduction, {
-			{ "Original", FaultListReduction::Original },
-			{ "RemoveEquivalent", FaultListReduction::RemoveEquivalent },
+		SettingFaultReduction reduction = SettingFaultReduction::Original;
+		auto result = Settings::ParseEnum(value, reduction, {
+			{ "Original", SettingFaultReduction::Original },
+			{ "RemoveEquivalent", SettingFaultReduction::RemoveEquivalent },
+			{ "RemoveCellInternal", SettingFaultReduction::RemoveCellInternal },
+			{ "RemoveSequentialClock", SettingFaultReduction::RemoveSequentialClock },
+			{ "RemoveSequentialSetReset", SettingFaultReduction::RemoveSequentialSetReset },
+			{ "RemoveConnectedToDontCare", SettingFaultReduction::RemoveConnectedToDontCare },
+			{ "RemoveConnectedToUnknown", SettingFaultReduction::RemoveConnectedToUnknown },
+			{ "RemoveCircuitPort", SettingFaultReduction::RemoveCircuitPort},
 		});
+		if (result)
+		{
+			switch (reduction)
+			{
+				case SettingFaultReduction::Original:
+					faultListReduction = SettingFaultReduction::Original;
+					break;
+				case SettingFaultReduction::RemoveEquivalent:
+				case SettingFaultReduction::RemoveCellInternal:
+				case SettingFaultReduction::RemoveSequentialClock:
+				case SettingFaultReduction::RemoveSequentialSetReset:
+				case SettingFaultReduction::RemoveConnectedToDontCare:
+				case SettingFaultReduction::RemoveConnectedToUnknown:
+				case SettingFaultReduction::RemoveCircuitPort:
+					faultListReduction = faultListReduction | reduction;
+					break;
+			}
+		}
+		return result;
 	}
 
 	return false;
@@ -164,24 +224,42 @@ void AtpgData<SingleTransitionDelayFaultModel>::Run(void)
 }
 
 AtpgData<CellAwareFaultModel>::AtpgData(std::string configPrefix):
-	Mixin::UdfmMixin(configPrefix)
+	Mixin::CellAwareSpecificationMixin(configPrefix)
 {
 }
 AtpgData<CellAwareFaultModel>::~AtpgData(void) = default;
 
 bool AtpgData<CellAwareFaultModel>::SetSetting(std::string key, std::string value)
 {
-	return UdfmMixin::SetSetting(key, value);
+	if (Settings::IsOption(key, "FaultListReduce", configPrefix))
+	{
+		SettingFaultReduction reduction = SettingFaultReduction::Original;
+		auto result = Settings::ParseEnum(value, reduction, {
+			{ "Original", SettingFaultReduction::Original },
+		});
+		if (result)
+		{
+			switch (reduction)
+			{
+				case SettingFaultReduction::Original:
+					faultListReduction = SettingFaultReduction::Original;
+					break;
+			}
+		}
+		return result;
+	}
+
+	return CellAwareSpecificationMixin::SetSetting(key, value);
 }
 
 void AtpgData<CellAwareFaultModel>::Init(void)
 {
-	UdfmMixin::Init();
+	CellAwareSpecificationMixin::Init();
 }
 
 void AtpgData<CellAwareFaultModel>::Run(void)
 {
-	UdfmMixin::Run();
+	CellAwareSpecificationMixin::Run();
 }
 
 template <typename FaultModel, typename FaultList>
@@ -200,6 +278,7 @@ AtpgBase<FaultModel, FaultList>::AtpgBase(std::string configPrefix):
 	faultMapping(),
 	faultListFilter(".*"),
 	faultListExclude(""),
+	faultListSamples(0u),
 	testPatterns(),
 	statPatternsGenerated(),
 	printFaultListReport(PrintFaultListReport::PrintSummary),
@@ -356,6 +435,10 @@ bool AtpgBase<FaultModel, FaultList>::SetSetting(std::string key, std::string va
 		faultListExclude = value;
 		return true;
 	}
+	if (Settings::IsOption(key, "FaultListSamples", configPrefix))
+	{
+		return Settings::ParseSizet(value, faultListSamples);
+	}
 	if (Settings::IsOption(key, "SimulateAllFaults", configPrefix))
 	{
 		return Settings::ParseEnum(value, simulateAllFaults, {
@@ -464,7 +547,7 @@ void AtpgBase<FaultModel, FaultList>::GenerateFaultList(void)
 	{
 		if constexpr (std::is_same_v<FaultModel, Fault::SingleStuckAtFaultModel>)
 		{
-			std::vector<SingleStuckAtFault> allFaults { };
+			std::vector<Fault::SingleStuckAtFault> allFaults { };
 
 			generationTimer.SetTimeReference();
 			ASSERT(faultListFile != "") << "No fault list file has been specified";
@@ -539,14 +622,16 @@ void AtpgBase<FaultModel, FaultList>::GenerateFaultList(void)
 			reductionTimer.SetTimeReference();
 			auto [filteredFaultList, fullToFilteredFaults] = Fault::FilterStuckAtFaultListByPattern(*this->circuit, faultListFilter, Fault::FilterPatternType::Normal, allFaults);
 			auto [includedFaultList, filteredToIncludedFaults] = Fault::FilterStuckAtFaultListByPattern(*this->circuit, faultListExclude, Fault::FilterPatternType::Inverted, filteredFaultList);
+			auto [sampledFaultList, includedToSampledFaults] = Fault::SampleStuckAtFaultList(includedFaultList, faultListSamples);
 			reductionTimer.Stop();
 
 			// Collect statistics
 			statistics.Add("FaultList.FilteredFaults", filteredFaultList.size(), "Fault(s)", "The number of faults which matched the fault list filter");
 			statistics.Add("FaultList.IncludedFaults", includedFaultList.size(), "Fault(s)", "The number of faults which are not excluded");
+			statistics.Add("FaultList.SampledFaults", sampledFaultList.size(), "Fault(s)", "The number of faults which sampled for pattern generation");
 
 			fullFaultList = FaultList(allFaults);
-			faultList = FaultList(includedFaultList);
+			faultList = FaultList(sampledFaultList);
 			faultMapping = std::vector<size_t>(fullFaultList.size(), 0u);
 
 			std::iota(faultMapping.begin(), faultMapping.end(), 0u);
@@ -560,11 +645,15 @@ void AtpgBase<FaultModel, FaultList>::GenerateFaultList(void)
 				{
 					faultMapping[faultIndex] = filteredToIncludedFaults[faultMapping[faultIndex]];
 				}
+				if (faultMapping[faultIndex] != Fault::REMOVED_FAULT)
+				{
+					faultMapping[faultIndex] = includedToSampledFaults[faultMapping[faultIndex]];
+				}
 			}
 		}
 		else if constexpr (std::is_same_v<FaultModel, Fault::SingleTransitionDelayFaultModel>)
 		{
-			std::vector<SingleTransitionDelayFault> allFaults { };
+			std::vector<Fault::SingleTransitionDelayFault> allFaults { };
 
 			generationTimer.SetTimeReference();
 			ASSERT(faultListFile != "") << "No fault list file has been specified";
@@ -643,14 +732,16 @@ void AtpgBase<FaultModel, FaultList>::GenerateFaultList(void)
 			reductionTimer.SetTimeReference();
 			auto [filteredFaultList, fullToFilteredFaults] = Fault::FilterTransitionDelayFaultListByPattern(*this->circuit, faultListFilter, Fault::FilterPatternType::Normal, allFaults);
 			auto [includedFaultList, filteredToIncludedFaults] = Fault::FilterTransitionDelayFaultListByPattern(*this->circuit, faultListExclude, Fault::FilterPatternType::Inverted, filteredFaultList);
+			auto [sampledFaultList, includedToSampledFaults] = Fault::SampleTransitionDelayFaultList(includedFaultList, faultListSamples);
 			reductionTimer.Stop();
 
 			// Collect statistics
 			statistics.Add("FaultList.FilteredFaults", filteredFaultList.size(), "Fault(s)", "The number of faults which matched the fault list filter");
 			statistics.Add("FaultList.IncludedFaults", includedFaultList.size(), "Fault(s)", "The number of faults which are not excluded");
+			statistics.Add("FaultList.SampledFaults", sampledFaultList.size(), "Fault(s)", "The number of faults which sampled for pattern generation");
 
 			fullFaultList = FaultList(allFaults);
-			faultList = FaultList(includedFaultList);
+			faultList = FaultList(sampledFaultList);
 			faultMapping = std::vector<size_t>(fullFaultList.size(), 0u);
 
 			std::iota(faultMapping.begin(), faultMapping.end(), 0u);
@@ -664,11 +755,15 @@ void AtpgBase<FaultModel, FaultList>::GenerateFaultList(void)
 				{
 					faultMapping[faultIndex] = filteredToIncludedFaults[faultMapping[faultIndex]];
 				}
+				if (faultMapping[faultIndex] != Fault::REMOVED_FAULT)
+				{
+					faultMapping[faultIndex] = includedToSampledFaults[faultMapping[faultIndex]];
+				}
 			}
 		}
 		else if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
 		{
-			std::vector<CellAwareFault> allFaults { };
+			std::vector<Fault::CellAwareFault> allFaults { };
 
 			generationTimer.SetTimeReference();
 			ASSERT(faultListFile != "") << "No fault list file has been specified";
@@ -696,31 +791,34 @@ void AtpgBase<FaultModel, FaultList>::GenerateFaultList(void)
 				ASSERT(cellMetaData != nullptr) << "Cell " << cellName << " not found in circuit.";
 
 				const auto& sourceInfo { cellMetaData->GetSourceInfo() };
-				ASSERT(sourceInfo.template GetProperty<bool>("module-is-cell").value_or(false)) << "The cell has to have the cell attribute.";
+				ASSERT(sourceInfo.template GetProperty<bool>("module-is-cell").value_or(false))
+					<< "The cell has to have the cell attribute.";
 
-				auto cellType = sourceInfo.template GetProperty<std::string>("module-type").value_or("");
-				ASSERT(cellType != "") << "The cell type attribute has to be defined.";
+				auto cellType = sourceInfo.template GetProperty<std::string>("cell-type").value_or("");
+				ASSERT(cellType != "") << "The cell-type attribute has to be defined.";
 
-				auto udfmFault { this->GetUdfm()->GetFault(cellType, faultName) };
-				ASSERT(udfmFault) << "Could not find UDFM fault " << faultName << " for cell " << cellType << " in the UDFM.";
-
-				auto cellAwareFault { MapUdfmFaultToCell(*this->circuit, cellMetaData, udfmFault) };
-				ASSERT(cellAwareFault.has_value()) << "Could not map cell-aware fault to cell";
-				allFaults.push_back(cellAwareFault.value());
+				ASSERT(this->GetCellAwareModelSpecification()->HasFault(cellType, faultName))
+					<< "Could not find fault " << faultName << " for cell " << cellType << " in the specification.";
+				auto faultSpecification { this->GetCellAwareModelSpecification()->GetFault(cellType, faultName) };
+				auto cellAwareFault { Fault::CreateCellAwareFaultForCell(faultSpecification, cellMetaData) };
+				ASSERT(cellAwareFault) << "Could not map cell-aware fault to cell";
+				allFaults.push_back(*cellAwareFault);
 			}
 			generationTimer.Stop();
 
 			reductionTimer.SetTimeReference();
 			auto [filteredFaultList, fullToFilteredFaults] = Fault::FilterCellAwareFaultListByPattern(*this->circuit, faultListFilter, Fault::FilterPatternType::Normal, allFaults);
 			auto [includedFaultList, filteredToIncludedFaults] = Fault::FilterCellAwareFaultListByPattern(*this->circuit, faultListExclude, Fault::FilterPatternType::Inverted, filteredFaultList);
+			auto [sampledFaultList, includedToSampledFaults] = Fault::SampleCellAwareFaultList(includedFaultList, faultListSamples);
 			reductionTimer.Stop();
 
 			// Collect statistics
 			statistics.Add("FaultList.FilteredFaults", filteredFaultList.size(), "Fault(s)", "The number of faults which matched the fault list filter");
 			statistics.Add("FaultList.IncludedFaults", includedFaultList.size(), "Fault(s)", "The number of faults which are not excluded");
+			statistics.Add("FaultList.SampledFaults", sampledFaultList.size(), "Fault(s)", "The number of faults which sampled for pattern generation");
 
 			fullFaultList = FaultList(allFaults);
-			faultList = FaultList(includedFaultList);
+			faultList = FaultList(sampledFaultList);
 			faultMapping = std::vector<size_t>(fullFaultList.size(), 0u);
 
 			std::iota(faultMapping.begin(), faultMapping.end(), 0u);
@@ -733,6 +831,10 @@ void AtpgBase<FaultModel, FaultList>::GenerateFaultList(void)
 				if (faultMapping[faultIndex] != Fault::REMOVED_FAULT)
 				{
 					faultMapping[faultIndex] = filteredToIncludedFaults[faultMapping[faultIndex]];
+				}
+				if (faultMapping[faultIndex] != Fault::REMOVED_FAULT)
+				{
+					faultMapping[faultIndex] = includedToSampledFaults[faultMapping[faultIndex]];
 				}
 			}
 		}
@@ -746,14 +848,25 @@ void AtpgBase<FaultModel, FaultList>::GenerateFaultList(void)
 	{
 		if constexpr (std::is_same_v<FaultModel, Fault::SingleStuckAtFaultModel>)
 		{
-			auto reductions = Fault::StuckAtFaultReduction::RemoveCellInternal
-				| Fault::StuckAtFaultReduction::RemoveSequentialClock
-				| Fault::StuckAtFaultReduction::RemoveSequentialSetReset
-				| Fault::StuckAtFaultReduction::RemoveConnectedToDontCare
-				| Fault::StuckAtFaultReduction::RemoveConnectedToUnknown;
-			if (this->faultListReduction == AtpgData<FaultModel>::FaultListReduction::RemoveEquivalent)
+			using OptionReduction = typename AtpgData<FaultModel>::SettingFaultReduction;
+			using FaultReduction = typename Fault::StuckAtFaultReduction;
+
+			auto reductions = FaultReduction::RemoveNone;
+			for (auto& [settingsOption, faultListOption] : std::vector<std::tuple<OptionReduction, FaultReduction>> {
+				{ OptionReduction::Original, Fault::StuckAtFaultReduction::RemoveNone },
+				{ OptionReduction::RemoveEquivalent, Fault::StuckAtFaultReduction::RemoveEquivalent },
+				{ OptionReduction::RemoveCellInternal, Fault::StuckAtFaultReduction::RemoveCellInternal },
+				{ OptionReduction::RemoveSequentialClock, Fault::StuckAtFaultReduction::RemoveSequentialClock },
+				{ OptionReduction::RemoveSequentialSetReset, Fault::StuckAtFaultReduction::RemoveSequentialSetReset },
+				{ OptionReduction::RemoveConnectedToDontCare, Fault::StuckAtFaultReduction::RemoveConnectedToDontCare },
+				{ OptionReduction::RemoveConnectedToUnknown, Fault::StuckAtFaultReduction::RemoveConnectedToUnknown },
+				{ OptionReduction::RemoveCircuitPort, Fault::StuckAtFaultReduction::RemoveCircuitPort },
+			})
 			{
-				reductions |= Fault::StuckAtFaultReduction::RemoveEquivalent;
+				if ((this->faultListReduction & settingsOption) == settingsOption)
+				{
+					reductions |= faultListOption;
+				}
 			}
 
 			generationTimer.SetTimeReference();
@@ -761,49 +874,66 @@ void AtpgBase<FaultModel, FaultList>::GenerateFaultList(void)
 			generationTimer.Stop();
 
 			reductionTimer.SetTimeReference();
-			auto [collapsedFaultList, fullToCollapsedFaults] = Fault::ReduceStuckAtFaultList(*this->circuit, reductions, allFaults);
-			auto [filteredFaultList, collapsedToFilteredFaults] = Fault::FilterStuckAtFaultListByPattern(*this->circuit, faultListFilter, Fault::FilterPatternType::Normal, collapsedFaultList);
+			auto [reducedFaultList, fullToReducedFaults] = Fault::ReduceStuckAtFaultList(*this->circuit, reductions, allFaults);
+			auto [filteredFaultList, reducedToFilteredFaults] = Fault::FilterStuckAtFaultListByPattern(*this->circuit, faultListFilter, Fault::FilterPatternType::Normal, reducedFaultList);
 			auto [includedFaultList, filteredToIncludedFaults] = Fault::FilterStuckAtFaultListByPattern(*this->circuit, faultListExclude, Fault::FilterPatternType::Inverted, filteredFaultList);
+			auto [sampledFaultList, includedToSampledFaults] = Fault::SampleStuckAtFaultList(includedFaultList, faultListSamples);
 			reductionTimer.Stop();
 
 			// Collect statistics
-			statistics.Add("FaultList.EquivalentFaults", allFaults.size() - collapsedFaultList.size(), "Fault(s)", "The number of faults which were removed due to being equivalent");
-			statistics.Add("FaultList.RemainingFaults", collapsedFaultList.size(), "Fault(s)", "The number of faults after removing equivalent faults");
-			statistics.Add("FaultList.CollapseRatio", collapsedFaultList.size() * 100.0f / allFaults.size(), "Percent", "The ratio of the collapsed fault list compared to the original fault list");
+			statistics.Add("FaultList.EquivalentFaults", allFaults.size() - reducedFaultList.size(), "Fault(s)", "The number of faults which were removed due to being marked reducable");
+			statistics.Add("FaultList.RemainingFaults", reducedFaultList.size(), "Fault(s)", "The number of faults after reducing faults");
+			statistics.Add("FaultList.ReducedRatio", reducedFaultList.size() * 100.0f / allFaults.size(), "Percent", "The ratio of the reduced fault list compared to the original fault list");
 			statistics.Add("FaultList.FilteredFaults", filteredFaultList.size(), "Fault(s)", "The number of faults which matched the fault list filter");
 			statistics.Add("FaultList.IncludedFaults", includedFaultList.size(), "Fault(s)", "The number of faults which are not excluded");
+			statistics.Add("FaultList.SampledFaults", sampledFaultList.size(), "Fault(s)", "The number of faults which sampled for pattern generation");
 
 			fullFaultList = FaultList(allFaults);
-			faultList = FaultList(includedFaultList);
+			faultList = FaultList(sampledFaultList);
 			faultMapping = std::vector<size_t>(fullFaultList.size(), 0u);
-
 			std::iota(faultMapping.begin(), faultMapping.end(), 0u);
+
 			for (size_t faultIndex { 0u }; faultIndex < fullFaultList.size(); faultIndex++)
 			{
 				if (faultMapping[faultIndex] != Fault::REMOVED_FAULT)
 				{
-					faultMapping[faultIndex] = fullToCollapsedFaults[faultMapping[faultIndex]];
+					faultMapping[faultIndex] = fullToReducedFaults[faultMapping[faultIndex]];
 				}
 				if (faultMapping[faultIndex] != Fault::REMOVED_FAULT)
 				{
-					faultMapping[faultIndex] = collapsedToFilteredFaults[faultMapping[faultIndex]];
+					faultMapping[faultIndex] = reducedToFilteredFaults[faultMapping[faultIndex]];
 				}
 				if (faultMapping[faultIndex] != Fault::REMOVED_FAULT)
 				{
 					faultMapping[faultIndex] = filteredToIncludedFaults[faultMapping[faultIndex]];
 				}
+				if (faultMapping[faultIndex] != Fault::REMOVED_FAULT)
+				{
+					faultMapping[faultIndex] = includedToSampledFaults[faultMapping[faultIndex]];
+				}
 			}
 		}
 		else if constexpr (std::is_same_v<FaultModel, Fault::SingleTransitionDelayFaultModel>)
 		{
-			auto reductions = Fault::TransitionDelayFaultReduction::RemoveCellInternal
-				| Fault::TransitionDelayFaultReduction::RemoveSequentialClock
-				| Fault::TransitionDelayFaultReduction::RemoveSequentialSetReset
-				| Fault::TransitionDelayFaultReduction::RemoveConnectedToDontCare
-				| Fault::TransitionDelayFaultReduction::RemoveConnectedToUnknown;
-			if (this->faultListReduction == AtpgData<FaultModel>::FaultListReduction::RemoveEquivalent)
+			using OptionReduction = typename AtpgData<FaultModel>::SettingFaultReduction;
+			using FaultReduction = typename Fault::TransitionDelayFaultReduction;
+
+			auto reductions = FaultReduction::RemoveNone;
+			for (auto& [settingsOption, faultListOption] : std::vector<std::tuple<OptionReduction, FaultReduction>> {
+				{ OptionReduction::Original, FaultReduction::RemoveNone },
+				{ OptionReduction::RemoveEquivalent, FaultReduction::RemoveEquivalent },
+				{ OptionReduction::RemoveCellInternal, FaultReduction::RemoveCellInternal },
+				{ OptionReduction::RemoveSequentialClock, FaultReduction::RemoveSequentialClock },
+				{ OptionReduction::RemoveSequentialSetReset, FaultReduction::RemoveSequentialSetReset },
+				{ OptionReduction::RemoveConnectedToDontCare, FaultReduction::RemoveConnectedToDontCare },
+				{ OptionReduction::RemoveConnectedToUnknown, FaultReduction::RemoveConnectedToUnknown },
+				{ OptionReduction::RemoveCircuitPort, FaultReduction::RemoveCircuitPort },
+			})
 			{
-				reductions |= Fault::TransitionDelayFaultReduction::RemoveEquivalent;
+				if ((this->faultListReduction & settingsOption) == settingsOption)
+				{
+					reductions |= faultListOption;
+				}
 			}
 
 			generationTimer.SetTimeReference();
@@ -811,20 +941,22 @@ void AtpgBase<FaultModel, FaultList>::GenerateFaultList(void)
 			generationTimer.Stop();
 
 			reductionTimer.SetTimeReference();
-			auto [collapsedFaultList, fullToCollapsedFaults] = Fault::ReduceTransitionDelayFaultList(*this->circuit, reductions, allFaults);
-			auto [filteredFaultList, collapsedToFilteredFaults] = Fault::FilterTransitionDelayFaultListByPattern(*this->circuit, faultListFilter, Fault::FilterPatternType::Normal, collapsedFaultList);
+			auto [reducedFaultList, fullToReducedFaults] = Fault::ReduceTransitionDelayFaultList(*this->circuit, reductions, allFaults);
+			auto [filteredFaultList, reducedToFilteredFaults] = Fault::FilterTransitionDelayFaultListByPattern(*this->circuit, faultListFilter, Fault::FilterPatternType::Normal, reducedFaultList);
 			auto [includedFaultList, filteredToIncludedFaults] = Fault::FilterTransitionDelayFaultListByPattern(*this->circuit, faultListExclude, Fault::FilterPatternType::Inverted, filteredFaultList);
+			auto [sampledFaultList, includedToSampledFaults] = Fault::SampleTransitionDelayFaultList(includedFaultList, faultListSamples);
 			reductionTimer.Stop();
 
 			// Collect statistics
-			statistics.Add("FaultList.EquivalentFaults", allFaults.size() - collapsedFaultList.size(), "Fault(s)", "The number of faults which were removed due to being equivalent");
-			statistics.Add("FaultList.RemainingFaults", collapsedFaultList.size(), "Fault(s)", "The number of faults after removing equivalent faults");
-			statistics.Add("FaultList.CollapseRatio", collapsedFaultList.size() * 100.0f / allFaults.size(), "Percent", "The ratio of the collapsed fault list compared to the original fault list");
+			statistics.Add("FaultList.EquivalentFaults", allFaults.size() - reducedFaultList.size(), "Fault(s)", "The number of faults which were removed due to being marked reducable");
+			statistics.Add("FaultList.RemainingFaults", reducedFaultList.size(), "Fault(s)", "The number of faults after reducing faults");
+			statistics.Add("FaultList.ReducedRatio", reducedFaultList.size() * 100.0f / allFaults.size(), "Percent", "The ratio of the reduced fault list compared to the original fault list");
 			statistics.Add("FaultList.FilteredFaults", filteredFaultList.size(), "Fault(s)", "The number of faults which matched the fault list filter");
 			statistics.Add("FaultList.IncludedFaults", includedFaultList.size(), "Fault(s)", "The number of faults which are not excluded");
+			statistics.Add("FaultList.SampledFaults", sampledFaultList.size(), "Fault(s)", "The number of faults which sampled for pattern generation");
 
 			fullFaultList = FaultList(allFaults);
-			faultList = FaultList(includedFaultList);
+			faultList = FaultList(sampledFaultList);
 			faultMapping = std::vector<size_t>(fullFaultList.size(), 0u);
 
 			std::iota(faultMapping.begin(), faultMapping.end(), 0u);
@@ -832,35 +964,59 @@ void AtpgBase<FaultModel, FaultList>::GenerateFaultList(void)
 			{
 				if (faultMapping[faultIndex] != Fault::REMOVED_FAULT)
 				{
-					faultMapping[faultIndex] = fullToCollapsedFaults[faultMapping[faultIndex]];
+					faultMapping[faultIndex] = fullToReducedFaults[faultMapping[faultIndex]];
 				}
 				if (faultMapping[faultIndex] != Fault::REMOVED_FAULT)
 				{
-					faultMapping[faultIndex] = collapsedToFilteredFaults[faultMapping[faultIndex]];
+					faultMapping[faultIndex] = reducedToFilteredFaults[faultMapping[faultIndex]];
 				}
 				if (faultMapping[faultIndex] != Fault::REMOVED_FAULT)
 				{
 					faultMapping[faultIndex] = filteredToIncludedFaults[faultMapping[faultIndex]];
+				}
+				if (faultMapping[faultIndex] != Fault::REMOVED_FAULT)
+				{
+					faultMapping[faultIndex] = includedToSampledFaults[faultMapping[faultIndex]];
 				}
 			}
 		}
 		else if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
 		{
+			using OptionReduction = typename AtpgData<FaultModel>::SettingFaultReduction;
+			using FaultReduction = typename Fault::CellAwareFaultReduction;
+
+			auto reductions = FaultReduction::RemoveNone;
+			for (auto& [settingsOption, faultListOption] : std::vector<std::tuple<OptionReduction, FaultReduction>> {
+				{ OptionReduction::Original, FaultReduction::RemoveNone },
+			})
+			{
+				if ((this->faultListReduction & settingsOption) == settingsOption)
+				{
+					reductions |= faultListOption;
+				}
+			}
+
 			generationTimer.SetTimeReference();
-			auto allFaults = Fault::GenerateCellAwareFaultList(*this->circuit, *this->GetUdfm());
+			auto allFaults = Fault::GenerateCellAwareFaultList(*this->circuit, *this->GetCellAwareModelSpecification());
 			generationTimer.Stop();
 
 			reductionTimer.SetTimeReference();
-			auto [filteredFaultList, fullToFilteredFaults] = Fault::FilterCellAwareFaultListByPattern(*this->circuit, faultListFilter, Fault::FilterPatternType::Normal, allFaults);
+			auto [reducedFaultList, fullToReducedFaults] = Fault::ReduceCellAwareFaultList(*this->circuit, reductions, allFaults);
+			auto [filteredFaultList, reducedToFilteredFaults] = Fault::FilterCellAwareFaultListByPattern(*this->circuit, faultListFilter, Fault::FilterPatternType::Normal, reducedFaultList);
 			auto [includedFaultList, filteredToIncludedFaults] = Fault::FilterCellAwareFaultListByPattern(*this->circuit, faultListExclude, Fault::FilterPatternType::Inverted, filteredFaultList);
+			auto [sampledFaultList, includedToSampledFaults] = Fault::SampleCellAwareFaultList(includedFaultList, faultListSamples);
 			reductionTimer.Stop();
 
 			// Collect statistics
+			statistics.Add("FaultList.EquivalentFaults", allFaults.size() - reducedFaultList.size(), "Fault(s)", "The number of faults which were removed due to being marked reducable");
+			statistics.Add("FaultList.RemainingFaults", reducedFaultList.size(), "Fault(s)", "The number of faults after reducing faults");
+			statistics.Add("FaultList.ReducedRatio", reducedFaultList.size() * 100.0f / allFaults.size(), "Percent", "The ratio of the reduced fault list compared to the original fault list");
 			statistics.Add("FaultList.FilteredFaults", filteredFaultList.size(), "Fault(s)", "The number of faults which matched the fault list filter");
 			statistics.Add("FaultList.IncludedFaults", includedFaultList.size(), "Fault(s)", "The number of faults which are not excluded");
+			statistics.Add("FaultList.SampledFaults", sampledFaultList.size(), "Fault(s)", "The number of faults which sampled for pattern generation");
 
 			fullFaultList = FaultList(allFaults);
-			faultList = FaultList(includedFaultList);
+			faultList = FaultList(sampledFaultList);
 			faultMapping = std::vector<size_t>(fullFaultList.size(), 0u);
 
 			std::iota(faultMapping.begin(), faultMapping.end(), 0u);
@@ -868,11 +1024,19 @@ void AtpgBase<FaultModel, FaultList>::GenerateFaultList(void)
 			{
 				if (faultMapping[faultIndex] != Fault::REMOVED_FAULT)
 				{
-					faultMapping[faultIndex] = fullToFilteredFaults[faultMapping[faultIndex]];
+					faultMapping[faultIndex] = fullToReducedFaults[faultMapping[faultIndex]];
+				}
+				if (faultMapping[faultIndex] != Fault::REMOVED_FAULT)
+				{
+					faultMapping[faultIndex] = reducedToFilteredFaults[faultMapping[faultIndex]];
 				}
 				if (faultMapping[faultIndex] != Fault::REMOVED_FAULT)
 				{
 					faultMapping[faultIndex] = filteredToIncludedFaults[faultMapping[faultIndex]];
+				}
+				if (faultMapping[faultIndex] != Fault::REMOVED_FAULT)
+				{
+					faultMapping[faultIndex] = includedToSampledFaults[faultMapping[faultIndex]];
 				}
 			}
 		}
@@ -897,23 +1061,18 @@ void AtpgBase<FaultModel, FaultList>::GenerateFaultList(void)
 	if (printFaultListReport == PrintFaultListReport::PrintDetail
 		|| printFaultListReport == PrintFaultListReport::PrintSummary)
 	{
-		size_t collapsedFaults { 0u };
 		size_t removedFaults { 0u };
-
 		for (size_t faultIndex { 0u }; faultIndex < fullFaultList.size(); ++faultIndex)
 		{
 			if (faultMapping[faultIndex] == Fault::REMOVED_FAULT)
 			{
 				removedFaults++;
 			}
-			else if (faultIndex != (faultMapping[faultIndex] + removedFaults))
-			{
-				collapsedFaults++;
-			}
 		}
 
+		const auto reducedFaults { fullFaultList.size() - removedFaults - faultList.size() };
 		LOG(INFO) << "Total faults: " << fullFaultList.size();
-		LOG(INFO) << "    Collapsed faults: " << collapsedFaults;
+		LOG(INFO) << "    Reduced faults: " << reducedFaults;
 		LOG(INFO) << "    Removed faults: " << removedFaults;
 		LOG(INFO) << "    Final faults: " << faultList.size();
 	}
@@ -948,12 +1107,12 @@ void AtpgBase<FaultModel, FaultList>::GenerateFaultList(void)
 
 template <typename FaultModel, typename FaultList>
 template <typename PinData>
-void AtpgBase<FaultModel, FaultList>::ValidateAtpgResult(size_t faultIndex, Pattern::TestPattern& pattern, Pattern::OutputCapture capture, Tpg::LogicGenerator<PinData>& logicGenerator, const SimulationConfig& simConfig) const
+void AtpgBase<FaultModel, FaultList>::ValidateAtpgResult(size_t faultIndex, const Pattern::TestPattern& pattern, Pattern::OutputCapture capture, Tpg::LogicGenerator<PinData>& logicGenerator, const SimulationConfig& simConfig) const
 {
 	const auto& mappedCircuit = this->circuit->GetMappedCircuit();
 	const auto& [fault, metaData] = faultList[faultIndex];
-	SimulationResult atpgGoodResult = Tpg::Extractor::ExtractSimulationResult<PinData, GoodTag>(logicGenerator.GetContext());
-	SimulationResult atpgBadResult = Tpg::Extractor::ExtractSimulationResult<PinData, BadTag>(logicGenerator.GetContext());
+	const auto atpgGoodResult = Tpg::Extractor::ExtractSimulationResult<PinData, GoodTag>(logicGenerator.GetContext());
+	const auto atpgBadResult = Tpg::Extractor::ExtractSimulationResult<PinData, BadTag>(logicGenerator.GetContext());
 
 	LOG_IF(!CheckSensitization(FaultModel(fault), atpgGoodResult), FATAL) << "\n"
 		<< "The ATPG result does not sensitize the fault " << faultIndex << " (" + to_string(*fault) << ")\n"
@@ -961,31 +1120,23 @@ void AtpgBase<FaultModel, FaultList>::ValidateAtpgResult(size_t faultIndex, Patt
 		<< "Result ATPG Bad:  " << to_string(atpgBadResult) << "\n"
 		<< "Pattern: " << to_string(pattern);
 
-	const auto [testPrimaryOutputs, testSecondaryOutputs ] = Pattern::GetCaptureOutputs(capture);
 	bool propagated = false;
+	const auto [testPrimaryOutputs, testSecondaryOutputs] = Pattern::GetCaptureOutputs(capture);
 	for (size_t timeframe = 0u; timeframe < atpgGoodResult.GetNumberOfTimeframes(); ++timeframe)
 	{
-		if (testPrimaryOutputs)
+		for (auto const& primaryOutput : mappedCircuit.GetPrimaryOutputs())
 		{
-			for (auto const& primaryOutput : mappedCircuit.GetPrimaryOutputs())
-			{
-				const Logic good = atpgGoodResult.GetOutputLogic(primaryOutput, timeframe);
-				const Logic bad = atpgBadResult.GetOutputLogic(primaryOutput, timeframe);
-				const bool difference = IsValidLogic01(good) && IsValidLogic01(bad) && (bad != good);
-
-				propagated |= difference;
-			}
+			const Logic good = atpgGoodResult.GetOutputLogic(primaryOutput, timeframe);
+			const Logic bad = atpgBadResult.GetOutputLogic(primaryOutput, timeframe);
+			const bool difference = IsValidLogic01(good) && IsValidLogic01(bad) && (bad != good);
+			propagated |= (testPrimaryOutputs && difference);
 		}
-		if (testSecondaryOutputs)
+		for (auto const& secondaryOutput : mappedCircuit.GetSecondaryOutputs())
 		{
-			for (auto const& secondaryOutput : mappedCircuit.GetSecondaryOutputs())
-			{
-				const Logic good = atpgGoodResult.GetOutputLogic(secondaryOutput, timeframe);
-				const Logic bad = atpgBadResult.GetOutputLogic(secondaryOutput, timeframe);
-				const bool difference = IsValidLogic01(good) && IsValidLogic01(bad) && (bad != good);
-
-				propagated |= difference;
-			}
+			const Logic good = atpgGoodResult.GetOutputLogic(secondaryOutput, timeframe);
+			const Logic bad = atpgBadResult.GetOutputLogic(secondaryOutput, timeframe);
+			const bool difference = IsValidLogic01(good) && IsValidLogic01(bad) && (bad != good);
+			propagated |= (testSecondaryOutputs && difference);
 		}
 	}
 	LOG_IF(!propagated, FATAL) << "The ATPG result does not propagate the fault " << faultIndex	<< " (" + to_string(*fault) << ")";
@@ -1011,19 +1162,24 @@ void AtpgBase<FaultModel, FaultList>::ValidateAtpgResult(size_t faultIndex, Patt
 	{
 		for (auto [nodeId, node] : mappedCircuit.EnumerateNodes())
 		{
-			ASSERT((atpgGoodResult[timeframe][nodeId] == Logic::LOGIC_INVALID || atpgGoodResult[timeframe][nodeId] == simGoodResult[timeframe][nodeId])
-					&& (atpgBadResult[timeframe][nodeId] == Logic::LOGIC_INVALID ||  atpgBadResult[timeframe][nodeId] == simBadResult[timeframe][nodeId]))
-				<< "\nThe good or bad fault simulation did not match the ATPG at node "
-				<< node->GetName() << " in timeframe " << timeframe << " for nodeId " << nodeId << "\n"
-				<< "Result ATPG: " << to_string(atpgGoodResult[timeframe][nodeId])
-				<< "/" << to_string(atpgBadResult[timeframe][nodeId])
-				<< " and Sim " << to_string(simGoodResult[timeframe][nodeId])
-				<< "/" << to_string(simBadResult[timeframe][nodeId]) << "\n"
-				<< "Pattern: " << to_string(pattern) << "\n"
-				<< "\n" << to_string(*fault) << "\n\n"
-				<< "Comparison:\n"
-				<< to_string(atpgGoodResult, atpgBadResult, simGoodResult, simBadResult, mappedCircuit) << "\n"
-				<< DebugFaultLocation(atpgGoodResult, atpgBadResult, simGoodResult, simBadResult, faultIndex);
+			if (__builtin_expect((atpgGoodResult[timeframe][nodeId] != Logic::LOGIC_INVALID && atpgGoodResult[timeframe][nodeId] != simGoodResult[timeframe][nodeId])
+				|| (atpgBadResult[timeframe][nodeId] != Logic::LOGIC_INVALID && atpgBadResult[timeframe][nodeId] != simBadResult[timeframe][nodeId]), false))
+			{
+				Helper::DebugExportSimulation("sim-good", *this->circuit, simGoodResult);
+				Helper::DebugExportSimulation("sim-bad", *this->circuit, simBadResult);
+				Helper::DebugExportSimulation("atpg-good", *this->circuit, atpgGoodResult);
+				Helper::DebugExportSimulation("atpg-bad", *this->circuit, atpgBadResult);
+				LOG(FATAL) << "The good or bad fault simulation did not match the ATPG at node " << nodeId
+					<< " (" << node->GetName() << ") in timeframe " << timeframe << ":" << std::endl
+					<< to_string(pattern) << std::endl
+					<< Helper::DebugSimulationLocation<Helper::DebugSimulationVsAtpg>(
+						nodeId, *this->circuit, simGoodResult, simBadResult, atpgGoodResult, atpgBadResult) << std::endl
+					<< Helper::DebugSimulation<Helper::DebugSimulationVsAtpg>(
+						*this->circuit, simGoodResult, simBadResult, atpgGoodResult, atpgBadResult) << std::endl
+					<< Helper::DebugFaultLocation<Helper::DebugSimulationVsAtpg, FaultModel>(
+						{ fault }, *this->circuit, simGoodResult, simBadResult, atpgGoodResult, atpgBadResult) << std::endl
+					<< to_debug(this->circuit->GetMappedCircuit());
+			}
 		}
 	}
 }
@@ -1079,15 +1235,79 @@ void AtpgBase<FaultModel, FaultList>::RunFaultSimulation(const Tpg::Vcm::VcmCont
 				continue;
 			}
 
+			auto const is_fault_location = [&](auto const nodeId) -> bool {
+				if constexpr (std::is_same_v<FaultModel, Fault::SingleStuckAtFaultModel>)
+				{
+					auto const stuckAt = fault->GetStuckAt();
+					if (nodeId == stuckAt.GetNode()->GetNodeId())
+					{
+						return true;
+					}
+				}
+				else if constexpr (std::is_same_v<FaultModel, Fault::MultiStuckAtFaultModel>)
+				{
+					for (auto const& stuckAt : fault->GetStuckAts())
+					{
+						if (nodeId == stuckAt.GetNode()->GetNodeId())
+						{
+							return true;
+						}
+					}
+				}
+				else if constexpr (std::is_same_v<FaultModel, Fault::SingleTransitionDelayFaultModel>)
+				{
+					auto const transitionDelay = fault->GetTransitionDelay();
+					if (nodeId == transitionDelay.GetNode()->GetNodeId())
+					{
+						return true;
+					}
+				}
+				else if constexpr (std::is_same_v<FaultModel, Fault::MultiTransitionDelayFaultModel>)
+				{
+					for (auto const& transitionDelay : fault->GetTransitionDelays())
+					{
+						if (nodeId == transitionDelay.GetNode()->GetNodeId())
+						{
+							return true;
+						}
+					}
+				}
+				else if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
+				{
+					const auto& outputs = fault->GetStateMachine().GetOutputs();
+					if (std::find_if(outputs.begin(), outputs.end(), [&](const auto& output) {
+							return output.node->GetNodeId() == nodeId;
+						}) != outputs.end())
+					{
+						return true;
+					}
+				}
+				else
+				{
+					LOG(FATAL) << "Fault model not implemented";
+					__builtin_unreachable();
+				}
+
+				return false;
+			};
+
 			DVLOG(5) << "Checking if test pattern finds " << to_string(*fault);
 
 			// Do a pre-check if the fault is sensitized in at least one timeframe.
 			// If this is not the case then we can skip the simulation as no fault propagation is possible.
 			if (!CheckSensitization(FaultModel(fault), goodResult))
 			{
+				if (__builtin_expect(faultIndex == targetFaultIndex, false))
+				{
+					Helper::DebugExportSimulation("sim-good", *this->circuit, goodResult);
+					LOG(FATAL) << "The test pattern " << patternIndex << " does not sensitize the fault!" << std::endl
+						<< Helper::DebugFaultLocation<Helper::DebugSimulationGood, FaultModel>(
+							{ fault }, *this->circuit, goodResult, goodResult, goodResult, goodResult) << std::endl
+						<< Helper::DebugSimulation<Helper::DebugSimulationGood>(
+							*this->circuit, goodResult, goodResult, goodResult, goodResult);
+				}
+
 				// Fault is not sensitized -> test next fault
-				ASSERT(faultIndex != targetFaultIndex) << "The test pattern " << patternIndex << " does not sensitize the fault " << faultIndex
-						<< " (" + to_string(*fault) << ")";
 				continue;
 			}
 
@@ -1097,7 +1317,7 @@ void AtpgBase<FaultModel, FaultList>::RunFaultSimulation(const Tpg::Vcm::VcmCont
 			{
 				case IncrementalSimulation::Disabled:
 				{
-					VLOG(9) << "Incremental simulation disabled! This will slow down the simulation!";
+					DVLOG(9) << "Incremental simulation disabled! This will slow down the simulation!";
 
 				#ifndef NDEBUG
 					CpuClock eventDrivenSimulationClock;
@@ -1137,20 +1357,29 @@ void AtpgBase<FaultModel, FaultList>::RunFaultSimulation(const Tpg::Vcm::VcmCont
 
 			if (__builtin_expect(checkSimulation == CheckSimulation::Enabled, false))
 			{
-				SimulationResult checkResult(testPattern->GetNumberOfTimeframes(), mappedCircuit.GetNumberOfNodes());
-				SimulateTestPatternNaive<FaultModel>(mappedCircuit, *testPattern, { fault }, checkResult, simConfig);
-				for (size_t timeframe = 0u; timeframe < testPattern->GetNumberOfTimeframes(); ++timeframe)
+				SimulationResult goodCheck(testPattern->GetNumberOfTimeframes(), mappedCircuit.GetNumberOfNodes());
+				SimulationResult badCheck(testPattern->GetNumberOfTimeframes(), mappedCircuit.GetNumberOfNodes());
+				SimulateTestPatternNaive<Fault::FaultFreeModel>(mappedCircuit, *testPattern, { }, goodCheck, simConfig);
+				SimulateTestPatternNaive<FaultModel>(mappedCircuit, *testPattern, { fault }, badCheck, simConfig);
+
+				for (size_t timeframe { 0u }; timeframe < testPattern->GetNumberOfTimeframes(); timeframe++)
 				{
-					for (size_t nodeId = 0u; nodeId < mappedCircuit.GetNumberOfNodes(); ++nodeId)
+					for (size_t nodeId { 0u }; nodeId < mappedCircuit.GetNumberOfNodes(); nodeId++)
 					{
-						ASSERT(badResult[timeframe][nodeId] == checkResult[timeframe][nodeId])
-							<< "The event-based and naive simulation result did not match for gate "
-							<< mappedCircuit.GetNode(nodeId)->GetName() << ". Good: "
-							<< to_string(goodResult[timeframe][nodeId]) << ", Bad: "
-							<< to_string(badResult[timeframe][nodeId]) << ", Bad (Check): "
-							<< to_string(checkResult[timeframe][nodeId]) << std::endl
-							<< "Good:  " << to_string(badResult) << std::endl
-							<< "Check: " << to_string(checkResult);
+						if (__builtin_expect(goodResult[timeframe][nodeId] != goodCheck[timeframe][nodeId]
+								&& badResult[timeframe][nodeId] != badCheck[timeframe][nodeId], false))
+						{
+							Helper::DebugExportSimulation("sim-good", *this->circuit, goodResult);
+							Helper::DebugExportSimulation("sim-bad", *this->circuit, badResult);
+							Helper::DebugExportSimulation("check-good", *this->circuit, goodCheck);
+							Helper::DebugExportSimulation("check-bad", *this->circuit, badCheck);
+							LOG(FATAL) << "The event-based and naive simulation result did not match for gate "
+								<< std::to_string(nodeId) << " (" << mappedCircuit.GetNode(nodeId)->GetName() << "):" << std::endl
+								<< Helper::DebugSimulationLocation<Helper::DebugSimulationVsCheck>(
+									nodeId, *this->circuit, goodResult, badResult, goodCheck, badCheck) << std::endl
+								<< Helper::DebugSimulation<Helper::DebugSimulationVsCheck>(
+									*this->circuit, goodResult, badResult, goodCheck, badCheck);
+						}
 					}
 				}
 			}
@@ -1159,95 +1388,57 @@ void AtpgBase<FaultModel, FaultList>::RunFaultSimulation(const Tpg::Vcm::VcmCont
 			{
 				for (auto [inputNumber, secondaryInput] : mappedCircuit.EnumerateSecondaryInputs())
 				{
-					if constexpr (std::is_same_v<FaultModel, Fault::SingleStuckAtFaultModel>)
+					if (!is_fault_location(secondaryInput->GetNodeId())
+						&& __builtin_expect(goodResult[0u][secondaryInput->GetNodeId()] != badResult[0u][secondaryInput->GetNodeId()], false))
 					{
-						// This produces false positives in the case that the fault is located at this node.
-						// E.g. a stuck-at 0 fault at the output of flip-flop.
-						// => Skip all fault locations as we expect a different output value
-						if (secondaryInput->GetNodeId() == fault->GetNode()->GetNodeId())
-						{
-							continue;
-						}
+						Helper::DebugExportSimulation("sim-good", *this->circuit, goodResult);
+						Helper::DebugExportSimulation("sim-bad", *this->circuit, badResult);
+						LOG(FATAL) << "The initial state does not match for the good and bad simulation for gate "
+							<< secondaryInput->GetNodeId() << " (" << secondaryInput->GetName() << "):" << std::endl
+							<< Helper::DebugSimulationLocation<Helper::DebugSimulationGoodBad>(
+								secondaryInput->GetNodeId(), *this->circuit, goodResult, badResult, goodResult, badResult) << std::endl
+							<< Helper::DebugSimulation<Helper::DebugSimulationGoodBad>(
+								*this->circuit, goodResult, badResult, goodResult, badResult);
 					}
-					else if constexpr (std::is_same_v<FaultModel, Fault::MultiStuckAtFaultModel>)
-					{
-						// TODO: Implement
-						LOG(FATAL) << "MultiStuckAtFaultModel not implemented";
-						__builtin_unreachable();
-					}
-					else if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
-					{
-						const auto& effectNodeAndPorts = fault->GetEffectNodesAndPorts();
-
-						// This produces false positives in the case that the fault is located at this node.
-						// => Skip all fault locations as we expect a different output value
-						if (std::find_if(effectNodeAndPorts.begin(), effectNodeAndPorts.end(),
-							[&] (const Circuit::MappedCircuit::NodeAndPort& nap) { return nap.node->GetNodeId() == secondaryInput->GetNodeId(); } ) != effectNodeAndPorts.end())
-						{
-							continue;
-						}
-					}
-					else
-					{
-						LOG(FATAL) << "Fault model not implemented";
-						__builtin_unreachable();
-					}
-
-					ASSERT(goodResult[0u][secondaryInput->GetNodeId()] == badResult[0u][secondaryInput->GetNodeId()])
-						<< "The initial state does not match for the good and bad simulation for gate "
-						<< secondaryInput->GetName() << ". Good: "
-						<< to_string(goodResult[0u][secondaryInput->GetNodeId()]) << ", Bad: "
-						<< to_string(badResult[0u][secondaryInput->GetNodeId()]);
 				}
 			}
-
-			if (__builtin_expect(checkSimulationInputs == CheckSimulationInputs::CheckEqual, false))
+			for (size_t timeframe { 0u }; timeframe < testPattern->GetNumberOfTimeframes(); timeframe++)
 			{
-				// TODO: Rearrange for loops like below? (Should be better performance for CA and MultiStuckAt)
-				for (size_t timeframe = 0u; timeframe < testPattern->GetNumberOfTimeframes(); ++timeframe)
+				if (__builtin_expect(checkSimulationInputs == CheckSimulationInputs::CheckEqual, false))
 				{
 					for (auto [inputNumber, primaryInput] : mappedCircuit.EnumeratePrimaryInputs())
 					{
-						if constexpr (std::is_same_v<FaultModel, Fault::SingleStuckAtFaultModel>)
+						if (!is_fault_location(primaryInput->GetNodeId())
+							&& __builtin_expect(goodResult[timeframe][primaryInput->GetNodeId()] != badResult[timeframe][primaryInput->GetNodeId()], false))
 						{
-							// This produces false positives in the case that the fault is located at this node.
-							// E.g. a stuck-at 0 fault at this input port.
-							// => Skip all fault locations as we expect a different output value
-							if (primaryInput->GetNodeId() == fault->GetNode()->GetNodeId())
-							{
-								continue;
-							}
+							Helper::DebugExportSimulation("sim-good", *this->circuit, goodResult);
+							Helper::DebugExportSimulation("sim-bad", *this->circuit, badResult);
+							LOG(FATAL) << "The circuit input does not match for the good and bad simulation for input gate "
+								<< primaryInput->GetNodeId() << " (" << primaryInput->GetName() << "):" << std::endl
+								<< Helper::DebugSimulationLocation<Helper::DebugSimulationGoodBad>(
+									primaryInput->GetNodeId(), *this->circuit, goodResult, badResult, goodResult, badResult) << std::endl
+								<< Helper::DebugSimulation<Helper::DebugSimulationGoodBad>(
+									*this->circuit, goodResult, badResult, goodResult, badResult);
 						}
-						else if constexpr (std::is_same_v<FaultModel, Fault::MultiStuckAtFaultModel>)
+					}
+				}
+				if (__builtin_expect(checkSimulationFlipFlops == CheckSimulationFlipFlops::CheckEqual, false))
+				{
+					for (auto [inputNumber, secondaryInput] : mappedCircuit.EnumerateSecondaryInputs())
+					{
+						if (!is_fault_location(secondaryInput->GetNodeId())
+							&& __builtin_expect(goodResult[timeframe][secondaryInput->GetNodeId()] != testPattern->GetSecondaryInput(timeframe, inputNumber), false))
 						{
-							// TODO: Implement
-							LOG(FATAL) << "MultiStuckAtFaultModel not implemented";
-							__builtin_unreachable();
+							Helper::DebugExportSimulation("sim-good", *this->circuit, goodResult);
+							LOG(FATAL) << "The flip-flop content of node " << std::to_string(secondaryInput->GetNodeId())
+								<< " (" << secondaryInput->GetName() << ") does not match between simulation"
+								<< " and the test pattern at timeframe " << std::to_string(timeframe) << ":" << std::endl
+								<< "Expected: " << to_string(testPattern->GetSecondaryInput(timeframe, inputNumber)) << std::endl
+								<< Helper::DebugSimulationLocation<Helper::DebugSimulationGoodBad>(
+									secondaryInput->GetNodeId(), *this->circuit, goodResult, badResult, goodResult, badResult) << std::endl
+								<< Helper::DebugSimulation<Helper::DebugSimulationGoodBad>(
+									*this->circuit, goodResult, badResult, goodResult, badResult);
 						}
-						else if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
-						{
-							const auto& effectNodeAndPorts = fault->GetEffectNodesAndPorts();
-
-							// This produces false positives in the case that the fault is located at this node.
-							// E.g. a fault at the input port.
-							// => Skip all fault locations as we expect a different output value
-							if (std::find_if(effectNodeAndPorts.begin(), effectNodeAndPorts.end(),
-								[&] (const Circuit::MappedCircuit::NodeAndPort& nap) { return nap.node->GetNodeId() == primaryInput->GetNodeId(); } ) != effectNodeAndPorts.end())
-							{
-								continue;
-							}
-						}
-						else
-						{
-							LOG(FATAL) << "Fault model not implemented";
-							__builtin_unreachable();
-						}
-
-						ASSERT(goodResult[timeframe][primaryInput->GetNodeId()] == badResult[timeframe][primaryInput->GetNodeId()])
-							<< "The circuit input does not match for the good and bad simulation for input gate "
-							<< primaryInput->GetName() << ". Good: "
-							<< to_string(goodResult[timeframe][primaryInput->GetNodeId()]) << ", Bad: "
-							<< to_string(badResult[timeframe][primaryInput->GetNodeId()]);
 					}
 				}
 			}
@@ -1257,78 +1448,25 @@ void AtpgBase<FaultModel, FaultList>::RunFaultSimulation(const Tpg::Vcm::VcmCont
 				Pattern::TestPattern vcmPattern = VcmMixin::GetVcmPatternForSimulationResult(simulationContext, goodResult, badResult);
 				if (!VcmMixin::SimulateVcmPattern(simulationContext, vcmPattern))
 				{
-					if (faultIndex == targetFaultIndex)
+					if (__builtin_expect(faultIndex == targetFaultIndex, false))
 					{
 						const auto& vcmMappedCircuit { vcmCircuit->GetMappedCircuit() };
 						Simulation::SimulationConfig simConfig { Simulation::MakeSimulationConfig(Basic::MakeUnclockedSetResetFlipFlopModel()) };
 						Simulation::SimulationResult vcmResult(vcmPattern.GetNumberOfTimeframes(), vcmMappedCircuit.GetNumberOfNodes());
 						Simulation::SimulateTestPatternEventDriven<Fault::FaultFreeModel>(vcmMappedCircuit, vcmPattern, {}, vcmResult, simConfig);
 
-						DebugAtpgResult(goodResult, mappedCircuit, "circuit-good");
-						DebugAtpgResult(badResult, mappedCircuit, "circuit-bad");
-						DebugAtpgResult(vcmResult, vcmMappedCircuit, "vcm");
-
+						Helper::DebugExportSimulation("sim-good", *this->circuit, goodResult);
+						Helper::DebugExportSimulation("sim-bad", *this->circuit, badResult);
+						Helper::DebugExportSimulation("vcm", *this->vcmCircuit, vcmResult);
 						LOG(FATAL) << "The test pattern " << patternIndex << " does not test the fault " << faultIndex
-							<< " (" + to_string(*fault) << ") according to VCM";
+							<< " (" + to_string(*fault) << ") according to VCM" << std::endl
+							<< Helper::DebugFaultLocation<Helper::DebugSimulationGoodBad, FaultModel>(
+								{ fault }, *this->circuit, goodResult, badResult, goodResult, badResult) << std::endl
+							<< Helper::DebugSimulation<Helper::DebugSimulationGoodBad>(
+								*this->circuit, goodResult, badResult, goodResult, badResult);
 					}
 
 					goto nextFault;
-				}
-			}
-
-			if (__builtin_expect(checkSimulationFlipFlops == CheckSimulationFlipFlops::CheckEqual, false))
-			{
-				for (auto [inputNumber, secondaryInput] : mappedCircuit.EnumerateSecondaryInputs())
-				{
-					if constexpr (std::is_same_v<FaultModel, Fault::SingleStuckAtFaultModel>)
-					{
-						// This produces false positives in the case that the fault is located at this node.
-						// E.g. a stuck-at 0 fault at this flip-flop.
-						// => Skip all fault locations as we expect a different output value
-						if (secondaryInput->GetNodeId() == fault->GetNode()->GetNodeId())
-						{
-							continue;
-						}
-					}
-					else if constexpr (std::is_same_v<FaultModel, Fault::MultiStuckAtFaultModel>)
-					{
-						// TODO: Implement
-						LOG(FATAL) << "MultiStuckAtFaultModel not implemented";
-						__builtin_unreachable();
-					}
-					else if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
-					{
-						// This produces false positives in the case that the fault is located at this node.
-						// => Skip all fault locations as we expect a different output value
-						bool isFaultLocation = false;
-						for (const auto& nodeAndPort : fault->GetEffectNodesAndPorts())
-						{
-							if (__builtin_expect(secondaryInput->GetNodeId() == nodeAndPort.node->GetNodeId(), false))
-							{
-								isFaultLocation = true;
-								break;
-							}
-						}
-
-						if (__builtin_expect(isFaultLocation, false))
-						{
-							continue;
-						}
-					}
-					else
-					{
-						LOG(FATAL) << "Fault model not implemented";
-						__builtin_unreachable();
-					}
-
-					for (size_t timeframe = 0u; timeframe < testPattern->GetNumberOfTimeframes(); ++timeframe)
-					{
-						ASSERT(goodResult[timeframe][secondaryInput->GetNodeId()] == testPattern->GetSecondaryInput(timeframe, inputNumber))
-							<< "The flip-flop content of node " << mappedCircuit.GetNode(secondaryInput->GetNodeId())->GetName()
-							<< " does not match between simulation and the generated test pattern. Good: "
-							<< to_string(goodResult[timeframe][secondaryInput->GetNodeId()]) << ", Pattern: "
-							<< to_string(testPattern->GetSecondaryInput(timeframe, inputNumber));
-					}
 				}
 			}
 
@@ -1337,9 +1475,9 @@ void AtpgBase<FaultModel, FaultList>::RunFaultSimulation(const Tpg::Vcm::VcmCont
 				for (size_t index = 0u; testPrimaryOutputs && index < mappedCircuit.GetNumberOfPrimaryOutputs(); ++index)
 				{
 					const auto* primaryOutput = mappedCircuit.GetPrimaryOutput(index);
-					const Logic good = goodResult.GetOutputLogic(primaryOutput, timeframe);
-					const Logic bad = badResult.GetOutputLogic(primaryOutput, timeframe);
-					const bool difference = IsValidLogic01(good) && IsValidLogic01(bad) && (bad != good);
+					const auto good = goodResult.GetOutputLogic(primaryOutput, timeframe);
+					const auto bad = badResult.GetOutputLogic(primaryOutput, timeframe);
+					const auto difference = IsValidLogic01(good) && IsValidLogic01(bad) && (bad != good);
 
 					DVLOG(9) << "Primary Output " << index << ": " << "Good " << good << " <-> " << bad << " Bad"
 						<< (difference ? " (Difference detected)" : "");
@@ -1349,21 +1487,33 @@ void AtpgBase<FaultModel, FaultList>::RunFaultSimulation(const Tpg::Vcm::VcmCont
 							std::scoped_lock lock { parallelMutex };
 							if (metaData->faultStatus != Fault::FaultStatus::FAULT_STATUS_UNCLASSIFIED)
 							{
-								if (metaData->faultStatus == Fault::FaultStatus::FAULT_STATUS_UNDETECTED)
+								if (__builtin_expect(metaData->faultStatus == Fault::FaultStatus::FAULT_STATUS_UNDETECTED, false))
 								{
+									Helper::DebugExportSimulation("sim-good", *this->circuit, goodResult);
+									Helper::DebugExportSimulation("sim-bad", *this->circuit, badResult);
 									LOG(FATAL) << "Undetectable fault " << faultIndex << " " << to_string(*fault)
 										<< " with status " << to_string(metaData->faultStatus) << "/" << to_string(metaData->targetedFaultStatus)
-										<< " was found by test pattern " << patternIndex << "!";
+										<< " was found by test pattern " << patternIndex << "!" << std::endl
+										<< Helper::DebugFaultLocation<Helper::DebugSimulationGoodBad, FaultModel>(
+											{ fault }, *this->circuit, goodResult, badResult, goodResult, badResult) << std::endl
+										<< Helper::DebugSimulation<Helper::DebugSimulationGoodBad>(
+											*this->circuit, goodResult, badResult, goodResult, badResult);
 								}
 								goto nextFault;
 							}
 
-							if (checkMaxIterationCovered == CheckMaxIterationCovered::Enabled
-								&& metaData->targetedFaultStatus == Fault::TargetedFaultStatus::FAULT_STATUS_ABORTED_MAX_ITERATIONS)
+							if (__builtin_expect(checkMaxIterationCovered == CheckMaxIterationCovered::Enabled
+								&& metaData->targetedFaultStatus == Fault::TargetedFaultStatus::FAULT_STATUS_ABORTED_MAX_ITERATIONS, false))
 							{
+								Helper::DebugExportSimulation("sim-good", *this->circuit, goodResult);
+								Helper::DebugExportSimulation("sim-bad", *this->circuit, badResult);
 								LOG(FATAL) << "Fault " << faultIndex << " " << to_string(*fault)
 									<< " with status " << to_string(metaData->faultStatus) << "/" << to_string(metaData->targetedFaultStatus)
-									<< " was found by test pattern " << patternIndex << "!";
+									<< " was found by test pattern " << patternIndex << "!" << std::endl
+									<< Helper::DebugFaultLocation<Helper::DebugSimulationGoodBad, FaultModel>(
+										{ fault }, *this->circuit, goodResult, badResult, goodResult, badResult) << std::endl
+									<< Helper::DebugSimulation<Helper::DebugSimulationGoodBad>(
+										*this->circuit, goodResult, badResult, goodResult, badResult);
 							}
 
 							Mixin::FaultStatisticsMixin<FaultList>::SetFaultStatus(faultList, faultIndex, Fault::FaultStatus::FAULT_STATUS_DETECTED,
@@ -1391,9 +1541,9 @@ void AtpgBase<FaultModel, FaultList>::RunFaultSimulation(const Tpg::Vcm::VcmCont
 				for (size_t index = 0; testSecondaryOutputs && index < mappedCircuit.GetNumberOfSecondaryOutputs(); ++index)
 				{
 					const auto* secondaryOutput = mappedCircuit.GetSecondaryOutput(index);
-					const Logic good = goodResult.GetOutputLogic(secondaryOutput, timeframe);
-					const Logic bad = badResult.GetOutputLogic(secondaryOutput, timeframe);
-					const bool difference = IsValidLogic01(good) && IsValidLogic01(bad) && bad != good;
+					const auto good = goodResult.GetOutputLogic(secondaryOutput, timeframe);
+					const auto bad = badResult.GetOutputLogic(secondaryOutput, timeframe);
+					const auto difference = IsValidLogic01(good) && IsValidLogic01(bad) && bad != good;
 
 					DVLOG(9) << "Secondary Output " << index << ": " << "Good " << good << " <-> " << bad << " Bad"
 						<< (difference ? " (Difference detected)" : "");
@@ -1403,21 +1553,33 @@ void AtpgBase<FaultModel, FaultList>::RunFaultSimulation(const Tpg::Vcm::VcmCont
 							std::scoped_lock lock { parallelMutex };
 							if (metaData->faultStatus != Fault::FaultStatus::FAULT_STATUS_UNCLASSIFIED)
 							{
-								if (metaData->faultStatus == Fault::FaultStatus::FAULT_STATUS_UNDETECTED)
+								if (__builtin_expect(metaData->faultStatus == Fault::FaultStatus::FAULT_STATUS_UNDETECTED, false))
 								{
+									Helper::DebugExportSimulation("sim-good", *this->circuit, goodResult);
+									Helper::DebugExportSimulation("sim-bad", *this->circuit, badResult);
 									LOG(FATAL) << "Undetectable fault " << faultIndex << " " << to_string(*fault)
 										<< " with status " << to_string(metaData->faultStatus) << "/" << to_string(metaData->targetedFaultStatus)
-										<< " was found by test pattern " << patternIndex << "!";
+										<< " was found by test pattern " << patternIndex << "!" << std::endl
+										<< Helper::DebugFaultLocation<Helper::DebugSimulationGoodBad, FaultModel>(
+											{ fault }, *this->circuit, goodResult, badResult, goodResult, badResult) << std::endl
+										<< Helper::DebugSimulation<Helper::DebugSimulationGoodBad>(
+											*this->circuit, goodResult, badResult, goodResult, badResult);
 								}
 								goto nextFault;
 							}
 
-							if (checkMaxIterationCovered == CheckMaxIterationCovered::Enabled
-								&& metaData->targetedFaultStatus == Fault::TargetedFaultStatus::FAULT_STATUS_ABORTED_MAX_ITERATIONS)
+							if (__builtin_expect(checkMaxIterationCovered == CheckMaxIterationCovered::Enabled
+								&& metaData->targetedFaultStatus == Fault::TargetedFaultStatus::FAULT_STATUS_ABORTED_MAX_ITERATIONS, false))
 							{
+								Helper::DebugExportSimulation("sim-good", *this->circuit, goodResult);
+								Helper::DebugExportSimulation("sim-bad", *this->circuit, badResult);
 								LOG(FATAL) << "Fault " << faultIndex << " " << to_string(*fault)
 									<< " with status " << to_string(metaData->faultStatus) << "/" << to_string(metaData->targetedFaultStatus)
-									<< " was found by test pattern " << patternIndex << "!";
+									<< " was found by test pattern " << patternIndex << "!" << std::endl
+									<< Helper::DebugFaultLocation<Helper::DebugSimulationGoodBad, FaultModel>(
+										{ fault }, *this->circuit, goodResult, badResult, goodResult, badResult) << std::endl
+									<< Helper::DebugSimulation<Helper::DebugSimulationGoodBad>(
+										*this->circuit, goodResult, badResult, goodResult, badResult);
 							}
 
 							Mixin::FaultStatisticsMixin<FaultList>::SetFaultStatus(faultList, faultIndex, Fault::FaultStatus::FAULT_STATUS_DETECTED,
@@ -1443,10 +1605,16 @@ void AtpgBase<FaultModel, FaultList>::RunFaultSimulation(const Tpg::Vcm::VcmCont
 				}
 			}
 
-			if (faultIndex == targetFaultIndex)
+			if (__builtin_expect(faultIndex == targetFaultIndex, false))
 			{
-				LOG(FATAL) << "The test pattern " << patternIndex << " does not propagate the fault " << faultIndex
-					<< " (" + to_string(*fault) << ")";
+				Helper::DebugExportSimulation("sim-good", *this->circuit, goodResult);
+				Helper::DebugExportSimulation("sim-bad", *this->circuit, badResult);
+				LOG(FATAL) << "The test pattern " << patternIndex << " does not propagate the fault "
+					<< faultIndex << " (" + to_string(*fault) << ")" << std::endl
+					<< Helper::DebugFaultLocation<Helper::DebugSimulationGoodBad, FaultModel>(
+						{ fault }, *this->circuit, goodResult, badResult, goodResult, badResult) << std::endl
+					<< Helper::DebugSimulation<Helper::DebugSimulationGoodBad>(
+						*this->circuit, goodResult, badResult, goodResult, badResult);
 			}
 
 			nextFault:
@@ -1561,25 +1729,32 @@ bool AtpgBase<FaultModel, FaultList>::CheckSensitization(const FaultModel& fault
 	else if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
 	{
 		const auto& fault { faultModel.GetFault() };
-		for (const auto& alternative : fault->GetAlternatives())
+		const auto& stateMachine { fault->GetStateMachine() };
+
+		size_t currentState { 0u };
+		for (size_t timeframeId { 0u }; timeframeId < goodResult.GetNumberOfTimeframes(); timeframeId++)
 		{
-			for (size_t timeframeId { 0u }; timeframeId < goodResult.GetNumberOfTimeframes(); timeframeId++)
+			size_t nextState { 0u };
+			for (auto const& transition : stateMachine.GetState(currentState).GetTransitions())
 			{
-				// Not enough timeframes left to be able to fulfill conditions
-				bool satisfied { (timeframeId + alternative.conditions[0].logicConstraints.size()) <= goodResult.GetNumberOfTimeframes() };
-				for (const auto& condition : alternative.conditions)
+				bool satisfied = true;
+				for (auto& [nodeAndPort, constraint] : transition.GetInputs())
 				{
-					if (!satisfied) { break; }
-					for (size_t index { 0u }; index < alternative.conditions[0].logicConstraints.size(); index++)
-					{
-						if (!satisfied) { break; }
-						auto const targetNodeId { mappedCircuit.GetDriverForPort(condition.nodeAndPort)->GetNodeId() };
-						auto const goodValue { goodResult[timeframeId + index][targetNodeId] };
-						satisfied &= IsConstraintTrueForLogic(goodValue, condition.logicConstraints[index]);
-					}
+					auto const targetNodeId { mappedCircuit.GetDriverForPort(nodeAndPort)->GetNodeId() };
+					auto const goodValue { goodResult[timeframeId][targetNodeId] };
+					satisfied &= IsConstraintTrueForLogic(goodValue, constraint);
 				}
-				if (satisfied) { return true; }
+				if (__builtin_expect(satisfied, false))
+				{
+					if (transition.IsAccepting())
+					{
+						return true;
+					}
+					nextState = transition.GetTargetState();
+					break;
+				}
 			}
+			currentState = nextState;
 		}
 		return false;
 	}
@@ -1618,12 +1793,12 @@ std::vector<Fault::FaultStatus> AtpgBase<FaultModel, FaultList>::CheckCombinatio
 	{
 		if (faultMask[index])
 		{
-			std::atomic_store_explicit(&faultStatus[index], Fault::FaultStatus::FAULT_STATUS_UNDETECTED, std::memory_order_release);
-			std::atomic_fetch_add_explicit(&untestableFaults, 1u, std::memory_order_release);
+			faultStatus[index].store(Fault::FaultStatus::FAULT_STATUS_UNDETECTED, std::memory_order_release);
+			untestableFaults.fetch_add(1u, std::memory_order_release);
 		}
 		else
 		{
-			std::atomic_store_explicit(&faultStatus[index], Fault::FaultStatus::FAULT_STATUS_UNCLASSIFIED, std::memory_order_release);
+			faultStatus[index].store(Fault::FaultStatus::FAULT_STATUS_UNCLASSIFIED, std::memory_order_release);
 		}
 	}
 
@@ -1638,7 +1813,7 @@ std::vector<Fault::FaultStatus> AtpgBase<FaultModel, FaultList>::CheckCombinatio
 	print_status();
 
 	const auto check_testability = [&](size_t faultIndex) -> void {
-		if (std::atomic_load_explicit(&faultStatus[faultIndex], std::memory_order_acquire) == Fault::FaultStatus::FAULT_STATUS_DETECTED)
+		if (faultStatus[faultIndex].load(std::memory_order_acquire) == Fault::FaultStatus::FAULT_STATUS_DETECTED)
 		{
 			return;
 		}
@@ -1654,8 +1829,7 @@ std::vector<Fault::FaultStatus> AtpgBase<FaultModel, FaultList>::CheckCombinatio
 		auto logicGenerator = std::make_shared<Tpg::LogicGenerator<PinData>>(satSolver, this->circuit);
 
 		logicGenerator->template EmplaceModule<FaultGenerator>(faultModel);
-		auto faultTagger = logicGenerator->template EmplaceModule<FaultTagger>(faultModel);
-		faultTagger->SetTaggingMode(FaultTaggerMode::FullScan);
+		logicGenerator->template EmplaceModule<FaultTagger>(faultModel)->SetTaggingMode(FaultTaggerMode::Functional);
 
 		// Basic circuit encoding for single timeframe of combinational testability check.
 		logicGenerator->template EmplaceModule<Tpg::InputLogicEncoder<PinData, GoodTag>>(LogicConstraint::ONLY_LOGIC_01X);
@@ -1666,22 +1840,30 @@ std::vector<Fault::FaultStatus> AtpgBase<FaultModel, FaultList>::CheckCombinatio
 		logicGenerator->template EmplaceModule<Tpg::SequentialInputLogicEncoder<PinData, BadTag>>(LogicConstraint::ONLY_LOGIC_01X);
 		logicGenerator->template EmplaceModule<Tpg::SequentialOutputLogicEncoder<PinData, GoodTag>>(Basic::MakeUnclockedSetResetFlipFlopModel());
 		logicGenerator->template EmplaceModule<Tpg::SequentialOutputLogicEncoder<PinData, BadTag>>(Basic::MakeUnclockedSetResetFlipFlopModel());
+		logicGenerator->template EmplaceModule<Tpg::SequentialConnectionEncoder<PinData, GoodTag>>();
+		logicGenerator->template EmplaceModule<Tpg::SequentialConnectionEncoder<PinData, BadTag>>();
 		logicGenerator->template EmplaceModule<Tpg::OutputLogicEncoder<PinData, GoodTag>>();
 		logicGenerator->template EmplaceModule<Tpg::OutputLogicEncoder<PinData, BadTag>>();
+		if constexpr (has_diff_encoding_v<PinData>) logicGenerator->template EmplaceModule<Tpg::DChainCircuitTagger<PinData>>();
 
 		// Additional constraints for test generation where the fault effect has to be sensitized (difference at fault location)
 		// and propagated (difference at primary or secondary circuit output).
 		logicGenerator->template EmplaceModule<Tpg::PortConstraintEncoder<PinData, LDiffTag>>(Tpg::MakeConstantPortConstraint(Logic::LOGIC_ZERO), Tpg::ConstrainedPorts::Inputs);
+		logicGenerator->template EmplaceModule<Tpg::SequentialConstraintEncoder<PinData, LDiffTag>>(Tpg::MakeConstantSequentialInitializer(Logic::LOGIC_ZERO), Tpg::ConstrainedSequentials::Inputs);
 		logicGenerator->template EmplaceModule<FaultSensitization>(faultModel, FaultSensitizationTimeframe::Any);
-		logicGenerator->template EmplaceModule<Tpg::FaultPropagationConstraintEncoder<PinData>>(Tpg::FaultPropagationTarget::PrimaryAndSecondaryOutputs, Tpg::FaultPropagationTimeframe::Last);
+		logicGenerator->template EmplaceModule<Tpg::FaultPropagationConstraintEncoder<PinData>>(Tpg::FaultPropagationTarget::PrimaryAndSecondaryOutputs, Tpg::FaultPropagationTimeframe::Any);
+		if constexpr (has_diff_encoding_v<PinData>) logicGenerator->template EmplaceModule<Tpg::DChainBaseEncoder<PinData>>();
+		if constexpr (has_diff_encoding_v<PinData>) logicGenerator->template EmplaceModule<Tpg::BackwardDChainEncoder<PinData>>();
+		if constexpr (has_diff_encoding_v<PinData>) logicGenerator->template EmplaceModule<Tpg::DChainSequentialConnectionEncoder<PinData>>();
 
 		logicGenerator->GetContext().SetNumberOfTimeframes(timeframes);
 		if (!logicGenerator->GenerateCircuitLogic())
 		{
+			// Can happen if the fault sensitization module concludes that there is no faul propagation possible
 			Fault::FaultStatus expected = Fault::FaultStatus::FAULT_STATUS_UNCLASSIFIED;
-			if (std::atomic_compare_exchange_strong_explicit(&faultStatus[faultIndex], &expected, Fault::FaultStatus::FAULT_STATUS_UNDETECTED, std::memory_order_acq_rel, std::memory_order_acquire))
+			if (faultStatus[faultIndex].compare_exchange_strong(expected, Fault::FaultStatus::FAULT_STATUS_UNDETECTED, std::memory_order_acq_rel, std::memory_order_acquire))
 			{
-				std::atomic_fetch_add_explicit(&untestableFaults, 1u, std::memory_order_acq_rel);
+				untestableFaults.fetch_add(1u, std::memory_order_acq_rel);
 			}
 			print_status();
 			return;
@@ -1693,16 +1875,16 @@ std::vector<Fault::FaultStatus> AtpgBase<FaultModel, FaultList>::CheckCombinatio
 		case Sat::SatResult::SAT:
 		{
 			Fault::FaultStatus expected = Fault::FaultStatus::FAULT_STATUS_UNCLASSIFIED;
-			if (std::atomic_compare_exchange_strong_explicit(&faultStatus[faultIndex], &expected, Fault::FaultStatus::FAULT_STATUS_DETECTED, std::memory_order_acq_rel, std::memory_order_acquire))
+			if (faultStatus[faultIndex].compare_exchange_strong(expected, Fault::FaultStatus::FAULT_STATUS_DETECTED, std::memory_order_acq_rel, std::memory_order_acquire))
 			{
-				std::atomic_fetch_add_explicit(&testableFaults, 1u, std::memory_order_acq_rel);
+				testableFaults.fetch_add(1u, std::memory_order_acq_rel);
 			}
 
 			auto const& mappedCircuit = this->circuit->GetMappedCircuit();
 			auto pattern = Tpg::Extractor::ExtractTestPattern<PinData, GoodTag>(logicGenerator->GetContext(), Pattern::InputCapture::PrimaryAndSecondaryInputs);
 
 			SimulationConfig simConfig { MakeSimulationConfig(Basic::MakeUnclockedSetResetFlipFlopModel()) };
-			simConfig.sequentialMode = Simulation::SequentialMode::FullScan;
+			simConfig.sequentialMode = Simulation::SequentialMode::Functional;
 
 			SimulationResult goodResult(pattern.GetNumberOfTimeframes(), mappedCircuit.GetNumberOfNodes());
 			SimulateTestPatternEventDriven<Fault::FaultFreeModel>(mappedCircuit, pattern, {}, goodResult, simConfig);
@@ -1713,7 +1895,7 @@ std::vector<Fault::FaultStatus> AtpgBase<FaultModel, FaultList>::CheckCombinatio
 				for (size_t faultIndex = begin; faultIndex != end; ++faultIndex)
 				{
 					// Check for already detected faults if not SimulateAllFaults option is enabled
-					if (std::atomic_load_explicit(&faultStatus[faultIndex], std::memory_order_acquire) == Fault::FaultStatus::FAULT_STATUS_DETECTED)
+					if (faultStatus[faultIndex].load(std::memory_order_acquire) == Fault::FaultStatus::FAULT_STATUS_DETECTED)
 					{
 						continue;
 					}
@@ -1745,16 +1927,16 @@ std::vector<Fault::FaultStatus> AtpgBase<FaultModel, FaultList>::CheckCombinatio
 							if (__builtin_expect(has_difference(mappedCircuit.GetPrimaryOutput(index), timeframe), false))
 							{
 								Fault::FaultStatus expected = Fault::FaultStatus::FAULT_STATUS_UNCLASSIFIED;
-								if (std::atomic_compare_exchange_strong_explicit(&faultStatus[faultIndex], &expected, Fault::FaultStatus::FAULT_STATUS_DETECTED, std::memory_order_acq_rel, std::memory_order_acquire))
+								if (faultStatus[faultIndex].compare_exchange_strong(expected, Fault::FaultStatus::FAULT_STATUS_DETECTED, std::memory_order_acq_rel, std::memory_order_acquire))
 								{
-									std::atomic_fetch_add_explicit(&testableFaults, 1u, std::memory_order_acq_rel);
+									testableFaults.fetch_add(1u, std::memory_order_acq_rel);
 								}
 
 								expected = Fault::FaultStatus::FAULT_STATUS_EXTENDED;
-								if (std::atomic_compare_exchange_strong_explicit(&faultStatus[faultIndex], &expected, Fault::FaultStatus::FAULT_STATUS_DETECTED, std::memory_order_acq_rel, std::memory_order_acquire))
+								if (faultStatus[faultIndex].compare_exchange_strong(expected, Fault::FaultStatus::FAULT_STATUS_DETECTED, std::memory_order_acq_rel, std::memory_order_acquire))
 								{
-									std::atomic_fetch_sub_explicit(&timeouts, 1u, std::memory_order_acq_rel);
-									std::atomic_fetch_add_explicit(&testableFaults, 1u, std::memory_order_acq_rel);
+									timeouts.fetch_sub(1u, std::memory_order_acq_rel);
+									testableFaults.fetch_add(1u, std::memory_order_acq_rel);
 								}
 								goto nextFault;
 							}
@@ -1765,16 +1947,16 @@ std::vector<Fault::FaultStatus> AtpgBase<FaultModel, FaultList>::CheckCombinatio
 							if (__builtin_expect(has_difference(mappedCircuit.GetSecondaryOutput(index), timeframe), false))
 							{
 								Fault::FaultStatus expected = Fault::FaultStatus::FAULT_STATUS_UNCLASSIFIED;
-								if (std::atomic_compare_exchange_strong_explicit(&faultStatus[faultIndex], &expected, Fault::FaultStatus::FAULT_STATUS_DETECTED, std::memory_order_acq_rel, std::memory_order_acquire))
+								if (faultStatus[faultIndex].compare_exchange_strong(expected, Fault::FaultStatus::FAULT_STATUS_DETECTED, std::memory_order_acq_rel, std::memory_order_acquire))
 								{
-									std::atomic_fetch_add_explicit(&testableFaults, 1u, std::memory_order_acq_rel);
+									testableFaults.fetch_add(1u, std::memory_order_acq_rel);
 								}
 
 								expected = Fault::FaultStatus::FAULT_STATUS_EXTENDED;
-								if (std::atomic_compare_exchange_strong_explicit(&faultStatus[faultIndex], &expected, Fault::FaultStatus::FAULT_STATUS_DETECTED, std::memory_order_acq_rel, std::memory_order_acquire))
+								if (faultStatus[faultIndex].compare_exchange_strong(expected, Fault::FaultStatus::FAULT_STATUS_DETECTED, std::memory_order_acq_rel, std::memory_order_acquire))
 								{
-									std::atomic_fetch_sub_explicit(&timeouts, 1u, std::memory_order_acq_rel);
-									std::atomic_fetch_add_explicit(&testableFaults, 1u, std::memory_order_acq_rel);
+									timeouts.fetch_sub(1u, std::memory_order_acq_rel);
+									testableFaults.fetch_add(1u, std::memory_order_acq_rel);
 								}
 								goto nextFault;
 							}
@@ -1794,9 +1976,9 @@ std::vector<Fault::FaultStatus> AtpgBase<FaultModel, FaultList>::CheckCombinatio
 		case Sat::SatResult::UNKNOWN:
 		{
 			Fault::FaultStatus expected = Fault::FaultStatus::FAULT_STATUS_UNCLASSIFIED;
-			if (std::atomic_compare_exchange_strong_explicit(&faultStatus[faultIndex], &expected, Fault::FaultStatus::FAULT_STATUS_EXTENDED, std::memory_order_acq_rel, std::memory_order_acquire))
+			if (faultStatus[faultIndex].compare_exchange_strong(expected, Fault::FaultStatus::FAULT_STATUS_EXTENDED, std::memory_order_acq_rel, std::memory_order_acquire))
 			{
-				std::atomic_fetch_add_explicit(&timeouts, 1u, std::memory_order_acq_rel);
+				timeouts.fetch_add(1u, std::memory_order_acq_rel);
 			}
 			print_status();
 			return;
@@ -1805,9 +1987,9 @@ std::vector<Fault::FaultStatus> AtpgBase<FaultModel, FaultList>::CheckCombinatio
 		case Sat::SatResult::UNSAT:
 		{
 			Fault::FaultStatus expected = Fault::FaultStatus::FAULT_STATUS_UNCLASSIFIED;
-			if (std::atomic_compare_exchange_strong_explicit(&faultStatus[faultIndex], &expected, Fault::FaultStatus::FAULT_STATUS_UNDETECTED, std::memory_order_acq_rel, std::memory_order_acquire))
+			if (faultStatus[faultIndex].compare_exchange_strong(expected, Fault::FaultStatus::FAULT_STATUS_UNDETECTED, std::memory_order_acq_rel, std::memory_order_acquire))
 			{
-				std::atomic_fetch_add_explicit(&untestableFaults, 1u, std::memory_order_acq_rel);
+				untestableFaults.fetch_add(1u, std::memory_order_acq_rel);
 			}
 			print_status();
 			return;
@@ -1821,7 +2003,7 @@ std::vector<Fault::FaultStatus> AtpgBase<FaultModel, FaultList>::CheckCombinatio
 	std::vector<Fault::FaultStatus> result(faultList.size(), Fault::FaultStatus::FAULT_STATUS_UNCLASSIFIED);
 	for (size_t index { faultListBegin }; index != faultListEnd; ++index)
 	{
-		auto status = std::atomic_load_explicit(&faultStatus[index], std::memory_order_acquire);
+		auto status =  faultStatus[index].load(std::memory_order_acquire);
 		if (status == Fault::FaultStatus::FAULT_STATUS_DETECTED || status == Fault::FaultStatus::FAULT_STATUS_UNDETECTED)
 		{
 			result[index] = status;
@@ -1938,106 +2120,75 @@ void AtpgBase<FaultModel, FaultList>::ExportTestPatterns(Pattern::InputCapture c
 template <typename FaultModel, typename FaultList>
 void AtpgBase<FaultModel, FaultList>::ExportFaultList(void) const
 {
-	FaultList faultListWithEquivalent;
-	for (size_t index = 0; index < fullFaultList.size(); index++)
 	{
-		auto faultIndex = faultMapping[index];
-		if (faultIndex != Fault::REMOVED_FAULT)
+		FileHandle faultListHandle("[DataExportDirectory]/faults.json", false);
+		Io::FaultListExchangeFormat<FaultList> faultListExport { *this->circuit, faultList };
+		Io::ExportFaults(faultListHandle.GetOutStream(), faultListExport);
+	}
+
+	{
+		FaultList expandedFaultList;
+		for (size_t index = 0; index < fullFaultList.size(); index++)
 		{
-			faultListWithEquivalent.push_back(fullFaultList[index]);
-		}
-	}
-
-	FileHandle faultListHandle("[DataExportDirectory]/faults.json", false);
-	FileHandle faultListWithEquivalentHandle("[DataExportDirectory]/faults.all.json", false);
-	Io::FaultListExchangeFormat<FaultList> faultListExport { *this->circuit, faultList };
-	Io::FaultListExchangeFormat<FaultList> faultListWithEquivalentExport { *this->circuit, faultListWithEquivalent };
-	Io::ExportFaults(faultListHandle.GetOutStream(), faultListExport);
-	Io::ExportFaults(faultListWithEquivalentHandle.GetOutStream(), faultListWithEquivalentExport);
-}
-
-template <typename FaultModel, typename FaultList>
-std::string AtpgBase<FaultModel, FaultList>::DebugFaultLocation(const SimulationResult& atpgGoodResult, const SimulationResult& atpgBadResult, const SimulationResult& simGoodResult, const SimulationResult& simBadResult, size_t faultIndex) const
-{
-	// This function can be used to print additional information about the fault
-	if constexpr (std::is_same_v<FaultModel, Fault::SingleStuckAtFaultModel>)
-	{
-		return "";
-	}
-	else if constexpr (std::is_same_v<FaultModel, Fault::MultiStuckAtFaultModel>)
-	{
-		return "";
-	}
-	else if constexpr (std::is_same_v<FaultModel, Fault::CellAwareFaultModel>)
-	{
-		const auto& [fault, metaData] = faultList[faultIndex];
-
-		std::string retStr = "Fault Condition(s):\n";
-		for (const auto& [conditionNode, conditionPort] : fault->GetConditionNodesAndPorts())
-		{
-			size_t nodeId = conditionNode->GetDriverForPort(conditionPort)->GetNodeId();
-			retStr += "Condition @node id " + std::to_string(conditionNode->GetNodeId()) + " @" + to_string(conditionPort) + " (driver is node id " + std::to_string(nodeId) + "):\n";
-			std::string timeframeString = "timeframe:  ";
-			std::string atpgGoodString 	= "atpg good: ";
-			std::string atpgBadString 	= "atpg bad:  ";
-			std::string simGoodString 	= "sim good:  ";
-			std::string simBadString 	= "sim bad:   ";
-			std::string missMatchString = "missmatch: ";
-			for (size_t timeframe = 0u; timeframe < atpgGoodResult.GetNumberOfTimeframes(); ++timeframe)
+			auto [fault, metaData] = fullFaultList[index];
+			if (faultMapping[index] == Fault::REMOVED_FAULT)
 			{
-				bool missmatchGood = atpgGoodResult[timeframe][nodeId] != simGoodResult[timeframe][nodeId];
-				bool missmatchBad = atpgBadResult[timeframe][nodeId] != simBadResult[timeframe][nodeId];
-				timeframeString += std::to_string(timeframe) + " | ";
-				atpgGoodString += 	(missmatchGood 	? ">" : " ") + to_string(atpgGoodResult[timeframe][nodeId]) 	+ (missmatchGood 	? "<" : " ") + "|";
-				atpgBadString += 	(missmatchBad 	? ">" : " ") + to_string(atpgBadResult[timeframe][nodeId]) 	+ (missmatchBad 	? "<" : " ") + "|";
-				simGoodString += 	(missmatchGood 	? ">" : " ") + to_string(simGoodResult[timeframe][nodeId]) 	+ (missmatchGood 	? "<" : " ") + "|";
-				simBadString += 	(missmatchBad 	? ">" : " ") + to_string(simBadResult[timeframe][nodeId]) 	+ (missmatchBad 	? "<" : " ") + "|";
-				missMatchString += std::string((missmatchGood || missmatchBad) ? "!!!" : "___") + "|";
+				// Write the original fault metadata
+				expandedFaultList.emplace_back(fault, metaData);
 			}
-			retStr += timeframeString + "\n" + atpgGoodString + "\n" + atpgBadString + "\n" + simGoodString + "\n" + simBadString + "\n" + missMatchString + "\n\n";
-		}
-
-		retStr += "\nFault Location(s):\n";
-		for (const auto& [effectNode, effectPort] : fault->GetEffectNodesAndPorts())
-		{
-			size_t nodeId = effectNode->GetNodeId();
-			retStr += "Effect node @node " + std::to_string(nodeId) + " @" + to_string(effectPort) + ":\n";
-			std::string timeframeString = "timeframe:  ";
-			std::string atpgGoodString 	= "atpg good: ";
-			std::string atpgBadString 	= "atpg bad:  ";
-			std::string simGoodString 	= "sim good:  ";
-			std::string simBadString 	= "sim bad:   ";
-			std::string missMatchString = "missmatch: ";
-			for (size_t timeframe = 0u; timeframe < atpgGoodResult.GetNumberOfTimeframes(); ++timeframe)
+			else
 			{
-				bool missmatchGood = atpgGoodResult[timeframe][nodeId] != simGoodResult[timeframe][nodeId];
-				bool missmatchBad = atpgBadResult[timeframe][nodeId] != simBadResult[timeframe][nodeId];
-				timeframeString += std::to_string(timeframe) + " | ";
-				atpgGoodString += 	(missmatchGood 	? ">" : " ") + to_string(atpgGoodResult[timeframe][nodeId]) 	+ (missmatchGood 	? "<" : " ") + "|";
-				atpgBadString += 	(missmatchBad 	? ">" : " ") + to_string(atpgBadResult[timeframe][nodeId]) 	+ (missmatchBad 	? "<" : " ") + "|";
-				simGoodString += 	(missmatchGood 	? ">" : " ") + to_string(simGoodResult[timeframe][nodeId]) 	+ (missmatchGood 	? "<" : " ") + "|";
-				simBadString += 	(missmatchBad 	? ">" : " ") + to_string(simBadResult[timeframe][nodeId]) 	+ (missmatchBad 	? "<" : " ") + "|";
-				missMatchString += std::string((missmatchGood || missmatchBad)
-										? "!!!"	: (atpgGoodResult[timeframe][nodeId] != atpgBadResult[timeframe][nodeId]) ? "EFF" : "___") + "|";
+				// Keep the original fault data but replace the meta data (fault status)
+				auto [reducedFault, reducedMetaData] = faultList[faultMapping[index]];
+				expandedFaultList.emplace_back(fault, reducedMetaData);
 			}
-			retStr += timeframeString + "\n" + atpgGoodString + "\n" + atpgBadString + "\n" + simGoodString + "\n" + simBadString + "\n" + missMatchString + "\n\n";
 		}
-		return retStr;
-	}
-	else
-	{
-		LOG(FATAL) << "Fault model not implemented";
-		__builtin_unreachable();
-	}
-}
 
-template<typename FaultModel, typename FaultList>
-void AtpgBase<FaultModel, FaultList>::DebugAtpgResult(const Simulation::SimulationResult& result, const Circuit::MappedCircuit& circuit, const std::string& name)
-{
-	FileHandle handleTrace { boost::str(boost::format("%s-trace.txt") % name), false };
-	FileHandle handleCompact { boost::str(boost::format("%s-compact.txt") % name), false };
-	handleTrace.GetOutStream() << to_string(result, circuit);
-	handleCompact.GetOutStream() << to_string(result);
+		FileHandle expandedFaultListHandle("[DataExportDirectory]/faults.all.json", false);
+		Io::FaultListExchangeFormat<FaultList> expandedFaultListExport { *this->circuit, expandedFaultList };
+		Io::ExportFaults(expandedFaultListHandle.GetOutStream(), expandedFaultListExport);
+	}
+
+	{
+		using ptree = boost::property_tree::ptree;
+		ptree faultMappingElements;
+		for (size_t index = 0; index < fullFaultList.size(); index++)
+		{
+			ptree faultMappingItem;
+			faultMappingItem.put("fault-id", index);
+
+			auto faultIndex = faultMapping[index];
+			if (faultIndex == Fault::REMOVED_FAULT)
+			{
+				faultMappingItem.put("status", "removed");
+			}
+			else if (to_string(*fullFaultList.GetFault(index)) != to_string(*faultList.GetFault(faultIndex)))
+			{
+				faultMappingItem.put("status", "eqivalent");
+				faultMappingItem.put("compacted-fault-id", faultIndex);
+			}
+			else
+			{
+				faultMappingItem.put("status", "kept");
+				faultMappingItem.put("compacted-fault-id", faultIndex);
+			}
+			faultMappingElements.push_back(std::make_pair("", faultMappingItem));
+		}
+
+		ptree faultMappingRoot;
+		faultMappingRoot.put_child("faults", faultMappingElements);
+		faultMappingRoot.put_child("circuit", Io::CreateCircuitGuard(*circuit));
+
+		try
+		{
+			FileHandle faultMappingHandle("[DataExportDirectory]/faults.all-to-compact.json", false);
+			boost::property_tree::write_json(faultMappingHandle.GetOutStream(), faultMappingRoot);
+		}
+		catch (boost::property_tree::json_parser_error& exception)
+		{
+			LOG(ERROR) << "Could not write json data: " << exception.what();
+		}
+	}
 }
 
 template class AtpgBase<SingleStuckAtFaultModel, SingleStuckAtFaultList>;
@@ -2045,12 +2196,12 @@ template class AtpgBase<SingleTransitionDelayFaultModel, SingleTransitionDelayFa
 template class AtpgBase<CellAwareFaultModel, CellAwareFaultList>;
 
 #define FOR_CONTAINER(CONTAINER) \
-	template void AtpgBase<SingleStuckAtFaultModel, SingleStuckAtFaultList>::ValidateAtpgResult(size_t faultIndex, Pattern::TestPattern& pattern, Pattern::OutputCapture capture, Tpg::LogicGenerator<PinDataGB<CONTAINER>>& logicGenerator, const SimulationConfig& simConfig) const; \
-	template void AtpgBase<SingleStuckAtFaultModel, SingleStuckAtFaultList>::ValidateAtpgResult(size_t faultIndex, Pattern::TestPattern& pattern, Pattern::OutputCapture capture, Tpg::LogicGenerator<PinDataGBD<CONTAINER>>& logicGenerator, const SimulationConfig& simConfig) const; \
-	template void AtpgBase<SingleTransitionDelayFaultModel, SingleTransitionDelayFaultList>::ValidateAtpgResult(size_t faultIndex, Pattern::TestPattern& pattern, Pattern::OutputCapture capture, Tpg::LogicGenerator<PinDataGB<CONTAINER>>& logicGenerator, const SimulationConfig& simConfig) const; \
-	template void AtpgBase<SingleTransitionDelayFaultModel, SingleTransitionDelayFaultList>::ValidateAtpgResult(size_t faultIndex, Pattern::TestPattern& pattern, Pattern::OutputCapture capture, Tpg::LogicGenerator<PinDataGBD<CONTAINER>>& logicGenerator, const SimulationConfig& simConfig) const; \
-	template void AtpgBase<CellAwareFaultModel, CellAwareFaultList>::ValidateAtpgResult(size_t faultIndex, Pattern::TestPattern& pattern, Pattern::OutputCapture capture, Tpg::LogicGenerator<PinDataGB<CONTAINER>>& logicGenerator, const SimulationConfig& simConfig) const; \
-	template void AtpgBase<CellAwareFaultModel, CellAwareFaultList>::ValidateAtpgResult(size_t faultIndex, Pattern::TestPattern& pattern, Pattern::OutputCapture capture, Tpg::LogicGenerator<PinDataGBD<CONTAINER>>& logicGenerator, const SimulationConfig& simConfig) const;
+	template void AtpgBase<SingleStuckAtFaultModel, SingleStuckAtFaultList>::ValidateAtpgResult(size_t faultIndex, const Pattern::TestPattern& pattern, Pattern::OutputCapture capture, Tpg::LogicGenerator<PinDataGB<CONTAINER>>& logicGenerator, const SimulationConfig& simConfig) const; \
+	template void AtpgBase<SingleStuckAtFaultModel, SingleStuckAtFaultList>::ValidateAtpgResult(size_t faultIndex, const Pattern::TestPattern& pattern, Pattern::OutputCapture capture, Tpg::LogicGenerator<PinDataGBD<CONTAINER>>& logicGenerator, const SimulationConfig& simConfig) const; \
+	template void AtpgBase<SingleTransitionDelayFaultModel, SingleTransitionDelayFaultList>::ValidateAtpgResult(size_t faultIndex, const Pattern::TestPattern& pattern, Pattern::OutputCapture capture, Tpg::LogicGenerator<PinDataGB<CONTAINER>>& logicGenerator, const SimulationConfig& simConfig) const; \
+	template void AtpgBase<SingleTransitionDelayFaultModel, SingleTransitionDelayFaultList>::ValidateAtpgResult(size_t faultIndex, const Pattern::TestPattern& pattern, Pattern::OutputCapture capture, Tpg::LogicGenerator<PinDataGBD<CONTAINER>>& logicGenerator, const SimulationConfig& simConfig) const; \
+	template void AtpgBase<CellAwareFaultModel, CellAwareFaultList>::ValidateAtpgResult(size_t faultIndex, const Pattern::TestPattern& pattern, Pattern::OutputCapture capture, Tpg::LogicGenerator<PinDataGB<CONTAINER>>& logicGenerator, const SimulationConfig& simConfig) const; \
+	template void AtpgBase<CellAwareFaultModel, CellAwareFaultList>::ValidateAtpgResult(size_t faultIndex, const Pattern::TestPattern& pattern, Pattern::OutputCapture capture, Tpg::LogicGenerator<PinDataGBD<CONTAINER>>& logicGenerator, const SimulationConfig& simConfig) const;
 INSTANTIATE_ALL_CONTAINER
 
 };

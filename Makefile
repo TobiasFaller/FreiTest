@@ -5,22 +5,22 @@ RUN_ARGS ?= --log-level=trace \
 	--CircuitName medium/benchmark1 \
 	--Settings ./settings/circuits/benchmarks/generated-generic.freitest.jsonc \
 	--Settings ./settings/workflows/scale4edge/tpg/stuck-at/atpg-stuckat-sat-fullscan.freitest.jsonc
-TEST_TARGET ?= $$(${BAZEL} query 'kind("test", //test:*)')
+TEST_TARGET ?= $$(${BAZEL} query 'kind("test", //test:*)' | tr '\n' ' ')
 TEST_ARGS ?= --log_level=all
 
-BAZEL ?= /bin/env bazel --client_debug --max_idle_secs=0
+BAZEL ?= /bin/env bazelisk --client_debug --max_idle_secs=0
 BAZEL_BUILD_ARGS ?=
 BAZEL_RUN_ARGS ?= --run_under="cd $$(pwd) && "
 BAZEL_TEST_ARGS ?= --test_output=all
 
-DOCKER_FILE ?= Dockerfile.ubuntu
+DOCKER_FILE ?= Dockerfile.ubuntu24
 DOCKER_TAG ?= latest
 DOCKER_TARGET ?= runner
 DOCKER_BUILD_TESTS ?= yes
 DOCKER_RUN_TESTS ?= yes
 
 .SUFFIXES:
-.PHONY: all help build run test docker/build docker/run docker/package docker/image docker/sysroot clean mrproper public
+.PHONY: all help build run test docker/build docker/run docker/package docker/image docker/sysroot clean mrproper
 
 all: help
 
@@ -130,16 +130,3 @@ docker_sysroot: docker_build
 				| grep -v -E '\''boot|dev|export|init|lost\+found|media|mnt|proc|run|sys|tmp'\'') \
 			| pigz -9 > /export/${PACKAGE_NAME}'
 
-public:
-	# Publishes FreiTest to public git repository
-	mkdir -p public; true
-	(git --git-dir=public/.git --work-tree=public clone git@github.com:TobiasFaller/FreiTest.git \
-		|| (git --git-dir=public/.git --work-tree=public fetch --all \
-			&& git --git-dir=public/.git --work-tree=public rebase origin/main)) \
-		&& git --git-dir=public/.git --work-tree=public reset --hard HEAD
-	rm -rf public/*; true
-	python3 scripts/copy_files.py --config public.txt --source . --destination public
-	find public -type d -exec chmod 755 {} \;
-	find public -type f -exec chmod 644 {} \;
-	cd public; git add .
-	cd public; git -c core.pager=cat diff --cached --summary

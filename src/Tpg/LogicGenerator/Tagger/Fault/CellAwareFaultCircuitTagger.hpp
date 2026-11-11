@@ -12,7 +12,7 @@ namespace FreiTest
 namespace Tpg
 {
 
-enum class CellAwareFaultTaggingMode { FullScan, Functional };
+enum class CellAwareFaultTaggingMode { Independent, Functional };
 
 template<typename PinData>
 class CellAwareFaultCircuitTagger: public ICircuitTagger<PinData>

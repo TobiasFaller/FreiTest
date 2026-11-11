@@ -104,9 +104,20 @@ Cell-Aware Fault Model:
   - Default: 0 (From the start)
 - `Scale4Edge/TestPatternGeneration/FaultEndIndex <index: uint>`: The end index of the fault in the fault list where the ATPG should start.
   - Default: (2^64)-1 (INT_MAX) (Till the end)
-- `Scale4Edge/TestPatternGeneration/FaultListFilter <filter: string>`: A regex to apply as filter to the fault list. Faults that don't match the filter are removed (applied before FaultListExclude)
+- `Scale4Edge/TestPatternGeneration/FaultListFilter <filter: string>`: A regex to apply as filter to the fault list. Faults that don't match the filter are removed (applied after FaultListReduce, but before FaultListExclude)
   - Default ".*"
 - `Scale4Edge/TestPatternGeneration/FaultListExclude <filter: string>`: A regex to apply as exclusion filter to the fault list. Faults that match the filter are removed (applied after FaultListFilter)
+  - Default ""
+- `Scale4Edge/TestPatternGeneration/FaultListReduce <reductions: options>`: Reduce the fault list by removing groups of unwanted faults (applied before FaultListFilter)
+  - `Original`: Keep all original faults and reset all reduction options to inactive.
+  - `RemoveEquivalent`: Enable removal of equivalent faults (only stuck-at / transition-delay faults).
+  - `RemoveCellInternal`: Enable removal of cell-internal faults (only stuck-at / transition-delay faults).
+  - `RemoveSequentialClock`: Enable removal of faults that are located at sequential clock inputs (only stuck-at / transition-delay faults).
+  - `RemoveSequentialSetReset`: Enable removal of faults that are located at sequential set / reset inputs (only stuck-at / transition-delay faults).
+  - `RemoveConnectedToDontCare`: Enable removal of faults that are driven by DON'T CARE constants (only stuck-at / transition-delay faults).
+  - `RemoveConnectedToUnknown`: Enable removal of faults that are driven by UNKNOWN constants (only stuck-at / transition-delay faults).
+  - `RemoveCircuitPort`: Enable removal of faults that are located at inputs and outputs of the circuit (only stuck-at / transition-delay faults).
+  - Default: `RemoveEquivalent` (stuck-at / transition-delay faults), `Original` (cell-aware faults)
 - `Scale4Edge/TestPatternGeneration/FaultSimulation <options>` Sets the simulation of generated test patterns for all unclassified faults.
   - `Disabled`: Only simulate the test pattern for the single targeted fault
   - `Enabled`: Simulate the test pattern for all unclassified faults

@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
-#include <execution>
+#if __has_include(<execution>)
+# include <execution>
+#endif
 #include <random>
 #include <vector>
 #include <type_traits>

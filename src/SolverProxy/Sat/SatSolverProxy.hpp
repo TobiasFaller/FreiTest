@@ -29,6 +29,7 @@ enum class SatSolver
 	DEBUG_MAX_SAT,
 	EXPORT_SAT_DIMACS,
 	EXPORT_MAX_SAT_DIMACS,
+	EXTERNAL_ARBITRARY_SOLVER
 };
 
 enum class DebugProxy
@@ -45,7 +46,7 @@ enum class SatResult
 };
 
 class SatSolverProxy:
-	public ISolverProxy
+	public virtual ISolverProxy
 {
 public:
 	SatSolverProxy(SatSolver solver);

@@ -116,9 +116,6 @@ aiger_version (void)
 #define IMPORT_private_FROM(p) \
   aiger_private * private = (aiger_private*) (p)
 
-#define IMPORT_const_private_FROM(p) \
-  aiger_private const * private = (aiger_private*) (p)
-
 #define EXPORT_public_FROM(p) \
   aiger * public = &(p)->public
 
@@ -256,7 +253,9 @@ aiger_delete_str (aiger_private * private, char *str)
 static char *
 aiger_copy_str (aiger_private * private, const char *str)
 {
-  char *res;  if (!str)
+  char *res;
+
+  if (!str || !str[0])
     return 0;
 
   NEWN (res, strlen (str) + 1);
@@ -421,6 +420,7 @@ aiger_add_reset (aiger * public, unsigned lit, unsigned reset)
 {
   IMPORT_private_FROM (public);
   aiger_type * type;
+  assert (reset <= 1 || reset == lit);
   assert (!aiger_error (public));
   assert (lit);
   assert (!aiger_sign (lit));
@@ -638,9 +638,9 @@ aiger_error_usu (aiger_private * private,
 }
 
 const char *
-aiger_error (aiger const * public)
+aiger_error (aiger * public)
 {
-  IMPORT_const_private_FROM (public);
+  IMPORT_private_FROM (public);
   return private->error;
 }
 
@@ -930,18 +930,6 @@ aiger_default_get (FILE * file)
 }
 
 static int
-aiger_string_get (const char **str)
-{
-    char c = **str;
-
-    if (c == '\0')
-        return EOF;
-
-    ++*str;
-    return c;
-}
-
-static int
 aiger_default_put (char ch, FILE * file)
 {
   return putc ((unsigned char) ch, file);
@@ -1203,6 +1191,8 @@ aiger_write_symbols_aux (aiger * public,
       if (!symbols[i].name)
 	continue;
 
+      assert (symbols[i].name[0]);
+
       if (aiger_put_s (state, put, type) == EOF ||
 	  aiger_put_u (state, put, i) == EOF ||
 	  put (' ', state) == EOF ||
@@ -1307,7 +1297,7 @@ aiger_write_ascii (aiger * public, void *state, aiger_put put)
 }
 
 static unsigned
-aiger_max_input_or_latch (aiger const * public)
+aiger_max_input_or_latch (aiger * public)
 {
   unsigned i, tmp, res;
 
@@ -1333,7 +1323,7 @@ aiger_max_input_or_latch (aiger const * public)
 }
 
 int
-aiger_is_reencoded (aiger const * public)
+aiger_is_reencoded (aiger * public)
 {
   unsigned i, tmp, max, lhs;
   aiger_and *and;
@@ -2679,13 +2669,6 @@ aiger_read_from_file (aiger * public, FILE * file)
 }
 
 const char *
-aiger_read_from_string (aiger * public, const char *str)
-{
-    assert (!aiger_error (public));
-    return aiger_read_generic (public, &str, (aiger_get) aiger_string_get);
-}
-
-const char *
 aiger_open_and_read_from_file (aiger * public, const char *file_name)
 {
   IMPORT_private_FROM (public);
@@ -2734,9 +2717,9 @@ aiger_open_and_read_from_file (aiger * public, const char *file_name)
 }
 
 const char *
-aiger_get_symbol (aiger const * public, unsigned lit)
+aiger_get_symbol (aiger * public, unsigned lit)
 {
-  IMPORT_const_private_FROM (public);
+  IMPORT_private_FROM (public);
   aiger_symbol *symbol;
   aiger_type *type;
   unsigned var;
@@ -2761,9 +2744,9 @@ aiger_get_symbol (aiger const * public, unsigned lit)
 }
 
 static aiger_type *
-aiger_lit2type (aiger const * public, unsigned lit)
+aiger_lit2type (aiger * public, unsigned lit)
 {
-  IMPORT_const_private_FROM (public);
+  IMPORT_private_FROM (public);
   aiger_type *type;
   unsigned var;
 
@@ -2775,7 +2758,7 @@ aiger_lit2type (aiger const * public, unsigned lit)
 }
 
 int
-aiger_lit2tag (aiger const * public, unsigned lit)
+aiger_lit2tag (aiger * public, unsigned lit) 
 {
   aiger_type * type;
   lit = aiger_strip (lit);
@@ -2787,7 +2770,7 @@ aiger_lit2tag (aiger const * public, unsigned lit)
 }
 
 aiger_symbol *
-aiger_is_input (aiger const * public, unsigned lit)
+aiger_is_input (aiger * public, unsigned lit)
 {
   aiger_type *type;
   aiger_symbol *res;
@@ -2803,7 +2786,7 @@ aiger_is_input (aiger const * public, unsigned lit)
 }
 
 aiger_symbol *
-aiger_is_latch (aiger const * public, unsigned lit)
+aiger_is_latch (aiger * public, unsigned lit)
 {
   aiger_symbol *res;
   aiger_type *type;
@@ -2819,7 +2802,7 @@ aiger_is_latch (aiger const * public, unsigned lit)
 }
 
 aiger_and *
-aiger_is_and (aiger const * public, unsigned lit)
+aiger_is_and (aiger * public, unsigned lit)
 {
   aiger_type *type;
   aiger_and *res;

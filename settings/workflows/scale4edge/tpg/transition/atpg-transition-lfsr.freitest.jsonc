@@ -1,5 +1,5 @@
 [
-	{"application": "SCALE4EDGE_LFSR_TRANSITION_ATPG"},
+	{"application": "SCALE4EDGE_LFSR_TRANSITION_DELAY_ATPG"},
 
 	{"define": "OutputDir", "value": "./output"},
 	{"setting": "DataExportDirectory", "value": "[OutputDir]/Lfsr_[Circuit]"},

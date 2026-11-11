@@ -101,8 +101,8 @@ void TestPatternsToStatistics<FaultModel, FaultList>::Run(void)
 		switch (inputCapture)
 		{
 		case Pattern::InputCapture::PrimaryInputsOnly: return Simulation::SequentialMode::Functional;
-		case Pattern::InputCapture::SecondaryInputsOnly: return Simulation::SequentialMode::FullScan;
-		case Pattern::InputCapture::PrimaryAndSecondaryInputs: return Simulation::SequentialMode::FullScan;
+		case Pattern::InputCapture::SecondaryInputsOnly: return Simulation::SequentialMode::Independent;
+		case Pattern::InputCapture::PrimaryAndSecondaryInputs: return Simulation::SequentialMode::Independent;
 		case Pattern::InputCapture::PrimaryAndInitialSecondaryInputs: return Simulation::SequentialMode::Functional;
 		default: Logging::Panic();
 		}

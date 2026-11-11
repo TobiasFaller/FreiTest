@@ -14,7 +14,7 @@ namespace FreiTest
 namespace Simulation
 {
 
-enum class SequentialMode { FullScan, Functional };
+enum class SequentialMode { Independent, Functional };
 
 struct SimulationConfig
 {

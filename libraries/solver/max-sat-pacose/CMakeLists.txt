@@ -45,9 +45,6 @@ target_link_libraries(Pacose PRIVATE
   z
 )
 
-target_compile_options(Pacose PRIVATE -fsanitize=address -fno-omit-frame-pointer)
-target_link_options(Pacose PRIVATE -fsanitize=address -fno-omit-frame-pointer)
-
 set(CMAKE_CTEST_ARGUMENTS -V --output-on-failure)
 enable_testing()
 add_test(NAME RegressionSuite COMMAND ${PROJECT_SOURCE_DIR}/MaxSATRegressionSuite/run_tests.sh -s ${PROJECT_SOURCE_DIR}/bin/Pacose)

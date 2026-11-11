@@ -1,0 +1,22 @@
+[
+	{"include": "./repeatable-constant-switching-activity-maximization-ri5cy.jsonc"},
+
+	{"setting": "SatSolver", "value": "PROD_MAX_SAT_INC_BMO_COMPLETE"},
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/MaxSATSolverSetting", "value": "OLL"},
+
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/StressTargetCells", "value": "ExcludeCellNets"},
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/StressTargetSubmodules", "value": "IncludeSubmodules"},
+
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/Timeframes", "value": "8"},
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/FirstTimeframeOfStateA", "value": "5"},
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/FirstTimeframeOfStateB", "value": "6"},
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/FirstTimeframeOfStateC", "value": "7"},
+
+	{"setting": "Scale4Edge/TestPatternGeneration/VcmTag", "value": "load_store_unit"},
+	{"setting": "Scale4Edge/TestPatternGeneration/VcmParameter", "value" : "mode_of_operation=10"},
+	{"setting": "Scale4Edge/TestPatternGeneration/VcmParameter", "value" : "hard_reset=1"},
+
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/StressTargetHierarchyName", "value":"riscv_top/load_store_unit_i"},
+	{"setting": "PoliTO/RepeatableConstantSwitchingStimuliGeneration/LiteralDChainOptimization", "value" : "Yes"}
+]
+
